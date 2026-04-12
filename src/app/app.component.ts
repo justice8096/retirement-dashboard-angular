@@ -70,6 +70,18 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
+    }
+    /* Angular host elements must participate in flex layout */
+    app-context-bar {
+      flex-shrink: 0;
+    }
+    app-mock-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
     }
   `],
 })

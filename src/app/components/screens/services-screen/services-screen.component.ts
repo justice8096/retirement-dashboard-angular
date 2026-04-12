@@ -1,7 +1,8 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { LocationService } from '@services/location.service';
+import { NavigationService } from '@services/navigation.service';
 import { ApiService } from '@services/api.service';
-import { LocalService } from '@models/api.model';
+import { LocalService, LocationFull } from '@models/api.model';
 
 @Component({
   selector: 'app-services-screen',
@@ -16,16 +17,22 @@ import { LocalService } from '@models/api.model';
         </div>
       </div>
 
-      @if (loc.loading()) {
-        <div class="status-msg">Loading…</div>
+      @if (!selectedCities().length) {
+        <div class="empty-state">
+          <div class="empty-icon">📍</div>
+          <p>Select cities on the
+            <button class="link-btn" (click)="goToOverview()">Overview</button>
+            tab using the checkboxes, then come back to view their services.
+          </p>
+        </div>
       } @else {
-        <!-- Location selector -->
-        <div class="loc-pills">
-          @for (l of loc.fullLocations(); track l.id) {
-            <button class="loc-pill"
-              [class.active]="selectedId() === l.id"
-              (click)="select(l.id)">
-              {{ l.name }}
+        <!-- City tabs from selection -->
+        <div class="city-tabs">
+          @for (city of selectedCities(); track city.id) {
+            <button class="city-tab"
+              [class.active]="activeCity() === city.id"
+              (click)="selectCity(city.id)">
+              {{ city.name }}
             </button>
           }
         </div>
@@ -33,7 +40,6 @@ import { LocalService } from '@models/api.model';
         @if (isLoading()) {
           <div class="status-msg">Loading services…</div>
         } @else if (services().length) {
-          <!-- Group by category -->
           @for (group of grouped(); track group.category) {
             <div class="group-section">
               <h3 class="group-title">{{ group.category }}</h3>
@@ -62,9 +68,9 @@ import { LocalService } from '@models/api.model';
               </div>
             </div>
           }
-        } @else if (selectedId()) {
+        } @else if (activeCity()) {
           <!-- Fallback: healthcare + lifestyle from location data -->
-          @if (selectedLoc(); as sl) {
+          @if (activeLoc(); as sl) {
             <div class="fallback-card">
               <h3 class="fb-title">{{ sl.name }} — Available Info</h3>
               @if (sl.healthcare) {
@@ -91,7 +97,7 @@ import { LocalService } from '@models/api.model';
             </div>
           }
         } @else {
-          <div class="status-msg">Select a location above to view local services.</div>
+          <div class="status-msg">Select a city tab above to view its services.</div>
         }
       }
     </div>
@@ -103,14 +109,33 @@ import { LocalService } from '@models/api.model';
     .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
     .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
 
-    .loc-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-    .loc-pill {
-      padding: 6px 12px; font-size: 11px; border-radius: 6px; cursor: pointer;
-      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
-      color: var(--dark-text-sec); font-family: var(--font-sans); transition: all 0.15s;
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 60px 24px; color: var(--dark-text-muted);
     }
-    .loc-pill:hover { border-color: var(--dark-blue); }
-    .loc-pill.active { background: rgba(92, 156, 230, 0.12); border-color: var(--dark-blue); color: var(--dark-blue); font-weight: 600; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
+    .link-btn {
+      background: none; border: none; color: var(--dark-amber); cursor: pointer;
+      font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+
+    .city-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--dark-border); padding-bottom: 8px;
+    }
+    .city-tab {
+      padding: 6px 14px; font-size: 12px; border-radius: 6px 6px 0 0; cursor: pointer;
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-bottom: none; color: var(--dark-text-sec);
+      font-family: var(--font-sans); transition: all 0.15s;
+    }
+    .city-tab:hover { color: var(--dark-text); }
+    .city-tab.active {
+      background: var(--dark-bg-secondary); border-color: var(--dark-amber);
+      color: var(--dark-amber); font-weight: 600;
+    }
 
     .group-section { margin-top: 4px; }
     .group-title {
@@ -149,14 +174,21 @@ import { LocalService } from '@models/api.model';
 })
 export class ServicesScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
+  private readonly nav = inject(NavigationService);
   private readonly api = inject(ApiService);
 
-  readonly selectedId = signal<string | null>(null);
+  readonly activeCity = signal<string | null>(null);
   readonly services = signal<LocalService[]>([]);
   readonly isLoading = signal(false);
 
-  readonly selectedLoc = computed(() =>
-    this.loc.fullLocations().find(l => l.id === this.selectedId()) ?? null
+  /** Cities selected via checkboxes on Overview */
+  readonly selectedCities = computed(() => {
+    const ids = this.loc.selectedIds();
+    return this.loc.fullLocations().filter(l => ids.has(l.id));
+  });
+
+  readonly activeLoc = computed<LocationFull | null>(() =>
+    this.loc.fullLocations().find(l => l.id === this.activeCity()) ?? null
   );
 
   readonly grouped = computed(() => {
@@ -171,10 +203,15 @@ export class ServicesScreenComponent implements OnInit {
 
   ngOnInit(): void {
     this.loc.loadFull();
+    // Auto-select first checked city
+    const cities = this.selectedCities();
+    if (cities.length && !this.activeCity()) {
+      this.selectCity(cities[0].id);
+    }
   }
 
-  select(id: string): void {
-    this.selectedId.set(id);
+  selectCity(id: string): void {
+    this.activeCity.set(id);
     this.isLoading.set(true);
     this.services.set([]);
     this.api.getLocationSupplement(id, 'services').subscribe({
@@ -187,5 +224,10 @@ export class ServicesScreenComponent implements OnInit {
         this.isLoading.set(false);
       },
     });
+  }
+
+  goToOverview(): void {
+    this.nav.selectScreen('overview');
+    this.nav.selectCategory('locations');
   }
 }

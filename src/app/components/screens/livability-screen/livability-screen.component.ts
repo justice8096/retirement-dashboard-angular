@@ -1,15 +1,8 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { LocationService } from '@services/location.service';
+import { NavigationService } from '@services/navigation.service';
 import { ApiService } from '@services/api.service';
 import { InclusionSupplement, InclusionCategory } from '@models/api.model';
-
-interface LocLivability {
-  id: string;
-  name: string;
-  country: string;
-  data: InclusionSupplement | null;
-  loading: boolean;
-}
 
 @Component({
   selector: 'app-livability-screen',
@@ -24,70 +17,76 @@ interface LocLivability {
         </div>
       </div>
 
-      @if (loc.loading()) {
-        <div class="status-msg">Loading…</div>
+      @if (!selectedCities().length) {
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <p>Select cities on the
+            <button class="link-btn" (click)="goToOverview()">Overview</button>
+            tab using the checkboxes, then come back to view livability scores.
+          </p>
+        </div>
       } @else {
-        <!-- Location selector -->
-        <div class="loc-pills">
-          @for (item of locEntries(); track item.id) {
-            <button class="loc-pill"
-              [class.active]="selectedId() === item.id"
-              (click)="select(item.id)">
-              {{ item.name }}
+        <!-- City tabs from selection -->
+        <div class="city-tabs">
+          @for (city of selectedCities(); track city.id) {
+            <button class="city-tab"
+              [class.active]="activeCity() === city.id"
+              (click)="selectCity(city.id)">
+              {{ city.name }}
             </button>
           }
         </div>
 
-        @if (active(); as entry) {
-          @if (entry.loading) {
-            <div class="status-msg">Loading livability data for {{ entry.name }}…</div>
-          } @else if (!entry.data) {
-            <!-- Fallback: show lifestyle ratings from location data -->
-            <div class="fallback-card">
-              <p class="fb-hint">Detailed livability data not yet available for {{ entry.name }}.</p>
-              @if (getLifestyle(entry.id); as ls) {
-                <div class="ls-grid">
-                  <div class="ls-item"><span class="ls-label">Safety</span><span class="ls-val">{{ ls.safetyRating }}/10</span></div>
-                  <div class="ls-item"><span class="ls-label">Expat Community</span><span class="ls-val">{{ ls.expatCommunity }}/10</span></div>
-                  <div class="ls-item"><span class="ls-label">English</span><span class="ls-val">{{ ls.englishPrevalence }}/10</span></div>
-                  <div class="ls-item"><span class="ls-label">Dog Friendly</span><span class="ls-val">{{ ls.dogFriendly }}/10</span></div>
-                </div>
-              }
-            </div>
-          } @else {
-            @if (entry.data.overall) {
-              <div class="overall-card">
-                <div class="overall-score">{{ entry.data.overall.score }}<span class="out-of">/10</span></div>
-                <div class="overall-summary">{{ entry.data.overall.summary }}</div>
-              </div>
-            }
-
-            <div class="cat-grid">
-              @for (cat of livabilityCategories(entry.data); track cat.key) {
-                <div class="cat-card">
-                  <div class="cat-header">
-                    <span class="cat-name">{{ cat.label }}</span>
-                    <span class="cat-score" [class]="scoreClass(cat.cat.score)">{{ cat.cat.score }}/10</span>
-                  </div>
-                  <p class="cat-summary">{{ cat.cat.summary }}</p>
-                  @if (cat.cat.positiveFactors?.length) {
-                    <div class="factors">
-                      @for (f of cat.cat.positiveFactors; track f) {
-                        <span class="factor pos">✓ {{ f }}</span>
-                      }
-                    </div>
-                  }
-                  @if (cat.cat.riskFactors?.length) {
-                    <div class="factors">
-                      @for (f of cat.cat.riskFactors; track f) {
-                        <span class="factor neg">⚠ {{ f }}</span>
-                      }
-                    </div>
-                  }
-                </div>
-              }
+        @if (isLoading()) {
+          <div class="status-msg">Loading livability data…</div>
+        } @else if (activeData()) {
+          @if (activeData()!.overall) {
+            <div class="overall-card">
+              <div class="overall-score">{{ activeData()!.overall!.score }}<span class="out-of">/10</span></div>
+              <div class="overall-summary">{{ activeData()!.overall!.summary }}</div>
             </div>
           }
+
+          <div class="cat-grid">
+            @for (cat of livabilityCategories(activeData()!); track cat.key) {
+              <div class="cat-card">
+                <div class="cat-header">
+                  <span class="cat-name">{{ cat.label }}</span>
+                  <span class="cat-score" [class]="scoreClass(cat.cat.score)">{{ cat.cat.score }}/10</span>
+                </div>
+                <p class="cat-summary">{{ cat.cat.summary }}</p>
+                @if (cat.cat.positiveFactors?.length) {
+                  <div class="factors">
+                    @for (f of cat.cat.positiveFactors; track f) {
+                      <span class="factor pos">✓ {{ f }}</span>
+                    }
+                  </div>
+                }
+                @if (cat.cat.riskFactors?.length) {
+                  <div class="factors">
+                    @for (f of cat.cat.riskFactors; track f) {
+                      <span class="factor neg">⚠ {{ f }}</span>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        } @else if (activeCity()) {
+          <!-- Fallback: lifestyle ratings from location data -->
+          <div class="fallback-card">
+            <p class="fb-hint">Detailed livability data not yet available for this location.</p>
+            @if (activeLifestyle(); as ls) {
+              <div class="ls-grid">
+                <div class="ls-item"><span class="ls-label">Safety</span><span class="ls-val">{{ ls.safetyRating }}/10</span></div>
+                <div class="ls-item"><span class="ls-label">Expat Community</span><span class="ls-val">{{ ls.expatCommunity }}/10</span></div>
+                <div class="ls-item"><span class="ls-label">English</span><span class="ls-val">{{ ls.englishPrevalence }}/10</span></div>
+                <div class="ls-item"><span class="ls-label">Dog Friendly</span><span class="ls-val">{{ ls.dogFriendly }}/10</span></div>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="status-msg">Select a city tab above to view livability scores.</div>
         }
       }
     </div>
@@ -99,14 +98,33 @@ interface LocLivability {
     .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
     .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
 
-    .loc-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-    .loc-pill {
-      padding: 6px 12px; font-size: 11px; border-radius: 6px; cursor: pointer;
-      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
-      color: var(--dark-text-sec); font-family: var(--font-sans); transition: all 0.15s;
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 60px 24px; color: var(--dark-text-muted);
     }
-    .loc-pill:hover { border-color: var(--dark-blue); }
-    .loc-pill.active { background: rgba(92, 156, 230, 0.12); border-color: var(--dark-blue); color: var(--dark-blue); font-weight: 600; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
+    .link-btn {
+      background: none; border: none; color: var(--dark-amber); cursor: pointer;
+      font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+
+    .city-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--dark-border); padding-bottom: 8px;
+    }
+    .city-tab {
+      padding: 6px 14px; font-size: 12px; border-radius: 6px 6px 0 0; cursor: pointer;
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-bottom: none; color: var(--dark-text-sec);
+      font-family: var(--font-sans); transition: all 0.15s;
+    }
+    .city-tab:hover { color: var(--dark-text); }
+    .city-tab.active {
+      background: var(--dark-bg-secondary); border-color: var(--dark-amber);
+      color: var(--dark-amber); font-weight: 600;
+    }
 
     .overall-card {
       display: flex; align-items: center; gap: 16px;
@@ -149,47 +167,56 @@ interface LocLivability {
 })
 export class LivabilityScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
+  private readonly nav = inject(NavigationService);
   private readonly api = inject(ApiService);
 
-  readonly selectedId = signal<string | null>(null);
+  readonly activeCity = signal<string | null>(null);
   readonly dataMap = signal<Record<string, InclusionSupplement | null>>({});
-  readonly loadingSet = signal<Set<string>>(new Set());
+  readonly isLoading = signal(false);
 
-  readonly locEntries = computed<LocLivability[]>(() =>
-    this.loc.fullLocations().map(l => ({
-      id: l.id, name: l.name, country: l.country,
-      data: this.dataMap()[l.id] ?? null,
-      loading: this.loadingSet().has(l.id),
-    }))
-  );
+  /** Cities selected via checkboxes on Overview */
+  readonly selectedCities = computed(() => {
+    const ids = this.loc.selectedIds();
+    return this.loc.fullLocations().filter(l => ids.has(l.id));
+  });
 
-  readonly active = computed(() => {
-    const id = this.selectedId();
-    return id ? this.locEntries().find(e => e.id === id) ?? null : null;
+  readonly activeData = computed<InclusionSupplement | null>(() => {
+    const id = this.activeCity();
+    return id ? (this.dataMap()[id] ?? null) : null;
+  });
+
+  readonly activeLifestyle = computed(() => {
+    const id = this.activeCity();
+    return id ? (this.loc.fullLocations().find(l => l.id === id)?.lifestyle ?? null) : null;
   });
 
   ngOnInit(): void {
     this.loc.loadFull();
+    const cities = this.selectedCities();
+    if (cities.length && !this.activeCity()) {
+      this.selectCity(cities[0].id);
+    }
   }
 
-  select(id: string): void {
-    this.selectedId.set(id);
+  selectCity(id: string): void {
+    this.activeCity.set(id);
     if (this.dataMap()[id] !== undefined) return;
-    this.loadingSet.update(s => { const n = new Set(s); n.add(id); return n; });
+    this.isLoading.set(true);
     this.api.getLocationSupplement(id, 'inclusion').subscribe({
       next: (d) => {
         this.dataMap.update(m => ({ ...m, [id]: d as InclusionSupplement }));
-        this.loadingSet.update(s => { const n = new Set(s); n.delete(id); return n; });
+        this.isLoading.set(false);
       },
       error: () => {
         this.dataMap.update(m => ({ ...m, [id]: null }));
-        this.loadingSet.update(s => { const n = new Set(s); n.delete(id); return n; });
+        this.isLoading.set(false);
       },
     });
   }
 
-  getLifestyle(id: string) {
-    return this.loc.fullLocations().find(l => l.id === id)?.lifestyle ?? null;
+  goToOverview(): void {
+    this.nav.selectScreen('overview');
+    this.nav.selectCategory('locations');
   }
 
   livabilityCategories(data: InclusionSupplement): { key: string; label: string; cat: InclusionCategory }[] {

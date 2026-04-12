@@ -147,10 +147,14 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
     </div>
   `,
   styles: [`
-    .content-pane {
-      flex: 1;
+    :host {
       display: flex;
       flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .content-pane {
+      flex: 1;
       padding: 24px 16px 24px 24px;
       overflow-y: scroll;
       min-height: 0;
