@@ -1,8 +1,9 @@
 import {
   Component, inject, signal, computed, OnInit, OnDestroy,
-  ElementRef, viewChild, AfterViewInit,
+  ElementRef, viewChild, AfterViewInit, effect,
 } from '@angular/core';
 import { LocationService } from '@services/location.service';
+import { NavigationService } from '@services/navigation.service';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NeighborhoodsSupplement, Neighborhood, LocationFull } from '@models/api.model';
@@ -37,12 +38,6 @@ function geocodeCity(name: string): [number, number] | null {
   return CITY_COORDS[key] ?? null;
 }
 
-interface LocWithNeighborhoods {
-  loc: LocationFull;
-  supplement: NeighborhoodsSupplement | null;
-  loading: boolean;
-}
-
 @Component({
   selector: 'app-neighborhoods-screen',
   standalone: true,
@@ -52,7 +47,7 @@ interface LocWithNeighborhoods {
         <span class="header-icon">🏘️</span>
         <div>
           <h2 class="header-title">Neighborhoods</h2>
-          <p class="header-sub">Explore neighborhoods across {{ loc.fullLocations().length }} retirement destinations</p>
+          <p class="header-sub">Explore neighborhoods in your selected retirement destinations</p>
         </div>
       </div>
 
@@ -61,140 +56,143 @@ interface LocWithNeighborhoods {
         <div #mapEl class="map-container"></div>
       </div>
 
-      @if (loc.loading()) {
-        <div class="status-msg">Loading locations…</div>
+      @if (!selectedCities().length) {
+        <div class="empty-state">
+          <div class="empty-icon">📍</div>
+          <p>Select cities on the
+            <button class="link-btn" (click)="goToOverview()">Overview</button>
+            tab using the checkboxes, then come back to explore their neighborhoods.
+          </p>
+        </div>
       } @else {
-
-        <!-- Location selector -->
-        <div class="loc-pills">
-          @for (item of locEntries(); track item.loc.id) {
-            <button class="loc-pill"
-              [class.active]="selectedLocId() === item.loc.id"
-              (click)="selectLoc(item.loc.id)">
-              {{ item.loc.name }}
-              @if (item.supplement) {
-                <span class="pill-count">{{ item.supplement.neighborhoods.length }}</span>
+        <!-- City tabs from selection -->
+        <div class="city-tabs">
+          @for (city of selectedCities(); track city.id) {
+            <button class="city-tab"
+              [class.active]="activeCity() === city.id"
+              (click)="selectCity(city.id)">
+              {{ city.name }}
+              @if (supplementMap()[city.id]; as supp) {
+                <span class="pill-count">{{ supp.neighborhoods.length }}</span>
               }
             </button>
           }
         </div>
 
-        <!-- Neighborhood cards for selected location -->
-        @if (activeEntry(); as entry) {
-          @if (entry.loading) {
-            <div class="status-msg">Loading neighborhoods for {{ entry.loc.name }}…</div>
-          } @else if (!entry.supplement) {
-            <!-- Fallback: show location-level data -->
+        <!-- Neighborhood content -->
+        @if (isLoading()) {
+          <div class="status-msg">Loading neighborhoods…</div>
+        } @else if (activeSupplement()) {
+          <div class="nbh-header-row">
+            <h3 class="nbh-city">{{ activeSupplement()!.city }}</h3>
+            <span class="nbh-count">{{ activeSupplement()!.neighborhoods.length }} neighborhoods</span>
+          </div>
+          <div class="nbh-grid">
+            @for (nbh of activeSupplement()!.neighborhoods; track nbh.id) {
+              <div class="nbh-card">
+                <div class="nbh-top">
+                  <h4 class="nbh-name">{{ nbh.name }}</h4>
+                  <span class="nbh-safety" [class]="safetyClass(nbh.safetyRating)">{{ nbh.safetyRating }}</span>
+                </div>
+                <p class="nbh-desc">{{ nbh.description }}</p>
+                <div class="nbh-character">{{ nbh.character }}</div>
+
+                <div class="score-row">
+                  <div class="score">
+                    <span class="score-val">{{ nbh.walkabilityScore }}</span>
+                    <span class="score-label">Walk</span>
+                  </div>
+                  <div class="score">
+                    <span class="score-val">{{ nbh.transitScore }}</span>
+                    <span class="score-label">Transit</span>
+                  </div>
+                  <div class="score expat-score">
+                    <span class="score-val">{{ nbh.expats.communitySize }}</span>
+                    <span class="score-label">Expats</span>
+                  </div>
+                </div>
+
+                @if (nbh.housing) {
+                  <div class="housing-section">
+                    <div class="housing-row">
+                      @if (nbh.housing.avgRentOneBedroomEUR) {
+                        <div class="housing-item">
+                          <span class="h-label">1BR Rent</span>
+                          <span class="h-value">€{{ nbh.housing.avgRentOneBedroomEUR.toLocaleString() }}</span>
+                        </div>
+                      }
+                      @if (nbh.housing.avgRentTwoBedroomEUR) {
+                        <div class="housing-item">
+                          <span class="h-label">2BR Rent</span>
+                          <span class="h-value">€{{ nbh.housing.avgRentTwoBedroomEUR.toLocaleString() }}</span>
+                        </div>
+                      }
+                      @if (nbh.housing.buyPricePerSqmEUR) {
+                        <div class="housing-item">
+                          <span class="h-label">Buy/m²</span>
+                          <span class="h-value">€{{ nbh.housing.buyPricePerSqmEUR.toLocaleString() }}</span>
+                        </div>
+                      }
+                    </div>
+                    @if (nbh.housing.predominantType) {
+                      <div class="housing-type">{{ nbh.housing.predominantType }}</div>
+                    }
+                  </div>
+                }
+
+                @if (nbh.character_notes) {
+                  <div class="nbh-notes">💡 {{ nbh.character_notes }}</div>
+                }
+              </div>
+            }
+          </div>
+        } @else if (activeCity()) {
+          <!-- Fallback: show lifestyle data -->
+          @if (activeLoc(); as entry) {
             <div class="fallback-card">
-              <h3 class="fb-title">{{ entry.loc.name }}, {{ entry.loc.country }}</h3>
-              @if (entry.loc.cities?.length) {
+              <h3 class="fb-title">{{ entry.name }}, {{ entry.country }}</h3>
+              @if (entry.cities?.length) {
                 <div class="cities-row">
-                  @for (city of entry.loc.cities; track city) {
+                  @for (city of entry.cities; track city) {
                     <span class="city-chip">{{ city }}</span>
                   }
                 </div>
               }
-              @if (entry.loc.lifestyle) {
+              @if (entry.lifestyle) {
                 <div class="lifestyle-grid">
                   <div class="ls-item">
                     <span class="ls-label">Safety</span>
                     <div class="rating-bar">
-                      <div class="rating-fill" [style.width.%]="(entry.loc.lifestyle.safetyRating / 10) * 100"></div>
+                      <div class="rating-fill" [style.width.%]="(entry.lifestyle.safetyRating / 10) * 100"></div>
                     </div>
-                    <span class="ls-val">{{ entry.loc.lifestyle.safetyRating }}/10</span>
+                    <span class="ls-val">{{ entry.lifestyle.safetyRating }}/10</span>
                   </div>
                   <div class="ls-item">
                     <span class="ls-label">Expat Community</span>
                     <div class="rating-bar">
-                      <div class="rating-fill expat" [style.width.%]="(entry.loc.lifestyle.expatCommunity / 10) * 100"></div>
+                      <div class="rating-fill expat" [style.width.%]="(entry.lifestyle.expatCommunity / 10) * 100"></div>
                     </div>
-                    <span class="ls-val">{{ entry.loc.lifestyle.expatCommunity }}/10</span>
+                    <span class="ls-val">{{ entry.lifestyle.expatCommunity }}/10</span>
                   </div>
                   <div class="ls-item">
                     <span class="ls-label">English</span>
                     <div class="rating-bar">
-                      <div class="rating-fill english" [style.width.%]="(entry.loc.lifestyle.englishPrevalence / 10) * 100"></div>
+                      <div class="rating-fill english" [style.width.%]="(entry.lifestyle.englishPrevalence / 10) * 100"></div>
                     </div>
-                    <span class="ls-val">{{ entry.loc.lifestyle.englishPrevalence }}/10</span>
+                    <span class="ls-val">{{ entry.lifestyle.englishPrevalence }}/10</span>
                   </div>
                   <div class="ls-item">
                     <span class="ls-label">Dog Friendly</span>
                     <div class="rating-bar">
-                      <div class="rating-fill dog" [style.width.%]="(entry.loc.lifestyle.dogFriendly / 10) * 100"></div>
+                      <div class="rating-fill dog" [style.width.%]="(entry.lifestyle.dogFriendly / 10) * 100"></div>
                     </div>
-                    <span class="ls-val">{{ entry.loc.lifestyle.dogFriendly }}/10</span>
+                    <span class="ls-val">{{ entry.lifestyle.dogFriendly }}/10</span>
                   </div>
                 </div>
               }
               <div class="no-nbh-hint">
                 Detailed neighborhood data not available for this location.
               </div>
-            </div>
-          } @else {
-            <div class="nbh-header-row">
-              <h3 class="nbh-city">{{ entry.supplement.city }}</h3>
-              <span class="nbh-count">{{ entry.supplement.neighborhoods.length }} neighborhoods</span>
-            </div>
-            <div class="nbh-grid">
-              @for (nbh of entry.supplement.neighborhoods; track nbh.id) {
-                <div class="nbh-card">
-                  <div class="nbh-top">
-                    <h4 class="nbh-name">{{ nbh.name }}</h4>
-                    <span class="nbh-safety" [class]="safetyClass(nbh.safetyRating)">{{ nbh.safetyRating }}</span>
-                  </div>
-                  <p class="nbh-desc">{{ nbh.description }}</p>
-                  <div class="nbh-character">{{ nbh.character }}</div>
-
-                  <!-- Scores -->
-                  <div class="score-row">
-                    <div class="score">
-                      <span class="score-val">{{ nbh.walkabilityScore }}</span>
-                      <span class="score-label">Walk</span>
-                    </div>
-                    <div class="score">
-                      <span class="score-val">{{ nbh.transitScore }}</span>
-                      <span class="score-label">Transit</span>
-                    </div>
-                    <div class="score expat-score">
-                      <span class="score-val">{{ nbh.expats.communitySize }}</span>
-                      <span class="score-label">Expats</span>
-                    </div>
-                  </div>
-
-                  <!-- Housing -->
-                  @if (nbh.housing) {
-                    <div class="housing-section">
-                      <div class="housing-row">
-                        @if (nbh.housing.avgRentOneBedroomEUR) {
-                          <div class="housing-item">
-                            <span class="h-label">1BR Rent</span>
-                            <span class="h-value">€{{ nbh.housing.avgRentOneBedroomEUR.toLocaleString() }}</span>
-                          </div>
-                        }
-                        @if (nbh.housing.avgRentTwoBedroomEUR) {
-                          <div class="housing-item">
-                            <span class="h-label">2BR Rent</span>
-                            <span class="h-value">€{{ nbh.housing.avgRentTwoBedroomEUR.toLocaleString() }}</span>
-                          </div>
-                        }
-                        @if (nbh.housing.buyPricePerSqmEUR) {
-                          <div class="housing-item">
-                            <span class="h-label">Buy/m²</span>
-                            <span class="h-value">€{{ nbh.housing.buyPricePerSqmEUR.toLocaleString() }}</span>
-                          </div>
-                        }
-                      </div>
-                      @if (nbh.housing.predominantType) {
-                        <div class="housing-type">{{ nbh.housing.predominantType }}</div>
-                      }
-                    </div>
-                  }
-
-                  @if (nbh.character_notes) {
-                    <div class="nbh-notes">💡 {{ nbh.character_notes }}</div>
-                  }
-                </div>
-              }
             </div>
           }
         }
@@ -215,18 +213,32 @@ interface LocWithNeighborhoods {
     }
     .map-container { width: 100%; height: 100%; }
 
-    /* Location pills */
-    .loc-pills { display: flex; flex-wrap: wrap; gap: 6px; }
-    .loc-pill {
-      padding: 6px 12px; font-size: 11px; border-radius: 6px; cursor: pointer;
-      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
-      color: var(--dark-text-sec); font-family: var(--font-sans);
-      transition: all 0.15s;
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 40px 24px; color: var(--dark-text-muted);
     }
-    .loc-pill:hover { border-color: var(--dark-blue); color: var(--dark-text); }
-    .loc-pill.active {
-      background: rgba(92, 156, 230, 0.12); border-color: var(--dark-blue);
-      color: var(--dark-blue); font-weight: 600;
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
+    .link-btn {
+      background: none; border: none; color: var(--dark-amber); cursor: pointer;
+      font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+
+    .city-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap;
+      border-bottom: 1px solid var(--dark-border); padding-bottom: 8px;
+    }
+    .city-tab {
+      padding: 6px 14px; font-size: 12px; border-radius: 6px 6px 0 0; cursor: pointer;
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-bottom: none; color: var(--dark-text-sec);
+      font-family: var(--font-sans); transition: all 0.15s;
+    }
+    .city-tab:hover { color: var(--dark-text); }
+    .city-tab.active {
+      background: var(--dark-bg-secondary); border-color: var(--dark-amber);
+      color: var(--dark-amber); font-weight: 600;
     }
     .pill-count {
       display: inline-flex; align-items: center; justify-content: center;
@@ -308,6 +320,7 @@ interface LocWithNeighborhoods {
 })
 export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly loc = inject(LocationService);
+  private readonly nav = inject(NavigationService);
   readonly api = inject(ApiService);
   readonly dyscalculia = inject(DyscalculiaService);
 
@@ -315,34 +328,40 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
   private map: L.Map | null = null;
   private markers: L.Marker[] = [];
 
-  readonly selectedLocId = signal<string | null>(null);
+  readonly activeCity = signal<string | null>(null);
   readonly supplementMap = signal<Record<string, NeighborhoodsSupplement | null>>({});
   readonly loadingSet = signal<Set<string>>(new Set());
 
-  readonly locEntries = computed<LocWithNeighborhoods[]>(() => {
-    const locs = this.loc.fullLocations();
-    const supps = this.supplementMap();
-    const loading = this.loadingSet();
-    return locs.map(l => ({
-      loc: l,
-      supplement: supps[l.id] ?? null,
-      loading: loading.has(l.id),
-    }));
+  readonly selectedCities = computed(() => {
+    const ids = this.loc.selectedIds();
+    return this.loc.fullLocations().filter(l => ids.has(l.id));
   });
 
-  readonly activeEntry = computed(() => {
-    const id = this.selectedLocId();
-    if (!id) return null;
-    return this.locEntries().find(e => e.loc.id === id) ?? null;
+  readonly activeLoc = computed<LocationFull | null>(() =>
+    this.loc.fullLocations().find(l => l.id === this.activeCity()) ?? null
+  );
+
+  readonly isLoading = computed(() => {
+    const id = this.activeCity();
+    return id ? this.loadingSet().has(id) : false;
+  });
+
+  readonly activeSupplement = computed<NeighborhoodsSupplement | null>(() => {
+    const id = this.activeCity();
+    return id ? (this.supplementMap()[id] ?? null) : null;
   });
 
   ngOnInit(): void {
     this.loc.loadFull();
+    const cities = this.selectedCities();
+    if (cities.length && !this.activeCity()) {
+      this.selectCity(cities[0].id);
+    }
   }
 
   ngAfterViewInit(): void {
     this.initMap();
-    // Watch for locations loading and update map
+    // Update markers once locations load
     setTimeout(() => this.updateMapMarkers(), 1500);
   }
 
@@ -350,15 +369,21 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
     this.map?.remove();
   }
 
-  selectLoc(id: string): void {
-    this.selectedLocId.set(id);
+  selectCity(id: string): void {
+    this.activeCity.set(id);
     this.loadSupplement(id);
     // Pan map to location
-    const entry = this.locEntries().find(e => e.loc.id === id);
-    if (entry?.loc.cities?.length && this.map) {
-      const coords = geocodeCity(entry.loc.cities[0]);
+    const loc = this.loc.fullLocations().find(l => l.id === id);
+    if (loc && this.map) {
+      const city = loc.cities?.[0] ?? loc.name;
+      const coords = geocodeCity(city);
       if (coords) this.map.flyTo(coords, 8, { duration: 1 });
     }
+  }
+
+  goToOverview(): void {
+    this.nav.selectScreen('overview');
+    this.nav.selectCategory('locations');
   }
 
   private loadSupplement(locId: string): void {
@@ -396,21 +421,21 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
 
   updateMapMarkers(): void {
     if (!this.map) return;
-    // Clear existing
     this.markers.forEach(m => m.remove());
     this.markers = [];
 
-    const locs = this.loc.fullLocations();
+    // Only show markers for selected cities
+    const cities = this.selectedCities();
     const bounds: L.LatLng[] = [];
 
-    for (const l of locs) {
+    for (const l of cities) {
       const city = l.cities?.[0] ?? l.name;
       const coords = geocodeCity(city);
       if (!coords) continue;
 
       const marker = L.marker(coords)
         .bindPopup(`<b>${l.name}</b><br>${l.country}`)
-        .on('click', () => this.selectLoc(l.id));
+        .on('click', () => this.selectCity(l.id));
 
       marker.addTo(this.map!);
       this.markers.push(marker);
@@ -419,6 +444,8 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
 
     if (bounds.length > 1) {
       this.map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30] });
+    } else if (bounds.length === 1) {
+      this.map.setView(bounds[0], 6);
     }
   }
 
