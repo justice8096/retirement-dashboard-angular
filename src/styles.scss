@@ -1,0 +1,175 @@
+@use '@angular/material' as mat;
+
+/* ─── M3 Dark Theme ──────────────────────────────────────────────────── */
+$dark-theme: mat.define-theme((
+  color: (
+    theme-type: dark,
+    primary: mat.$blue-palette,
+    tertiary: mat.$orange-palette,
+  ),
+  typography: (
+    plain-family: 'Inter, Segoe UI, system-ui, sans-serif',
+    brand-family: 'Inter, Segoe UI, system-ui, sans-serif',
+  ),
+  density: (
+    scale: -1,
+  ),
+));
+
+html {
+  @include mat.all-component-themes($dark-theme);
+  @include mat.color-variants-backwards-compatibility($dark-theme);
+}
+
+/* ─── Design Tokens (Dark Theme) ─────────────────────────────────────── */
+:root {
+  --dark-bg: #0B1426;
+  --dark-bg-card: #162040;
+  --dark-bg-secondary: #111D35;
+  --dark-border: #1E3055;
+  --dark-amber: #D4943A;
+  --dark-amber-light: #E8B86D;
+  --dark-text: #E8ECF4;
+  --dark-text-sec: #8B9DC3;
+  --dark-text-muted: #5A6F94;
+  --dark-blue: #5C9CE6;
+  --dark-green: #4CAF50;
+  --dark-purple: #9C6FDE;
+  --dark-teal: #2A7B7B;
+  --dark-red: #E57373;
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  /* ─── Material Overrides ─────────────────────────────────────────── */
+  --mat-sys-primary: var(--dark-blue);
+  --mat-sys-secondary: var(--dark-amber);
+  --mat-sys-tertiary: var(--dark-amber);
+  --mat-sys-error: var(--dark-red);
+  --mat-sys-surface: var(--dark-bg);
+  --mat-sys-surface-container: var(--dark-bg-card);
+  --mat-sys-surface-container-low: var(--dark-bg-secondary);
+  --mat-sys-on-surface: var(--dark-text);
+  --mat-sys-on-surface-variant: var(--dark-text-sec);
+  --mat-sys-outline: var(--dark-border);
+  --mat-sys-outline-variant: var(--dark-border);
+
+  /* Slide toggle */
+  --mat-slide-toggle-selected-track-color: var(--dark-green);
+  --mat-slide-toggle-selected-handle-color: #fff;
+  --mat-slide-toggle-unselected-track-color: var(--dark-bg-card);
+  --mat-slide-toggle-unselected-handle-color: var(--dark-text-muted);
+
+  /* Tabs */
+  --mat-tab-header-active-label-text-color: var(--dark-text);
+  --mat-tab-header-active-focus-label-text-color: var(--dark-text);
+  --mat-tab-header-inactive-label-text-color: var(--dark-text-sec);
+  --mat-tab-header-active-ripple-color: transparent;
+  --mat-tab-header-active-focus-indicator-color: var(--dark-blue);
+
+  /* Chips */
+  --mat-chip-selected-trailing-icon-color: #fff;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background: var(--dark-bg);
+  color: var(--dark-text);
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ─── Dyscalculia Number Spacing Utilities ────────────────────────────── */
+.number-spacing-normal {
+  letter-spacing: normal;
+}
+.number-spacing-wide {
+  letter-spacing: 0.15em;
+}
+.number-spacing-grouped {
+  letter-spacing: 0.08em;
+}
+
+/* ─── Scrollbar Styling ──────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--dark-bg-secondary, #1a1a2e);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) var(--dark-bg-secondary, #1a1a2e);
+}
+
+/* ─── Transition Utility ─────────────────────────────────────────────── */
+.transition-fast {
+  transition: all 0.15s ease;
+}
+
+/* ─── Material Component Overrides ───────────────────────────────────── */
+
+/* Slide toggles: match our compact design */
+.mat-mdc-slide-toggle {
+  --mdc-switch-track-height: 22px;
+  --mdc-switch-track-width: 40px;
+  --mdc-switch-handle-height: 16px;
+  --mdc-switch-handle-width: 16px;
+}
+
+/* Tab groups: transparent background to blend with our panels */
+.mat-mdc-tab-group {
+  --mat-tab-header-label-text-size: 12px;
+  --mat-tab-header-label-text-weight: 500;
+}
+.mat-mdc-tab-header {
+  background: transparent;
+  border-bottom: 1px solid var(--dark-border);
+}
+.mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+  font-weight: 700;
+}
+
+/* Chips: match our compact chip sizing */
+.mat-mdc-chip {
+  --mdc-chip-container-height: 32px;
+  --mdc-chip-label-text-size: 11px;
+  --mdc-chip-container-shape-radius: 6px;
+  font-family: var(--font-sans);
+}
+
+/* Tooltips: match dark card style */
+.mat-mdc-tooltip .mdc-tooltip__surface {
+  background: var(--dark-bg-card) !important;
+  border: 1px solid var(--dark-border);
+  color: var(--dark-text) !important;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Buttons: match our compact sizing */
+.mat-mdc-button {
+  --mdc-text-button-label-text-size: 11px;
+  font-family: var(--font-sans);
+}
