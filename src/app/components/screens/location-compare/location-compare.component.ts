@@ -105,8 +105,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col rating-cell">
-                      {{ ratingBar(city.lifestyle?.safetyRating) }}
-                      <span class="rating-num">{{ city.lifestyle?.safetyRating ?? '–' }}</span>
+                      <div class="bar-track">
+                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.safetyRating ?? 0) * 10"></div>
+                      </div>
+                      <span class="rating-label">{{ city.lifestyle?.safetyRating ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -116,8 +118,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col rating-cell">
-                      {{ ratingBar(city.lifestyle?.dogFriendly) }}
-                      <span class="rating-num">{{ city.lifestyle?.dogFriendly ?? '–' }}</span>
+                      <div class="bar-track">
+                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.dogFriendly ?? 0) * 10"></div>
+                      </div>
+                      <span class="rating-label">{{ city.lifestyle?.dogFriendly ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -127,8 +131,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col rating-cell">
-                      {{ ratingBar(city.lifestyle?.expatCommunity) }}
-                      <span class="rating-num">{{ city.lifestyle?.expatCommunity ?? '–' }}</span>
+                      <div class="bar-track">
+                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.expatCommunity ?? 0) * 10"></div>
+                      </div>
+                      <span class="rating-label">{{ city.lifestyle?.expatCommunity ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -138,8 +144,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col rating-cell">
-                      {{ ratingBar(city.lifestyle?.englishPrevalence) }}
-                      <span class="rating-num">{{ city.lifestyle?.englishPrevalence ?? '–' }}</span>
+                      <div class="bar-track">
+                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.englishPrevalence ?? 0) * 10"></div>
+                      </div>
+                      <span class="rating-label">{{ city.lifestyle?.englishPrevalence ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -176,8 +184,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col rating-cell">
-                      {{ ratingBar(city.healthcare?.qualityRating) }}
-                      <span class="rating-num">{{ city.healthcare?.qualityRating ?? '–' }}</span>
+                      <div class="bar-track">
+                        <div class="bar-fill bar-fill--health" [style.width.%]="(city.healthcare?.qualityRating ?? 0) * 10"></div>
+                      </div>
+                      <span class="rating-label">{{ city.healthcare?.qualityRating ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -478,13 +488,32 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 8px;
       font-size: 11px;
     }
-    .rating-num {
+    .bar-track {
+      width: 60px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .bar-fill {
+      height: 100%;
+      background: var(--dark-amber, #f59e0b);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .bar-fill--health {
+      background: var(--dark-green, #4caf50);
+    }
+    .rating-label {
       font-size: 11px;
-      color: var(--dark-text-muted);
-      min-width: 18px;
+      font-weight: 600;
+      color: var(--dark-text-sec);
+      min-width: 30px;
+      text-align: left;
     }
 
     /* ─── Pros / Cons tags ────────────────── */
