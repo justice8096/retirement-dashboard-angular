@@ -104,11 +104,16 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🛡️</span> Safety
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col rating-cell">
-                      <div class="bar-track">
-                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.safetyRating ?? 0) * 10"></div>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Safety</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.safetyRating ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.safetyRating ?? '–' }}/10</span>
+                        </div>
                       </div>
-                      <span class="rating-label">{{ city.lifestyle?.safetyRating ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -117,11 +122,16 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🐾</span> Dog Friendly
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col rating-cell">
-                      <div class="bar-track">
-                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.dogFriendly ?? 0) * 10"></div>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Dog Friendly</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.dogFriendly ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.dogFriendly ?? '–' }}/10</span>
+                        </div>
                       </div>
-                      <span class="rating-label">{{ city.lifestyle?.dogFriendly ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -130,11 +140,16 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🌐</span> Expat Community
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col rating-cell">
-                      <div class="bar-track">
-                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.expatCommunity ?? 0) * 10"></div>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Expat Community</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.expatCommunity ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.expatCommunity ?? '–' }}/10</span>
+                        </div>
                       </div>
-                      <span class="rating-label">{{ city.lifestyle?.expatCommunity ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -143,11 +158,16 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🗣️</span> English Spoken
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col rating-cell">
-                      <div class="bar-track">
-                        <div class="bar-fill" [style.width.%]="(city.lifestyle?.englishPrevalence ?? 0) * 10"></div>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">English Spoken</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.englishPrevalence ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.englishPrevalence ?? '–' }}/10</span>
+                        </div>
                       </div>
-                      <span class="rating-label">{{ city.lifestyle?.englishPrevalence ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -157,7 +177,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
-                      {{ city.lifestyle?.internetSpeed ?? '–' }}
+                      <div class="metric-cell">
+                        <span class="metric-name">Internet</span>
+                        <span class="metric-text-val">{{ city.lifestyle?.internetSpeed ?? '–' }}</span>
+                      </div>
                     </td>
                   }
                 </tr>
@@ -175,7 +198,12 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🏥</span> System
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col">{{ city.healthcare?.system ?? '–' }}</td>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">System</span>
+                        <span class="metric-text-val">{{ city.healthcare?.system ?? '–' }}</span>
+                      </div>
+                    </td>
                   }
                 </tr>
                 <tr>
@@ -183,11 +211,16 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">⭐</span> Quality
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col rating-cell">
-                      <div class="bar-track">
-                        <div class="bar-fill bar-fill--health" [style.width.%]="(city.healthcare?.qualityRating ?? 0) * 10"></div>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Quality</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill bar-fill--health" [style.width.%]="(city.healthcare?.qualityRating ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.healthcare?.qualityRating ?? '–' }}/10</span>
+                        </div>
                       </div>
-                      <span class="rating-label">{{ city.healthcare?.qualityRating ?? '–' }}/10</span>
                     </td>
                   }
                 </tr>
@@ -197,7 +230,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
-                      {{ city.healthcare?.dentalIncluded ? '✓ Included' : '✗ Extra' }}
+                      <div class="metric-cell">
+                        <span class="metric-name">Dental</span>
+                        <span class="metric-text-val">{{ city.healthcare?.dentalIncluded ? '✓ Included' : '✗ Extra' }}</span>
+                      </div>
                     </td>
                   }
                 </tr>
@@ -206,7 +242,12 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">⏱️</span> Wait Times
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col">{{ city.healthcare?.waitTimes ?? '–' }}</td>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Wait Times</span>
+                        <span class="metric-text-val">{{ city.healthcare?.waitTimes ?? '–' }}</span>
+                      </div>
+                    </td>
                   }
                 </tr>
               }
@@ -223,7 +264,12 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🌤️</span> Type
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col">{{ city.climate?.type ?? '–' }}</td>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Type</span>
+                        <span class="metric-text-val">{{ city.climate?.type ?? '–' }}</span>
+                      </div>
+                    </td>
                   }
                 </tr>
                 <tr>
@@ -232,7 +278,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
-                      {{ city.climate?.avgTemp?.high != null ? city.climate!.avgTemp!.high + '°F' : '–' }}
+                      <div class="metric-cell">
+                        <span class="metric-name">Avg High</span>
+                        <span class="metric-text-val">{{ city.climate?.avgTemp?.high != null ? city.climate!.avgTemp!.high + '°F' : '–' }}</span>
+                      </div>
                     </td>
                   }
                 </tr>
@@ -242,7 +291,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
-                      {{ city.climate?.avgTemp?.low != null ? city.climate!.avgTemp!.low + '°F' : '–' }}
+                      <div class="metric-cell">
+                        <span class="metric-name">Avg Low</span>
+                        <span class="metric-text-val">{{ city.climate?.avgTemp?.low != null ? city.climate!.avgTemp!.low + '°F' : '–' }}</span>
+                      </div>
                     </td>
                   }
                 </tr>
@@ -260,7 +312,12 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">🛂</span> Visa Type
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col">{{ city.visa?.type ?? '–' }}</td>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Visa Type</span>
+                        <span class="metric-text-val">{{ city.visa?.type ?? '–' }}</span>
+                      </div>
+                    </td>
                   }
                 </tr>
                 <tr>
@@ -268,7 +325,12 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     <span class="row-icon">📅</span> Duration
                   </td>
                   @for (city of locations(); track city.id) {
-                    <td class="city-col">{{ city.visa?.duration ?? '–' }}</td>
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Duration</span>
+                        <span class="metric-text-val">{{ city.visa?.duration ?? '–' }}</span>
+                      </div>
+                    </td>
                   }
                 </tr>
                 @if (anyVisaCost()) {
@@ -279,7 +341,10 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     @for (city of locations(); track city.id) {
                       <td class="city-col"
                         [class]="dyscalculia.numberSpacingClass()">
-                        {{ city.visa?.costUSD ? fmt(city.visa!.costUSD!) : '–' }}
+                        <div class="metric-cell">
+                          <span class="metric-name">Visa Cost</span>
+                          <span class="metric-text-val">{{ city.visa?.costUSD ? fmt(city.visa!.costUSD!) : '–' }}</span>
+                        </div>
                       </td>
                     }
                   </tr>
@@ -297,14 +362,19 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   <span class="row-icon">👍</span> Pros
                 </td>
                 @for (city of locations(); track city.id) {
-                  <td class="city-col pros-cons-cell">
-                    @if (city.pros?.length) {
-                      @for (p of (city.pros ?? []).slice(0, 4); track p) {
-                        <span class="pro-tag">{{ p }}</span>
-                      }
-                    } @else {
-                      –
-                    }
+                  <td class="city-col">
+                    <div class="metric-cell">
+                      <span class="metric-name">Pros</span>
+                      <div class="tags-wrap">
+                        @if (city.pros?.length) {
+                          @for (p of (city.pros ?? []).slice(0, 4); track p) {
+                            <span class="pro-tag">{{ p }}</span>
+                          }
+                        } @else {
+                          <span class="metric-text-val">–</span>
+                        }
+                      </div>
+                    </div>
                   </td>
                 }
               </tr>
@@ -313,14 +383,19 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   <span class="row-icon">👎</span> Cons
                 </td>
                 @for (city of locations(); track city.id) {
-                  <td class="city-col pros-cons-cell">
-                    @if (city.cons?.length) {
-                      @for (c of (city.cons ?? []).slice(0, 4); track c) {
-                        <span class="con-tag">{{ c }}</span>
-                      }
-                    } @else {
-                      –
-                    }
+                  <td class="city-col">
+                    <div class="metric-cell">
+                      <span class="metric-name">Cons</span>
+                      <div class="tags-wrap">
+                        @if (city.cons?.length) {
+                          @for (c of (city.cons ?? []).slice(0, 4); track c) {
+                            <span class="con-tag">{{ c }}</span>
+                          }
+                        } @else {
+                          <span class="metric-text-val">–</span>
+                        }
+                      </div>
+                    </div>
                   </td>
                 }
               </tr>
@@ -483,13 +558,30 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
     .best-in-row { color: var(--dark-green); font-weight: 600; }
     .worst-in-row { color: var(--dark-red); }
 
+    /* ─── Metric cell (label + value in each column) ─── */
+    .metric-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .metric-name {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--dark-text-muted);
+    }
+    .metric-text-val {
+      font-size: 12px;
+      color: var(--dark-text);
+    }
+
     /* ─── Rating bar ──────────────────────── */
-    .rating-cell {
+    .bar-row {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 8px;
-      font-size: 11px;
     }
     .bar-track {
       width: 60px;
@@ -517,7 +609,7 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
     }
 
     /* ─── Pros / Cons tags ────────────────── */
-    .pros-cons-cell {
+    .tags-wrap {
       display: flex;
       flex-wrap: wrap;
       gap: 4px;
