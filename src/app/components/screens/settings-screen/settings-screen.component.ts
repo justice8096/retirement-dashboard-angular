@@ -388,7 +388,14 @@ export class SettingsScreenComponent implements OnInit {
         this.form.set({ ...f });
         this.loading.set(false);
       },
-      error: () => this.loading.set(false),
+      error: (err) => {
+        this.loading.set(false);
+        const detail = err?.error?.error ?? err?.message ?? err?.statusText ?? 'Unknown error';
+        const status = err?.status ? `${err.status}: ` : '';
+        this.saveMsg.set(`Load failed — ${status}${detail}`);
+        this.saveError.set(true);
+        console.error('Financial load error:', err);
+      },
     });
   }
 
@@ -411,10 +418,13 @@ export class SettingsScreenComponent implements OnInit {
         this.saveError.set(false);
         setTimeout(() => this.saveMsg.set(''), 3000);
       },
-      error: () => {
+      error: (err) => {
         this.saving.set(false);
-        this.saveMsg.set('Failed to save');
+        const detail = err?.error?.error ?? err?.error?.message ?? err?.message ?? err?.statusText ?? 'Unknown error';
+        const status = err?.status ? `${err.status}: ` : '';
+        this.saveMsg.set(`Failed to save — ${status}${detail}`);
         this.saveError.set(true);
+        console.error('Financial save error:', err);
       },
     });
   }
