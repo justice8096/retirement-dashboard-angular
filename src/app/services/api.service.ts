@@ -17,6 +17,7 @@ import {
   Badge,
   Contribution,
   ContributionProgress,
+  BrokerageFees,
 } from '@models/api.model';
 
 @Injectable({ providedIn: 'root' })
@@ -161,6 +162,16 @@ export class ApiService {
     data: Record<string, unknown>;
   }): Observable<Contribution> {
     return this.http.post<Contribution>(`${this.base}/contributions`, data);
+  }
+
+  /* --- Brokerage & Transfer Fees --- */
+
+  getFees(): Observable<BrokerageFees> {
+    return this.http.get<BrokerageFees>(`${this.base}/me/fees`);
+  }
+
+  updateFees(data: Partial<BrokerageFees>): Observable<BrokerageFees> {
+    return this.http.put<BrokerageFees>(`${this.base}/me/fees`, data);
   }
 
   /* ─── Health ────────────────────────────────────────────────────── */

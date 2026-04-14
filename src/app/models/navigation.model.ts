@@ -54,6 +54,7 @@ export const CATEGORIES: Category[] = [
     { id: 'taxes', label: 'Taxes' },
     { id: 'withdrawal', label: 'Withdrawal Strategy', badge: 'NEW' },
     { id: 'roth', label: 'Roth Planner', badge: 'NEW' },
+    { id: 'fees', label: 'Fees & Currency', badge: 'NEW' },
   ]},
   { id: 'simulate', label: 'Simulate', icon: '🎲', screens: [
     { id: 'montecarlo', label: 'Monte Carlo' },
