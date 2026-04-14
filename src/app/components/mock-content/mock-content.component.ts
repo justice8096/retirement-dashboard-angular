@@ -24,6 +24,7 @@ import { ProjectionsScreenComponent } from '@components/screens/projections-scre
 import { TaxesScreenComponent } from '@components/screens/taxes-screen/taxes-screen.component';
 import { WithdrawalScreenComponent } from '@components/screens/withdrawal-screen/withdrawal-screen.component';
 import { RothScreenComponent } from '@components/screens/roth-screen/roth-screen.component';
+import { FeesScreenComponent } from '@components/screens/fees-screen/fees-screen.component';
 
 /* ─── Setup screens ─────────────────────────────────────────────── */
 import { AssumptionsScreenComponent } from '@components/screens/assumptions-screen/assumptions-screen.component';
@@ -60,6 +61,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
     /* Income */
     SsScreenComponent, ProjectionsScreenComponent, TaxesScreenComponent,
     WithdrawalScreenComponent, RothScreenComponent,
+    FeesScreenComponent,
     /* Setup */
     AssumptionsScreenComponent, SettingsScreenComponent, FireSetupScreenComponent,
     /* Simulate */
@@ -119,6 +121,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         @case ('income/taxes')        { <app-taxes-screen /> }
         @case ('income/withdrawal')   { <app-withdrawal-screen /> }
         @case ('income/roth')         { <app-roth-screen /> }
+        @case ('income/fees')          { <app-fees-screen /> }
 
         <!-- Setup -->
         @case ('setup/assumptions')   { <app-assumptions-screen /> }

@@ -434,3 +434,44 @@ export interface LocalInfoSupplement {
   officialSites?: { title: string; url: string }[];
   youtubeChannels?: { title: string; url: string }[];
 }
+
+/* --- Brokerage & Transfer Fees --- */
+export type FxProvider = 'bank' | 'wise' | 'ofx' | 'xe' | 'other';
+
+export interface BrokerageFees {
+  // Stock brokerage fees (percentages as whole numbers, e.g. 0.5 = 0.5%)
+  brokerageFeePct: number;
+  brokerageFeeFlat: number;
+  brokerageAnnualFee: number;
+  brokerageExpenseRatio: number;
+
+  // Wire / ACH transfer fees (USD)
+  wireTransferFeeUsd: number;
+  wireTransferFeeLocal: number;
+  achTransferFee: number;
+
+  // Currency exchange fees
+  fxSpreadPct: number;
+  fxFixedFee: number;
+  fxProvider: FxProvider;
+
+  // Currency settings
+  localCurrency: string;
+  manualExchangeRate: number | null;
+
+  updatedAt: string;
+}
+
+/* --- Currency Conversion Helpers --- */
+export interface CurrencyConversion {
+  fromCurrency: string;
+  toCurrency: string;
+  exchangeRate: number;
+  fxSpreadPct: number;
+  fxFixedFee: number;
+  wireTransferFee: number;
+  amountUsd: number;
+  amountLocal: number;
+  totalFeesUsd: number;
+  netAmountLocal: number;
+}
