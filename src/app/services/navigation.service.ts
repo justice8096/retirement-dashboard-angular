@@ -17,7 +17,7 @@ export class NavigationService {
   readonly activeScreenId = signal<string>('overview');
   readonly focusedCatId = signal<string | null>(null);
   readonly showA11yPanel = signal<boolean>(false);
-  readonly a11yTab = signal<'display' | 'dyscalculia'>('display');
+  readonly a11yTab = signal<'display' | 'dyslexia' | 'dyscalculia'>('display');
 
   readonly categories = signal<Category[]>(CATEGORIES);
 
@@ -59,7 +59,7 @@ export class NavigationService {
     this.showA11yPanel.update(v => !v);
   }
 
-  setA11yTab(tab: 'display' | 'dyscalculia'): void {
+  setA11yTab(tab: 'display' | 'dyslexia' | 'dyscalculia'): void {
     this.a11yTab.set(tab);
   }
 

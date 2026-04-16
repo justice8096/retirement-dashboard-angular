@@ -112,6 +112,82 @@ export class DyscalculiaService {
     return 'More than most US household monthly budgets';
   }
 
+  /**
+   * Magnitude anchor keyed by context. Returns a plain-language phrase a
+   * dyscalculic user can use to calibrate the raw number. Dashboard
+   * Dyscalculia F-003 / F-005 — extends the old monthly-cost-only helper.
+   *
+   * @param amount Raw dollar amount (positive or negative).
+   * @param context Domain of the number: portfolio total, withdrawal, percentile, etc.
+   * @param yearlySpending Optional reference for anchors like "years of spending".
+   */
+  getAnchor(
+    amount: number,
+    context: 'monthly-cost' | 'portfolio' | 'withdrawal-year' | 'percentile' | 'general',
+    yearlySpending?: number,
+  ): string {
+    const abs = Math.abs(amount);
+    switch (context) {
+      case 'monthly-cost':
+        return this.getMagnitudeAnchor(abs);
+
+      case 'portfolio': {
+        if (yearlySpending && yearlySpending > 0) {
+          const years = Math.round(abs / yearlySpending);
+          return `about ${years} year${years === 1 ? '' : 's'} of your planned spending`;
+        }
+        if (abs < 100_000) return 'less than a year of a typical middle-income salary';
+        if (abs < 500_000) return 'around a typical starter-home price in many US markets';
+        if (abs < 1_000_000) return 'roughly what you need for a modest retirement at 4% withdrawal';
+        if (abs < 3_000_000) return 'enough to cover decades of modest retirement spending';
+        return 'well above the median net worth at US retirement age';
+      }
+
+      case 'withdrawal-year': {
+        if (abs < 20_000) return 'about what a part-time job pays in a year';
+        if (abs < 50_000) return 'around median US household income';
+        if (abs < 100_000) return 'around a comfortable middle-class yearly income';
+        return 'a high yearly income by US standards';
+      }
+
+      case 'percentile': {
+        if (yearlySpending && yearlySpending > 0) {
+          const years = Math.round(abs / yearlySpending);
+          if (amount < 0) return `a shortfall of about ${years} year${years === 1 ? '' : 's'} of spending`;
+          if (years === 0) return 'roughly nothing left over';
+          return `about ${years} year${years === 1 ? '' : 's'} of planned spending remaining`;
+        }
+        if (amount <= 0) return 'portfolio ran out of money';
+        return 'portfolio ended in positive territory';
+      }
+
+      default:
+        return this.getMagnitudeAnchor(abs);
+    }
+  }
+
+  /**
+   * Natural-frequency phrasing for a success-rate fraction. Maps 0.72 → "7 out of 10".
+   * Dashboard Dyscalculia F-002 — replaces abstract percentage framing with
+   * an anxiety-safe, low-cognitive-load phrase.
+   */
+  naturalFrequency(fraction: number): string {
+    const clamped = Math.max(0, Math.min(1, fraction));
+    const outOf10 = Math.round(clamped * 10);
+    return `${outOf10} out of 10`;
+  }
+
+  /**
+   * Tone class for a success fraction — used by Monte Carlo and similar
+   * screens. Never returns `danger`; uses a neutral tone for low scores to
+   * avoid the math-anxiety anti-pattern flagged in the dyscalculia audit.
+   */
+  toneForSuccessRate(fraction: number): 'success' | 'warn' | 'neutral' {
+    if (fraction > 0.9) return 'success';
+    if (fraction > 0.7) return 'warn';
+    return 'neutral';
+  }
+
   // ─── Persistence ────────────────────────────────────────────────────
 
   private persist(): void {
