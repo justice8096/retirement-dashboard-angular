@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { NavigationService } from '@services/navigation.service';
+import { HelpService } from '@services/help.service';
 
 @Component({
   selector: 'app-context-bar',
@@ -28,6 +29,22 @@ import { NavigationService } from '@services/navigation.service';
             }
           </button>
         }
+
+        <span class="spacer"></span>
+
+        <!-- Screen-specific help (F1 / ?) -->
+        <button
+          type="button"
+          class="help-btn"
+          [class.active]="help.open()"
+          (click)="help.toggle()"
+          [attr.aria-expanded]="help.open()"
+          [attr.aria-label]="'Help for ' + (nav.activeCat()?.label ?? '') + ' — ' + nav.activeScreenId()"
+          [style.fontSize.px]="fontSize"
+          title="Help for this page (F1)">
+          <span aria-hidden="true">?</span>
+          <span class="help-label">Help</span>
+        </button>
       </div>
     }
   `,
@@ -78,10 +95,45 @@ import { NavigationService } from '@services/navigation.service';
       margin-left: 4px;
       font-size: 10px;
     }
+
+    .spacer { flex: 1; min-width: 8px; }
+
+    .help-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--dark-border);
+      background: transparent;
+      color: var(--dark-text-sec);
+      font-family: inherit;
+      font-weight: 600;
+      min-height: 32px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .help-btn:hover {
+      background: var(--dark-bg-card);
+      color: var(--dark-text);
+      border-color: var(--dark-blue);
+    }
+    .help-btn.active {
+      background: var(--dark-blue);
+      color: #fff;
+      border-color: var(--dark-blue);
+    }
+    .help-btn .help-label {
+      font-size: 14px;
+    }
+    @media (max-width: 520px) {
+      .help-btn .help-label { display: none; }
+    }
   `],
 })
 export class ContextBarComponent {
   readonly nav = inject(NavigationService);
+  readonly help = inject(HelpService);
 
   get fontSize(): number {
     const map = { normal: 12, large: 13, xlarge: 15 };

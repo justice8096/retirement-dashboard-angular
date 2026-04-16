@@ -24,6 +24,8 @@ import { Component, EventEmitter, Output, HostListener } from '@angular/core';
           <dl>
             <dt><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>A</kbd></dt>
             <dd>Toggle accessibility panel</dd>
+            <dt><kbd>F1</kbd></dt>
+            <dd>Toggle help for the current page</dd>
             <dt><kbd>?</kbd></dt>
             <dd>Show this cheatsheet</dd>
             <dt><kbd>Esc</kbd></dt>

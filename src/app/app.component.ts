@@ -12,6 +12,8 @@ import { MockContentComponent } from '@components/mock-content/mock-content.comp
 import { OnboardingComponent } from '@components/onboarding/onboarding.component';
 import { ShortcutCheatsheetComponent } from '@components/shortcut-cheatsheet/shortcut-cheatsheet.component';
 import { ReadAloudButtonComponent } from '@components/read-aloud-button/read-aloud-button.component';
+import { HelpPanelComponent } from '@components/help-panel/help-panel.component';
+import { HelpService } from '@services/help.service';
 
 @Component({
   selector: 'app-root',
@@ -27,6 +29,7 @@ import { ReadAloudButtonComponent } from '@components/read-aloud-button/read-alo
     OnboardingComponent,
     ShortcutCheatsheetComponent,
     ReadAloudButtonComponent,
+    HelpPanelComponent,
   ],
   template: `
     @if (nav.phase() === 'onboarding') {
@@ -73,6 +76,11 @@ import { ReadAloudButtonComponent } from '@components/read-aloud-button/read-alo
         @if (showShortcuts()) {
           <app-shortcut-cheatsheet (close)="showShortcuts.set(false)" />
         }
+
+        <!-- Per-screen help drawer -->
+        @if (help.open()) {
+          <app-help-panel />
+        }
       </div>
     }
   `,
@@ -115,6 +123,7 @@ import { ReadAloudButtonComponent } from '@components/read-aloud-button/read-alo
 export class AppComponent implements OnInit {
   readonly nav = inject(NavigationService);
   readonly dyslexia = inject(DyslexiaService);
+  readonly help = inject(HelpService);
   private readonly dyscalculia = inject(DyscalculiaService);
 
   readonly showShortcuts = signal(false);
@@ -128,12 +137,19 @@ export class AppComponent implements OnInit {
 
   @HostListener('window:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
+    const inInput = this.isInInput(event.target);
+
     // '?' opens shortcut cheatsheet (dyslexia F-012)
-    if (event.key === '?' && !this.isInInput(event.target)) {
+    if (event.key === '?' && !inInput) {
       event.preventDefault();
       this.showShortcuts.update((v) => !v);
     }
-    // Escape closes cheatsheet
+    // F1 toggles screen-specific help
+    if (event.key === 'F1' && !inInput) {
+      event.preventDefault();
+      this.help.toggle();
+    }
+    // Escape closes cheatsheet (help panel handles its own Esc)
     if (event.key === 'Escape' && this.showShortcuts()) {
       this.showShortcuts.set(false);
     }
