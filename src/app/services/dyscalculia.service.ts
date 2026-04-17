@@ -41,9 +41,17 @@ export class DyscalculiaService {
 
   // ─── Number Formatting ──────────────────────────────────────────────
 
-  formatCurrency(amount: number): string {
+  /**
+   * Format a currency amount.
+   *
+   * @param amount  dollar value
+   * @param unit    suffix to append — '/mo' (default), '/yr', or '' for a
+   *                lump-sum total with no time dimension
+   */
+  formatCurrency(amount: number, unit: '/mo' | '/yr' | '' = '/mo'): string {
     const s = this.settings();
-    if (!s.enabled) return `$${amount.toLocaleString()}/mo`;
+    const perPhrase = unit === '/mo' ? ' per month' : unit === '/yr' ? ' per year' : '';
+    if (!s.enabled) return `$${amount.toLocaleString()}${unit}`;
 
     let value = amount;
     if (s.roundNumbers) {
@@ -52,11 +60,11 @@ export class DyscalculiaService {
 
     switch (s.numberFormat) {
       case 'words':
-        return `about ${this.numberToWords(value)} dollars per month`;
+        return `about ${this.numberToWords(value)} dollars${perPhrase}`;
       case 'spaced':
-        return `$${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}/mo`;
+        return `$${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${unit}`;
       default:
-        return `$${value.toLocaleString()}/mo`;
+        return `$${value.toLocaleString()}${unit}`;
     }
   }
 

@@ -4,7 +4,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
-import { FinancialSettings, WithdrawalStrategy, LocationFull } from '@models/api.model';
+import {
+  FinancialSettings, WithdrawalStrategy, LocationFull,
+  HouseholdProfile, HouseholdMember,
+} from '@models/api.model';
 import {
   runMonteCarlo,
   weightedInflationFromLocation,
@@ -21,6 +24,29 @@ const PERCENTILE_COLORS: { label: string; key: keyof MonteCarloResult; color: st
   { label: '75th Percentile', key: 'p75',    color: '#3AA0A0' },
   { label: '95th Percentile', key: 'p95',    color: '#4CAF50' },
 ];
+
+/**
+ * Monthly SS benefit adjusted for claim age.
+ *
+ * ssPia is the Primary Insurance Amount at Full Retirement Age (FRA). Claiming
+ * late increases it ~8% per year; claiming early reduces it ~6.67%/yr for the
+ * first 3 years and ~5%/yr after. API returns ssPia as a string, so coerce.
+ *
+ * Must match the logic in ss-screen.component.ts:estimateBenefit so the two
+ * screens agree.
+ */
+function estimateBenefitAtClaim(m: HouseholdMember): number {
+  const pia = Number(m.ssPia) || 0;
+  if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
+  const diff = m.ssClaimAge - m.ssFra;
+  if (diff === 0) return pia;
+  if (diff > 0) return Math.round(pia * (1 + diff * 0.08));
+  const yearsEarly = Math.abs(diff);
+  const reduction = yearsEarly <= 3
+    ? yearsEarly * 0.0667
+    : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
+  return Math.round(pia * (1 - reduction));
+}
 
 const PATH_CHART_W = 640;
 const PATH_CHART_H = 260;
@@ -72,10 +98,17 @@ const HIST_BINS = 40;
             </label>
 
             <label class="param">
-              <span class="param-label">Monthly Income ($)</span>
+              <span class="param-label">Social Security ($/mo)</span>
+              <input type="number" class="param-input"
+                [ngModel]="ssMonthly()" (ngModelChange)="ssMonthly.set($event)" />
+              <span class="param-hint">Household PIA total</span>
+            </label>
+
+            <label class="param">
+              <span class="param-label">Other Income ($/mo)</span>
               <input type="number" class="param-input"
                 [ngModel]="monthlyIncome()" (ngModelChange)="monthlyIncome.set($event)" />
-              <span class="param-hint">SS, pension, etc.</span>
+              <span class="param-hint">Pension, part-time, annuity</span>
             </label>
 
             <label class="param">
@@ -149,6 +182,31 @@ const HIST_BINS = 40;
           </button>
         </div>
 
+        <!-- Social Security summary card -->
+        <div class="ss-card">
+          <span class="ss-icon" aria-hidden="true">🏛️</span>
+          <div class="ss-body">
+            <div class="ss-label">Social Security included</div>
+            <div class="ss-row">
+              <div>
+                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(ssMonthly(), '/mo') }}</div>
+                <div class="ss-sub">monthly benefit</div>
+              </div>
+              <div>
+                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(ssMonthly() * 12, '/yr') }}</div>
+                <div class="ss-sub">annual (nominal)</div>
+              </div>
+              <div>
+                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(ssLifetime(), '') }}</div>
+                <div class="ss-sub">over {{ years() }} yrs, with {{ incGrowth() }}% COLA</div>
+              </div>
+            </div>
+            @if (fin()?.ssCutEnabled) {
+              <div class="ss-note">⚠ SS cut enabled in settings — benefit reduces after {{ fin()?.ssCutYear }}.</div>
+            }
+          </div>
+        </div>
+
         <!-- Results -->
         @if (results(); as r) {
           <div class="results-grid">
@@ -217,9 +275,9 @@ const HIST_BINS = 40;
                           stroke-width="1" fill="none" opacity="0.6" />
               }
               <!-- Axis labels -->
-              <text [attr.x]="4" [attr.y]="12" class="axis-text">{{ fmt(pathYMax()) }}</text>
+              <text [attr.x]="4" [attr.y]="12" class="axis-text">{{ fmt(pathYMax(), '') }}</text>
               <text [attr.x]="4" [attr.y]="pathZeroY() - 4" class="axis-text">$0</text>
-              <text [attr.x]="4" [attr.y]="pathH - 4" class="axis-text">{{ fmt(pathYMin()) }}</text>
+              <text [attr.x]="4" [attr.y]="pathH - 4" class="axis-text">{{ fmt(pathYMin(), '') }}</text>
               <text [attr.x]="pathW - 4" [attr.y]="pathH - 4" text-anchor="end" class="axis-text">Year {{ years() }}</text>
             </svg>
           </div>
@@ -238,8 +296,8 @@ const HIST_BINS = 40;
                     [attr.y1]="0" [attr.y2]="histH - 18"
                     stroke="var(--dark-amber)" stroke-width="2" />
               <text [attr.x]="medianX()" [attr.y]="12" text-anchor="middle" class="axis-text">Median</text>
-              <text [attr.x]="4" [attr.y]="histH - 4" class="axis-text">{{ fmt(histMin()) }}</text>
-              <text [attr.x]="histW - 4" [attr.y]="histH - 4" text-anchor="end" class="axis-text">{{ fmt(histMax()) }}</text>
+              <text [attr.x]="4" [attr.y]="histH - 4" class="axis-text">{{ fmt(histMin(), '') }}</text>
+              <text [attr.x]="histW - 4" [attr.y]="histH - 4" text-anchor="end" class="axis-text">{{ fmt(histMax(), '') }}</text>
             </svg>
           </div>
 
@@ -254,7 +312,7 @@ const HIST_BINS = 40;
                     <div class="pct-fill"
                          [style.width.%]="p.width"
                          [style.background]="p.color">
-                      <span class="pct-val" [class]="dyscalculia.numberSpacingClass()">{{ fmt(p.value) }}</span>
+                      <span class="pct-val" [class]="dyscalculia.numberSpacingClass()">{{ fmt(p.value, '') }}</span>
                     </div>
                   </div>
                 </div>
@@ -350,6 +408,27 @@ const HIST_BINS = 40;
     .pct-val { font-size: 12px; font-weight: 600; color: #fff; }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+
+    .ss-card {
+      display: flex; gap: 14px; align-items: flex-start;
+      background: linear-gradient(135deg, rgba(76, 175, 80, 0.08), rgba(42, 123, 123, 0.08));
+      border: 1px solid rgba(76, 175, 80, 0.35);
+      border-radius: 12px; padding: 16px 20px;
+    }
+    .ss-icon { font-size: 28px; line-height: 1; }
+    .ss-body { flex: 1; }
+    .ss-label {
+      font-size: 11px; color: var(--dark-text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+    }
+    .ss-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 16px;
+    }
+    .ss-num { font-size: 20px; font-weight: 700; color: var(--dark-green); line-height: 1.1; }
+    .ss-unit { font-size: 11px; color: var(--dark-text-muted); font-weight: 400; margin-left: 2px; }
+    .ss-sub { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
+    .ss-note { font-size: 11px; color: var(--dark-amber); margin-top: 8px; }
   `],
 })
 export class MontecarloScreenComponent implements OnInit {
@@ -361,11 +440,13 @@ export class MontecarloScreenComponent implements OnInit {
   readonly running = signal(false);
   readonly fin = signal<FinancialSettings | null>(null);
   readonly wd = signal<WithdrawalStrategy | null>(null);
+  readonly household = signal<HouseholdProfile | null>(null);
 
   /* ─── Inputs (all persist across the session via signals) ──────── */
   readonly selectedLocationId = signal<string>('');
   readonly portfolio = signal(0);
-  readonly monthlyIncome = signal(3000);
+  readonly ssMonthly = signal(0);
+  readonly monthlyIncome = signal(0);
   readonly runs = signal(5000);
   readonly years = signal(25);
   readonly meanReturn = signal(7);
@@ -399,6 +480,16 @@ export class MontecarloScreenComponent implements OnInit {
     const l = this.selectedLoc();
     if (!l?.monthlyCosts) return 0;
     return Object.values(l.monthlyCosts).reduce((s, c) => s + (c?.typical ?? 0), 0);
+  });
+
+  /** Nominal lifetime SS with compound COLA growth. */
+  readonly ssLifetime = computed(() => {
+    const monthly = this.ssMonthly();
+    const g = this.incGrowth() / 100;
+    const yrs = this.years();
+    if (monthly <= 0 || yrs <= 0) return 0;
+    if (g === 0) return monthly * 12 * yrs;
+    return monthly * 12 * (Math.pow(1 + g, yrs) - 1) / g;
   });
 
   /* ─── Path chart data ──────────────────────────────────────────── */
@@ -540,6 +631,18 @@ export class MontecarloScreenComponent implements OnInit {
       error: () => {},
     });
 
+    this.api.getHousehold().subscribe({
+      next: (h) => {
+        this.household.set(h);
+        const ssSum = (h.members ?? []).reduce(
+          (s, m) => s + estimateBenefitAtClaim(m),
+          0,
+        );
+        if (ssSum > 0) this.ssMonthly.set(Math.round(ssSum));
+      },
+      error: () => {},
+    });
+
     // Default the location selector to the first full location when it arrives
     queueMicrotask(() => {
       const sub = setInterval(() => {
@@ -577,7 +680,7 @@ export class MontecarloScreenComponent implements OnInit {
       try {
         const result = runMonteCarlo({
           portfolio: this.portfolio(),
-          monthlyIncome: this.monthlyIncome(),
+          monthlyIncome: this.ssMonthly() + this.monthlyIncome(),
           baseCost: this.baseCost(),
           isForeign: this.isForeign(),
           fxDrift: this.fxDrift() / 100,
@@ -597,22 +700,24 @@ export class MontecarloScreenComponent implements OnInit {
     }, 30);
   }
 
-  fmt(amount: number): string {
+  fmt(amount: number, unit: '/mo' | '/yr' | '' = '/mo'): string {
     const dollar = String.fromCharCode(36);
     return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount)
-      : dollar + Math.round(amount).toLocaleString();
+      ? this.dyscalculia.formatCurrency(amount, unit)
+      : dollar + Math.round(amount).toLocaleString() + unit;
   }
 
   /**
-   * Abbreviated currency for compact displays.
+   * Abbreviated currency for compact displays (always a lump-sum total —
+   * end balances, lifetime totals — so no time-unit suffix).
+   *
    * Dyscalculia F-003 anti-pattern fix: when the user has dyscalculia mode on,
    * we fall back to full `toLocaleString()` because K/M/B abbreviations force
    * magnitude decoding that is exactly what dyscalculic users struggle with.
    */
   fmtK(amount: number): string {
     if (this.dyscalculia.isEnabled()) {
-      return this.fmt(amount);
+      return this.fmt(amount, '');
     }
     const dollar = String.fromCharCode(36);
     const neg = amount < 0;
@@ -633,6 +738,6 @@ export class MontecarloScreenComponent implements OnInit {
 
   /** Annual spending reference for the percentile anchors. */
   annualSpending(): number {
-    return (this.baseCost() - this.monthlyIncome()) * 12;
+    return (this.baseCost() - this.ssMonthly() - this.monthlyIncome()) * 12;
   }
 }
