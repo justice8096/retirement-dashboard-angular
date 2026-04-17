@@ -67,10 +67,48 @@ export interface LifestyleInfo {
   safetyRating: number;
 }
 
+export interface TaxBracket {
+  min: number;
+  max: number | null;
+  rate: number;
+}
+
+export interface IncomeTaxTable {
+  applies?: boolean;
+  rate?: number;
+  type?: string;
+  brackets: TaxBracket[];
+  /** Standard/default deduction before bracket application. */
+  standardDeduction?: number;
+  /** Additional deduction amount (e.g. state-level). */
+  deduction?: number;
+  exemptions?: string;
+}
+
+export interface SalesTaxInfo {
+  rate: number;
+  notes?: string;
+}
+
+export interface PropertyTaxInfo {
+  rate: number;
+  notes?: string;
+}
+
 export interface TaxInfo {
-  notes: string;
-  vatRate: number;
-  socialChargesRate: number;
+  notes?: string;
+  vatRate?: number;
+  socialChargesRate?: number;
+  /** US federal income tax brackets. */
+  federalIncomeTax?: IncomeTaxTable;
+  /** US state (or regional) income tax brackets. */
+  stateIncomeTax?: IncomeTaxTable;
+  salesTax?: SalesTaxInfo;
+  propertyTax?: PropertyTaxInfo;
+  estVehicleTax?: number;
+  ssExempt?: boolean;
+  ssTaxedInCountry?: boolean;
+  socialCharges?: unknown;
 }
 
 export interface VisaInfo {
@@ -114,26 +152,34 @@ export interface CostCategoryMeta {
   icon: string;
   color: string;
   screenId?: string;
+  /**
+   * Whether this category is subject to the location's VAT / social charges.
+   * Used by the iterative tax-on-total convergence in LocationService. Rough
+   * VAT convention: essentials (rent, groceries, medicine, healthcare,
+   * insurance, utilities) are typically exempt or reduced-rate and excluded
+   * from the taxable base; discretionary spending is included.
+   */
+  taxable?: boolean;
 }
 
 export const COST_CATEGORIES: CostCategoryMeta[] = [
-  { key: 'rent', label: 'Housing', icon: '🏠', color: '#D4943A', screenId: 'housing' },
-  { key: 'groceries', label: 'Groceries', icon: '🛒', color: '#5C9CE6', screenId: 'groceries' },
-  { key: 'medicine', label: 'Medicine', icon: '💊', color: '#E57373', screenId: 'medicine' },
-  { key: 'healthcare', label: 'Healthcare', icon: '🏥', color: '#4CAF50' },
-  { key: 'medicalOOP', label: 'Medical OOP', icon: '🩺', color: '#2A7B7B' },
-  { key: 'insurance', label: 'Insurance', icon: '🛡️', color: '#8B9DC3' },
-  { key: 'transportation', label: 'Transportation', icon: '🚗', color: '#9C6FDE', screenId: 'transport' },
-  { key: 'entertainment', label: 'Entertainment', icon: '🎭', color: '#E8B86D', screenId: 'entertainment' },
-  { key: 'phoneCell', label: 'Cell Phones', icon: '📱', color: '#5A6F94', screenId: 'cellphones' },
-  { key: 'personalCare', label: 'Personal Care', icon: '💇', color: '#D4943A', screenId: 'personalcare' },
-  { key: 'clothing', label: 'Clothing', icon: '👔', color: '#5C9CE6' },
-  { key: 'subscriptions', label: 'Subscriptions', icon: '📺', color: '#9C6FDE' },
-  { key: 'utilities', label: 'Utilities', icon: '💡', color: '#4CAF50' },
-  { key: 'petCare', label: 'Pet Care', icon: '🐾', color: '#E8B86D' },
-  { key: 'miscellaneous', label: 'Miscellaneous', icon: '📦', color: '#8B9DC3' },
-  { key: 'buffer', label: 'Buffer', icon: '🔒', color: '#5A6F94' },
-  { key: 'taxes', label: 'Taxes', icon: '🏛️', color: '#E57373' },
+  { key: 'rent', label: 'Housing', icon: '🏠', color: '#D4943A', screenId: 'housing', taxable: false },
+  { key: 'groceries', label: 'Groceries', icon: '🛒', color: '#5C9CE6', screenId: 'groceries', taxable: false },
+  { key: 'medicine', label: 'Medicine', icon: '💊', color: '#E57373', screenId: 'medicine', taxable: false },
+  { key: 'healthcare', label: 'Healthcare', icon: '🏥', color: '#4CAF50', taxable: false },
+  { key: 'medicalOOP', label: 'Medical OOP', icon: '🩺', color: '#2A7B7B', taxable: false },
+  { key: 'insurance', label: 'Insurance', icon: '🛡️', color: '#8B9DC3', taxable: false },
+  { key: 'transportation', label: 'Transportation', icon: '🚗', color: '#9C6FDE', screenId: 'transport', taxable: true },
+  { key: 'entertainment', label: 'Entertainment', icon: '🎭', color: '#E8B86D', screenId: 'entertainment', taxable: true },
+  { key: 'phoneCell', label: 'Cell Phones', icon: '📱', color: '#5A6F94', screenId: 'cellphones', taxable: true },
+  { key: 'personalCare', label: 'Personal Care', icon: '💇', color: '#D4943A', screenId: 'personalcare', taxable: true },
+  { key: 'clothing', label: 'Clothing', icon: '👔', color: '#5C9CE6', taxable: true },
+  { key: 'subscriptions', label: 'Subscriptions', icon: '📺', color: '#9C6FDE', taxable: true },
+  { key: 'utilities', label: 'Utilities', icon: '💡', color: '#4CAF50', taxable: false },
+  { key: 'petCare', label: 'Pet Care', icon: '🐾', color: '#E8B86D', taxable: true },
+  { key: 'miscellaneous', label: 'Miscellaneous', icon: '📦', color: '#8B9DC3', taxable: true },
+  { key: 'buffer', label: 'Buffer', icon: '🔒', color: '#5A6F94', taxable: false },
+  { key: 'taxes', label: 'Taxes', icon: '🏛️', color: '#E57373', taxable: false },
 ];
 
 /* ─── Detailed Costs (supplement) ────────────────────────────────── */
@@ -283,6 +329,16 @@ export interface FinancialSettings {
   rothBalance: number | null;
   taxableBalance: number | null;
   hsaBalance: number | null;
+  /** Per-account load % (recurring annual drag). Whole-number percent, e.g. 0.5 = 0.5%. */
+  traditionalLoadPct?: number;
+  rothLoadPct?: number;
+  taxableLoadPct?: number;
+  hsaLoadPct?: number;
+  /** Per-account annual fees % / expense ratio. Whole-number percent. */
+  traditionalFeesPct?: number;
+  rothFeesPct?: number;
+  taxableFeesPct?: number;
+  hsaFeesPct?: number;
   updatedAt: string;
 }
 

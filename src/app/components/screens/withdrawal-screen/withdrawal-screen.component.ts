@@ -32,7 +32,7 @@ import { WithdrawalStrategy } from '@models/api.model';
               </div>
               <div class="kv">
                 <span class="k">Withdrawal Rate</span>
-                <span class="v">{{ wd()!.withdrawalRate }}%</span>
+                <span class="v">{{ pct(wd()!.withdrawalRate) }}%</span>
               </div>
               <div class="kv">
                 <span class="k">Spending Model</span>
@@ -41,19 +41,19 @@ import { WithdrawalStrategy } from '@models/api.model';
               @if (wd()!.ceilingRate) {
                 <div class="kv">
                   <span class="k">Ceiling Rate</span>
-                  <span class="v">{{ wd()!.ceilingRate }}%</span>
+                  <span class="v">{{ pct(wd()!.ceilingRate) }}%</span>
                 </div>
               }
               @if (wd()!.floorRate) {
                 <div class="kv">
                   <span class="k">Floor Rate</span>
-                  <span class="v">{{ wd()!.floorRate }}%</span>
+                  <span class="v">{{ pct(wd()!.floorRate) }}%</span>
                 </div>
               }
               @if (wd()!.declineRate) {
                 <div class="kv">
                   <span class="k">Decline Rate</span>
-                  <span class="v">{{ wd()!.declineRate }}%/yr</span>
+                  <span class="v">{{ pct(wd()!.declineRate) }}%/yr</span>
                 </div>
               }
             </div>
@@ -75,7 +75,7 @@ import { WithdrawalStrategy } from '@models/api.model';
                 @if (wd()!.refillThreshold) {
                   <div class="kv">
                     <span class="k">Refill Threshold</span>
-                    <span class="v">{{ wd()!.refillThreshold }}%</span>
+                    <span class="v">{{ pct(wd()!.refillThreshold) }}%</span>
                   </div>
                 }
               </div>
@@ -167,5 +167,13 @@ export class WithdrawalScreenComponent implements OnInit {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
       : '$' + amount.toLocaleString();
+  }
+
+  /** Withdrawal rates come from the API as decimal fractions (0.04 = 4%). */
+  pct(rate: number | null | undefined): string {
+    const n = Number(rate);
+    if (!isFinite(n)) return '—';
+    const whole = n > 1 ? n : n * 100;
+    return whole.toFixed(whole >= 10 ? 0 : 1);
   }
 }

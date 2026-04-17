@@ -31,6 +31,7 @@ export const CATEGORIES: Category[] = [
   { id: 'setup', label: 'Setup', icon: '⚙️', screens: [
     { id: 'assumptions', label: 'Assumptions' },
     { id: 'settings', label: 'Settings' },
+    { id: 'items', label: 'Items', badge: 'NEW' },
     { id: 'fire-setup', label: 'FIRE Setup', badge: 'NEW' },
   ]},
   { id: 'locations', label: 'Locations', icon: '📍', screens: [

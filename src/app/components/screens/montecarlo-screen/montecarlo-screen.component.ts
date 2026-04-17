@@ -12,7 +12,12 @@ import {
   runMonteCarlo,
   weightedInflationFromLocation,
   MonteCarloResult,
+  ReturnMode,
+  DEFAULT_REGIME,
 } from '@app/lib/monte-carlo';
+import {
+  HISTORICAL_PRESETS, HISTORICAL_RETURNS, statsForRange,
+} from '@app/data/historical-returns';
 
 // Dyscalculia F-002: Removed red `#E57373` for the lowest percentile — now
 // uses the same neutral amber gradient as the rest. Anxiety-inducing red is
@@ -35,6 +40,23 @@ const PERCENTILE_COLORS: { label: string; key: keyof MonteCarloResult; color: st
  * Must match the logic in ss-screen.component.ts:estimateBenefit so the two
  * screens agree.
  */
+/**
+ * Portfolio-weighted annual drag % from per-account load + fees. Decision:
+ * both load and fees are recurring — treated identically, just separate lines
+ * for reporting clarity in the Settings UI.
+ */
+function weightedAccountDragPct(f: FinancialSettings): number {
+  const rows: [number, number, number][] = [
+    [Number(f.traditionalBalance) || 0, Number(f.traditionalLoadPct) || 0, Number(f.traditionalFeesPct) || 0],
+    [Number(f.rothBalance)        || 0, Number(f.rothLoadPct)        || 0, Number(f.rothFeesPct)        || 0],
+    [Number(f.taxableBalance)     || 0, Number(f.taxableLoadPct)     || 0, Number(f.taxableFeesPct)     || 0],
+    [Number(f.hsaBalance)         || 0, Number(f.hsaLoadPct)         || 0, Number(f.hsaFeesPct)         || 0],
+  ];
+  const total = rows.reduce((s, [b]) => s + b, 0);
+  if (total <= 0) return 0;
+  return rows.reduce((s, [b, l, fe]) => s + (b / total) * (l + fe), 0);
+}
+
 function estimateBenefitAtClaim(m: HouseholdMember): number {
   const pia = Number(m.ssPia) || 0;
   if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
@@ -88,27 +110,28 @@ const HIST_BINS = 40;
                   <option [value]="l.id">{{ l.name }}</option>
                 }
               </select>
-              <span class="param-hint">{{ selectedLoc()?.currency || '—' }} · monthly cost ≈ {{ fmt(baseCost()) }}</span>
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ selectedLoc()?.currency || '—' }} · monthly cost ≈ {{ fmt(baseCost()) }}</span>
             </label>
 
             <label class="param">
               <span class="param-label">Portfolio ($)</span>
-              <input type="number" class="param-input"
+              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="portfolio()" (ngModelChange)="portfolio.set($event)" />
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ fmt(portfolio()) }} · {{ dyscalculia.getAnchor(portfolio(), 'portfolio') }}</span>
             </label>
 
             <label class="param">
               <span class="param-label">Social Security ($/mo)</span>
-              <input type="number" class="param-input"
+              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="ssMonthly()" (ngModelChange)="ssMonthly.set($event)" />
-              <span class="param-hint">Household PIA total</span>
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Household PIA total · {{ fmt(ssMonthly() * 12, '/yr') }}</span>
             </label>
 
             <label class="param">
               <span class="param-label">Other Income ($/mo)</span>
-              <input type="number" class="param-input"
+              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="monthlyIncome()" (ngModelChange)="monthlyIncome.set($event)" />
-              <span class="param-hint">Pension, part-time, annuity</span>
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Pension, part-time, annuity · {{ fmt(monthlyIncome() * 12, '/yr') }}</span>
             </label>
 
             <label class="param">
@@ -180,6 +203,107 @@ const HIST_BINS = 40;
           <button mat-flat-button class="run-btn" [disabled]="running()" (click)="runSimulation()">
             {{ running() ? 'Running…' : 'Run Simulation' }}
           </button>
+        </div>
+
+        <!-- Historical / Cycle settings -->
+        <div class="card hist-card">
+          <h3 class="card-title">Historical &amp; Cycles</h3>
+
+          <div class="hist-row">
+            <label class="param">
+              <span class="param-label">Sampling Mode</span>
+              <select class="param-input"
+                [ngModel]="returnMode()"
+                (ngModelChange)="returnMode.set($event)">
+                <option value="normal">Normal (Gaussian draws)</option>
+                <option value="bootstrap">Bootstrap (resample history)</option>
+                <option value="regime">Bull/Bear regimes</option>
+                <option value="historical-sequence">Historical sequence (backtest)</option>
+              </select>
+              <span class="param-hint">
+                @switch (returnMode()) {
+                  @case ('normal') { Draws return/inflation from a normal distribution (classic MC). }
+                  @case ('bootstrap') { Each year picks a random historical year — realistic tails + return/inflation correlation. }
+                  @case ('regime') { Alternates bull &amp; bear regimes via a 2-state Markov chain. Deterministic mean per state, runs still vary. }
+                  @case ('historical-sequence') { Replays actual {{ historicalStartYear() }}+ sequence forward. Deterministic — 1 path. }
+                }
+              </span>
+            </label>
+
+            <label class="param">
+              <span class="param-label">Historical Preset</span>
+              <select class="param-input"
+                [ngModel]="selectedPresetId()"
+                (ngModelChange)="applyPreset($event)">
+                <option value="">— custom —</option>
+                @for (p of historicalPresets; track p.id) {
+                  <option [value]="p.id">{{ p.label }}</option>
+                }
+              </select>
+              <span class="param-hint">
+                Snaps mean &amp; vol to the averages of a named period.
+              </span>
+            </label>
+          </div>
+
+          @if (returnMode() === 'historical-sequence') {
+            <div class="hist-row">
+              <label class="param">
+                <span class="param-label">Start Year</span>
+                <select class="param-input"
+                  [ngModel]="historicalStartYear()"
+                  (ngModelChange)="historicalStartYear.set(+$event)">
+                  @for (y of historicalYears; track y) {
+                    <option [value]="y">{{ y }}</option>
+                  }
+                </select>
+                <span class="param-hint">
+                  "If you retired in {{ historicalStartYear() }} with this plan…" — uses real annual returns forward.
+                </span>
+              </label>
+            </div>
+          }
+
+          @if (returnMode() === 'regime') {
+            <div class="regime-grid">
+              <div class="regime-col bull">
+                <h4 class="regime-title">🐂 Bull regime</h4>
+                <label class="param">
+                  <span class="param-label">Mean Return (%)</span>
+                  <input type="number" class="param-input" step="0.5"
+                    [ngModel]="regimeBullMean()" (ngModelChange)="regimeBullMean.set(+$event)" />
+                </label>
+                <label class="param">
+                  <span class="param-label">Volatility (%)</span>
+                  <input type="number" class="param-input" step="0.5"
+                    [ngModel]="regimeBullVol()" (ngModelChange)="regimeBullVol.set(+$event)" />
+                </label>
+                <label class="param">
+                  <span class="param-label">Annual P(switch to bear) %</span>
+                  <input type="number" class="param-input" step="1" min="0" max="100"
+                    [ngModel]="regimeBullToBear()" (ngModelChange)="regimeBullToBear.set(+$event)" />
+                </label>
+              </div>
+              <div class="regime-col bear">
+                <h4 class="regime-title">🐻 Bear regime</h4>
+                <label class="param">
+                  <span class="param-label">Mean Return (%)</span>
+                  <input type="number" class="param-input" step="0.5"
+                    [ngModel]="regimeBearMean()" (ngModelChange)="regimeBearMean.set(+$event)" />
+                </label>
+                <label class="param">
+                  <span class="param-label">Volatility (%)</span>
+                  <input type="number" class="param-input" step="0.5"
+                    [ngModel]="regimeBearVol()" (ngModelChange)="regimeBearVol.set(+$event)" />
+                </label>
+                <label class="param">
+                  <span class="param-label">Annual P(switch to bull) %</span>
+                  <input type="number" class="param-input" step="1" min="0" max="100"
+                    [ngModel]="regimeBearToBull()" (ngModelChange)="regimeBearToBull.set(+$event)" />
+                </label>
+              </div>
+            </div>
+          }
         </div>
 
         <!-- Social Security summary card -->
@@ -359,6 +483,20 @@ const HIST_BINS = 40;
       --mdc-filled-button-label-text-color: #fff;
     }
 
+    .hist-card { display: flex; flex-direction: column; gap: 14px; }
+    .hist-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .regime-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin-top: 4px;
+    }
+    .regime-col {
+      padding: 12px; border-radius: 8px; border: 1px solid var(--dark-border);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .regime-col.bull { border-left: 3px solid var(--dark-green); }
+    .regime-col.bear { border-left: 3px solid var(--dark-red); }
+    .regime-title { font-size: 12px; margin: 0; color: var(--dark-text); font-weight: 600; }
+
     .results-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -456,6 +594,23 @@ export class MontecarloScreenComponent implements OnInit {
   readonly currVol = signal(5);
   readonly fxDrift = signal(0);
   readonly incGrowth = signal(2);
+
+  /* ─── Historical / sampling-mode inputs ────────────────────────── */
+  readonly returnMode = signal<ReturnMode>('normal');
+  readonly selectedPresetId = signal<string>('');
+  /** Start year for historical-sequence backtest. Defaults to earliest data. */
+  readonly historicalStartYear = signal<number>(HISTORICAL_RETURNS[0].year);
+
+  /** Regime parameters (bull/bear Markov switching). */
+  readonly regimeBullMean = signal(DEFAULT_REGIME.bullMean * 100);
+  readonly regimeBullVol = signal(DEFAULT_REGIME.bullVol * 100);
+  readonly regimeBearMean = signal(DEFAULT_REGIME.bearMean * 100);
+  readonly regimeBearVol = signal(DEFAULT_REGIME.bearVol * 100);
+  readonly regimeBullToBear = signal(DEFAULT_REGIME.pBullToBear * 100);
+  readonly regimeBearToBull = signal(DEFAULT_REGIME.pBearToBull * 100);
+
+  readonly historicalPresets = HISTORICAL_PRESETS;
+  readonly historicalYears = HISTORICAL_RETURNS.map(r => r.year);
 
   readonly results = signal<MonteCarloResult | null>(null);
 
@@ -616,7 +771,10 @@ export class MontecarloScreenComponent implements OnInit {
       next: (f) => {
         this.fin.set(f);
         this.portfolio.set(f.portfolioBalance ?? 0);
-        if (typeof f.expectedReturn === 'number') this.meanReturn.set(f.expectedReturn);
+        if (typeof f.expectedReturn === 'number') {
+          const drag = weightedAccountDragPct(f);
+          this.meanReturn.set(+(f.expectedReturn - drag).toFixed(2));
+        }
         if (typeof f.expectedInflation === 'number') this.meanInflation.set(f.expectedInflation);
         if (f.fxDriftEnabled && typeof f.fxDriftAnnualRate === 'number') {
           this.fxDrift.set(f.fxDriftAnnualRate);
@@ -666,6 +824,18 @@ export class MontecarloScreenComponent implements OnInit {
     this.meanInflation.set(+(w * 100).toFixed(2));
   }
 
+  /** Snap mean/vol params to a named historical period. */
+  applyPreset(presetId: string): void {
+    this.selectedPresetId.set(presetId);
+    const preset = HISTORICAL_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    const s = statsForRange(preset.startYear, preset.endYear);
+    this.meanReturn.set(+(s.meanReturn * 100).toFixed(2));
+    this.volatility.set(+(s.volReturn * 100).toFixed(2));
+    this.meanInflation.set(+(s.meanInflation * 100).toFixed(2));
+    this.inflVol.set(+(s.volInflation * 100).toFixed(2));
+  }
+
   runSimulation(): void {
     const f = this.fin();
     const l = this.selectedLoc();
@@ -692,6 +862,16 @@ export class MontecarloScreenComponent implements OnInit {
           volInflation: this.inflVol() / 100,
           currVol: this.currVol() / 100,
           incGrowth: this.incGrowth() / 100,
+          returnMode: this.returnMode(),
+          historicalStartYear: this.historicalStartYear(),
+          regime: {
+            bullMean: this.regimeBullMean() / 100,
+            bullVol: this.regimeBullVol() / 100,
+            bearMean: this.regimeBearMean() / 100,
+            bearVol: this.regimeBearVol() / 100,
+            pBullToBear: this.regimeBullToBear() / 100,
+            pBearToBull: this.regimeBearToBull() / 100,
+          },
         });
         this.results.set(result);
       } finally {

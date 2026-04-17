@@ -55,17 +55,32 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
             </thead>
 
             <tbody>
-              <!-- Total monthly cost -->
+              <!-- Total monthly cost (incl. computed income tax) -->
               <tr class="total-row">
                 <td class="label-col sticky-col row-label">
                   <span class="row-icon">💰</span> Total Monthly
+                  <span class="row-sub">incl. est. income tax on {{ fmt(loc.annualIncome()) }}/yr</span>
                 </td>
                 @for (city of locations(); track city.id) {
                   <td class="city-col total-cell"
                     [class]="dyscalculia.numberSpacingClass()"
                     [class.cheapest]="isCheapest(city)"
                     [class.priciest]="isPriciest(city)">
-                    {{ fmt(city.monthlyCostTotal ?? 0) }}
+                    {{ fmtCents(totalWithTax(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Income tax line -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">🏛️</span> Income Tax
+                  <span class="row-sub">computed from your {{ fmt(loc.annualIncome()) }}/yr income</span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col"
+                    [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmtCents(monthlyTax(city)) }}
                   </td>
                 }
               </tr>
@@ -531,8 +546,13 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       display: flex;
       align-items: center;
       gap: 6px;
+      flex-wrap: wrap;
     }
     .row-icon { font-size: 13px; }
+    .row-sub {
+      font-size: 9px; color: var(--dark-text-muted); font-weight: 400;
+      width: 100%; padding-left: 18px; margin-top: 2px;
+    }
 
     .total-row td {
       font-weight: 700;
@@ -693,24 +713,38 @@ export class LocationCompareComponent implements OnInit {
     return '$' + val.toLocaleString();
   }
 
+  /** Currency with cents — for the Total Monthly + Income Tax rows. */
+  fmtCents(val: number): string {
+    return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   fmtCost(city: LocationFull, key: string): string {
     const val = city.monthlyCosts[key]?.typical ?? 0;
     if (!val) return '–';
     return this.fmt(val);
   }
 
+  /** Monthly cost total that includes computed income tax (not just the stored value). */
+  totalWithTax(city: LocationFull): number {
+    return this.loc.totalWithIncomeTax(city).total;
+  }
+
+  monthlyTax(city: LocationFull): number {
+    return this.loc.totalWithIncomeTax(city).monthlyTax;
+  }
+
   isCheapest(city: LocationFull): boolean {
     const locs = this.locations();
     if (locs.length < 2) return false;
-    const min = Math.min(...locs.map(l => l.monthlyCostTotal ?? Infinity));
-    return (city.monthlyCostTotal ?? Infinity) === min;
+    const min = Math.min(...locs.map(l => this.totalWithTax(l)));
+    return this.totalWithTax(city) === min;
   }
 
   isPriciest(city: LocationFull): boolean {
     const locs = this.locations();
     if (locs.length < 2) return false;
-    const max = Math.max(...locs.map(l => l.monthlyCostTotal ?? 0));
-    return (city.monthlyCostTotal ?? 0) === max;
+    const max = Math.max(...locs.map(l => this.totalWithTax(l)));
+    return this.totalWithTax(city) === max;
   }
 
   isBestInRow(key: string, city: LocationFull): boolean {

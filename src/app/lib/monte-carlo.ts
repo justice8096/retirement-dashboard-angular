@@ -1,19 +1,43 @@
 /**
  * Monte Carlo retirement simulation.
  *
- * Ported from D:\retirementProject\dashboard\src\workers\montecarlo.worker.js
- * to preserve identical semantics. Runs synchronously; for large run counts
- * consider moving to a Web Worker.
+ * Supports four sampling modes:
+ *   - 'normal'             : Gaussian draws from (meanReturn, volReturn) + (meanInflation, volInflation)
+ *   - 'bootstrap'          : random-year resample from HISTORICAL_RETURNS (return/inflation paired)
+ *   - 'regime'             : 2-state Markov switching bull/bear with different means and vols
+ *   - 'historical-sequence': actual annual returns starting at historicalStartYear, wrapping if needed
  *
- * Semantics (annual steps):
- *   - Stochastic real return  ~ N(meanReturn, volReturn)
- *   - Stochastic inflation    ~ N(meanInflation, volInflation), floored at 0
- *   - Stochastic currency     ~ N(1, currVol) applied to foreign cost-of-living
- *   - Systematic FX drift     compounded each year for foreign locations
- *   - Income grows at incGrowth each year
- *   - Cost inflates at annInfl each year
- *   - Per year: bal = bal * (1 + ret) + income*12 - cost*12 * currShock * fxMult
+ * Annual steps for every mode:
+ *   - bal *= (1 + annReturn)
+ *   - bal += income * 12 - cost * 12 * currShock * fxMult
+ *   - cost *= (1 + annInfl)
+ *   - income *= (1 + incGrowth)
  */
+
+import { HISTORICAL_RETURNS, bootstrapYear } from '../data/historical-returns';
+
+export type ReturnMode = 'normal' | 'bootstrap' | 'regime' | 'historical-sequence';
+
+export interface RegimeConfig {
+  /** Mean/vol in the bull state (decimal fractions). */
+  bullMean: number;
+  bullVol: number;
+  /** Mean/vol in the bear state. */
+  bearMean: number;
+  bearVol: number;
+  /** Transition probabilities per year. */
+  pBullToBear: number;
+  pBearToBull: number;
+}
+
+export const DEFAULT_REGIME: RegimeConfig = {
+  bullMean: 0.12,
+  bullVol: 0.12,
+  bearMean: -0.12,
+  bearVol: 0.22,
+  pBullToBear: 0.15,
+  pBearToBull: 0.45,
+};
 
 export interface MonteCarloParams {
   /** Starting portfolio balance in USD */
@@ -42,6 +66,12 @@ export interface MonteCarloParams {
   currVol: number;
   /** Income growth (decimal) */
   incGrowth: number;
+  /** Sampling mode for returns + inflation. Default 'normal'. */
+  returnMode?: ReturnMode;
+  /** Regime config (only used when returnMode === 'regime'). */
+  regime?: RegimeConfig;
+  /** Start year for 'historical-sequence' mode. Required for that mode. */
+  historicalStartYear?: number;
 }
 
 export interface MonteCarloResult {
@@ -68,33 +98,84 @@ function normalRandom(): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
+/**
+ * Resolve the year-(return, inflation) pair for a single simulation step,
+ * given the sampling mode. Encapsulates the mode-specific logic so the
+ * core sim loop stays flat.
+ */
+function sampleYear(
+  mode: ReturnMode,
+  y: number,
+  p: MonteCarloParams,
+  regimeState: { inBear: boolean },
+): { ret: number; inf: number } {
+  switch (mode) {
+    case 'bootstrap': {
+      return bootstrapYear();
+    }
+
+    case 'regime': {
+      const cfg = p.regime ?? DEFAULT_REGIME;
+      if (regimeState.inBear) {
+        if (Math.random() < cfg.pBearToBull) regimeState.inBear = false;
+      } else {
+        if (Math.random() < cfg.pBullToBear) regimeState.inBear = true;
+      }
+      const mean = regimeState.inBear ? cfg.bearMean : cfg.bullMean;
+      const vol  = regimeState.inBear ? cfg.bearVol  : cfg.bullVol;
+      const ret = mean + vol * normalRandom();
+      const inf = Math.max(0, p.meanInflation + p.volInflation * normalRandom());
+      return { ret, inf };
+    }
+
+    case 'historical-sequence': {
+      const start = p.historicalStartYear ?? HISTORICAL_RETURNS[0].year;
+      const startIdx = HISTORICAL_RETURNS.findIndex(r => r.year === start);
+      const idx = (startIdx >= 0 ? startIdx : 0) + y;
+      const row = HISTORICAL_RETURNS[idx % HISTORICAL_RETURNS.length];
+      return { ret: row.sp500, inf: row.cpi };
+    }
+
+    case 'normal':
+    default: {
+      const ret = p.meanReturn + p.volReturn * normalRandom();
+      const inf = Math.max(0, p.meanInflation + p.volInflation * normalRandom());
+      return { ret, inf };
+    }
+  }
+}
+
 export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   const {
     portfolio, monthlyIncome, baseCost, isForeign, fxDrift,
-    runs, years, meanReturn, volReturn,
-    meanInflation, volInflation, currVol, incGrowth,
+    runs, years, currVol, incGrowth,
   } = p;
+  const mode: ReturnMode = p.returnMode ?? 'normal';
+
+  // Historical-sequence is deterministic per start year, so a single "run"
+  // is the only meaningful output. Clamp runs to 1 to avoid identical dupes.
+  const effectiveRuns = mode === 'historical-sequence' ? 1 : runs;
 
   const drift = fxDrift || 0;
   const results: number[] = [];
   const paths: number[][] = [];
 
-  for (let r = 0; r < runs; r++) {
+  for (let r = 0; r < effectiveRuns; r++) {
     let bal = portfolio;
     let income = monthlyIncome;
     let cost = baseCost;
     let fxMult = 1;
+    const regimeState = { inBear: false };
     const path: number[] = [bal];
 
     for (let y = 0; y < years; y++) {
-      const annReturn = meanReturn + volReturn * normalRandom();
-      const annInfl = Math.max(0, meanInflation + volInflation * normalRandom());
+      const { ret, inf } = sampleYear(mode, y, p, regimeState);
       const currShock = isForeign ? 1 + currVol * normalRandom() : 1;
       if (isForeign && drift) fxMult *= (1 + drift);
 
-      bal *= (1 + annReturn);
+      bal *= (1 + ret);
       bal += income * 12 - cost * 12 * currShock * fxMult;
-      cost *= (1 + annInfl);
+      cost *= (1 + inf);
       income *= (1 + incGrowth);
 
       path.push(bal);
@@ -105,10 +186,10 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   }
 
   results.sort((a, b) => a - b);
-  const successRate = results.filter((v) => v > 0).length / runs;
+  const successRate = results.filter((v) => v > 0).length / effectiveRuns;
 
   // Percentile sampling (matches original floor-index behavior)
-  const at = (q: number): number => results[Math.floor(runs * q)] ?? 0;
+  const at = (q: number): number => results[Math.floor(effectiveRuns * q)] ?? 0;
 
   return {
     results,

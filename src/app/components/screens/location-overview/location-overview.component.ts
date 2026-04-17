@@ -148,6 +148,33 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
           {{ dyscalculia.getMagnitudeAnchor(cheap.monthlyCostTotal) }}
         </div>
       }
+
+      <!-- Converged totals (iterative tax-on-taxable-base) -->
+      @if (loc.convergedTotals().length) {
+        <div class="converged-card">
+          <div class="converged-head">
+            <h3 class="converged-title">💰 Converged Monthly Totals (tax-adjusted)</h3>
+            <span class="converged-sub">
+              VAT + social charges applied to taxable categories only · converges when change ≤ $3
+            </span>
+          </div>
+          <div class="converged-rows">
+            @for (r of loc.convergedTotals(); track r.id) {
+              <div class="converged-row">
+                <span class="cr-name">{{ r.name }}</span>
+                <span class="cr-country">{{ r.country }}</span>
+                <span class="cr-total" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmtCost(r.total) }}
+                </span>
+                <span class="cr-tax" [class]="dyscalculia.numberSpacingClass()"
+                      [title]="'Converged in ' + r.iterations + ' iteration(s)'">
+                  tax {{ fmtCost(r.tax) }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -329,6 +356,22 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
       text-align: center;
       padding: 8px 0;
     }
+    .converged-card {
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+    }
+    .converged-head { display: flex; flex-direction: column; gap: 2px; }
+    .converged-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--dark-text); }
+    .converged-sub { font-size: 10px; color: var(--dark-text-muted); }
+    .converged-rows { display: flex; flex-direction: column; gap: 4px; }
+    .converged-row {
+      display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr; gap: 10px; align-items: baseline;
+      padding: 6px 8px; border-radius: 6px; background: var(--dark-bg-secondary);
+    }
+    .cr-name { font-size: 13px; color: var(--dark-text); font-weight: 500; }
+    .cr-country { font-size: 11px; color: var(--dark-text-muted); }
+    .cr-total { font-size: 14px; font-weight: 700; color: var(--dark-amber); text-align: right; font-variant-numeric: tabular-nums; }
+    .cr-tax { font-size: 11px; color: var(--dark-text-sec); text-align: right; font-variant-numeric: tabular-nums; }
   `],
 })
 export class LocationOverviewComponent implements OnInit {
@@ -387,5 +430,11 @@ export class LocationOverviewComponent implements OnInit {
   clearAll(): void {
     this.loc.clearFilters();
     this.loc.regionFilter.set(null);
+  }
+
+  fmtCost(amount: number): string {
+    return this.dyscalculia.isEnabled()
+      ? this.dyscalculia.formatCurrency(amount)
+      : '$' + Math.round(amount).toLocaleString() + '/mo';
   }
 }

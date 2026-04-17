@@ -1,6 +1,7 @@
 import { Component, inject, input, computed, OnInit } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { ItemsService } from '@services/items.service';
 import { COST_CATEGORIES } from '@models/api.model';
 
 @Component({
@@ -18,6 +19,12 @@ import { COST_CATEGORIES } from '@models/api.model';
           </p>
         </div>
       </div>
+
+      @if (!loc.selectedIds().size) {
+        <div class="filter-banner">
+          Showing all locations — pick some on the <strong>Locations → Overview</strong> tab to narrow this view.
+        </div>
+      }
 
       @if (loc.loading()) {
         <div class="status-msg">Loading data…</div>
@@ -74,6 +81,12 @@ import { COST_CATEGORIES } from '@models/api.model';
                     <span class="range-max">{{ fmt(item.max) }}</span>
                   </div>
                 }
+                @if (item.areaAvg != null && item.areaName) {
+                  <div class="area-line">
+                    <span class="area-label">Avg in {{ item.areaName }}:</span>
+                    <span class="area-value">{{ fmt(item.areaAvg) }}</span>
+                  </div>
+                }
               </div>
             }
           </div>
@@ -116,14 +129,23 @@ import { COST_CATEGORIES } from '@models/api.model';
     .range-line { display: flex; gap: 4px; font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
     .range-min { color: var(--dark-green); }
     .range-max { color: var(--dark-red); }
+    .area-line { display: flex; gap: 6px; font-size: 10px; color: var(--dark-purple); margin-top: 2px; font-style: italic; }
+    .area-value { font-weight: 600; }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .filter-banner {
+      padding: 10px 14px; background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
+      border-left: 3px solid var(--dark-amber); border-radius: 6px;
+      font-size: 12px; color: var(--dark-text-sec);
+    }
+    .filter-banner strong { color: var(--dark-text); }
   `],
 })
 export class CostDetailComponent implements OnInit {
   readonly costKey = input.required<string>();
   readonly loc = inject(LocationService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly items = inject(ItemsService);
 
   readonly meta = computed(() => {
     const cat = COST_CATEGORIES.find(c => c.key === this.costKey());
@@ -132,14 +154,22 @@ export class CostDetailComponent implements OnInit {
 
   readonly ranked = computed(() => {
     const key = this.costKey();
-    return this.loc.fullLocations()
-      .map(l => ({
-        id: l.id,
-        name: l.name,
-        typical: l.monthlyCosts[key]?.typical ?? 0,
-        min: l.monthlyCosts[key]?.min ?? 0,
-        max: l.monthlyCosts[key]?.max ?? 0,
-      }))
+    const scale = this.items.scaleByCostKey()[key] ?? 1;
+    const isRent = key === 'rent';
+    return this.loc.selectedFullLocations()
+      .map(l => {
+        const hood = isRent ? this.loc.recommendedNeighborhood(l.id) : null;
+        const areaRent = hood?.housing?.avgRentOneBedroomEUR ?? null;
+        return {
+          id: l.id,
+          name: l.name,
+          typical: (l.monthlyCosts[key]?.typical ?? 0) * scale,
+          min: (l.monthlyCosts[key]?.min ?? 0) * scale,
+          max: (l.monthlyCosts[key]?.max ?? 0) * scale,
+          areaName: hood?.name ?? null,
+          areaAvg: areaRent,
+        };
+      })
       .filter(l => l.typical > 0)
       .sort((a, b) => a.typical - b.typical);
   });
@@ -157,6 +187,10 @@ export class CostDetailComponent implements OnInit {
 
   ngOnInit(): void {
     this.loc.loadFull();
+    this.items.load();
+    if (this.costKey() === 'rent') {
+      queueMicrotask(() => this.loc.preloadNeighborhoodsForSelected());
+    }
   }
 
   fmt(amount: number): string {
