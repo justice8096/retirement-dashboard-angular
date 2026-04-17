@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -64,47 +64,43 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
         <!-- Account Balances -->
         <div class="card">
           <h3 class="card-title">Account Balances</h3>
-          <div class="field-grid">
-            <label class="field">
-              <span class="field-label">Traditional IRA / 401k</span>
-              <div class="input-wrap dollar">
-                <span class="input-prefix">$</span>
-                <input type="number" class="field-input"
-                  [ngModel]="form().traditionalBalance"
-                  (ngModelChange)="patch('traditionalBalance', $event)"
-                  min="0" step="1000" />
+          <p class="card-sub">
+            Load and fees are recurring annual drags on return — both subtract from your effective growth rate.
+          </p>
+          <div class="account-grid">
+            <div class="account-head">
+              <span>Account</span><span>Balance</span><span>Load %/yr</span><span>Fees %/yr</span>
+            </div>
+            @for (acct of accountRows; track acct.key) {
+              <div class="account-row">
+                <span class="acct-name">{{ acct.label }}</span>
+                <div class="input-wrap dollar">
+                  <span class="input-prefix">$</span>
+                  <input type="number" class="field-input"
+                    [ngModel]="form()[acct.balanceKey]"
+                    (ngModelChange)="patch(acct.balanceKey, $event)"
+                    min="0" step="1000" />
+                </div>
+                <div class="input-wrap pct">
+                  <input type="number" class="field-input"
+                    [ngModel]="form()[acct.loadKey] ?? 0"
+                    (ngModelChange)="patch(acct.loadKey, $event)"
+                    min="0" max="10" step="0.05" />
+                  <span class="input-suffix">%</span>
+                </div>
+                <div class="input-wrap pct">
+                  <input type="number" class="field-input"
+                    [ngModel]="form()[acct.feesKey] ?? 0"
+                    (ngModelChange)="patch(acct.feesKey, $event)"
+                    min="0" max="10" step="0.05" />
+                  <span class="input-suffix">%</span>
+                </div>
               </div>
-            </label>
-            <label class="field">
-              <span class="field-label">Roth IRA / Roth 401k</span>
-              <div class="input-wrap dollar">
-                <span class="input-prefix">$</span>
-                <input type="number" class="field-input"
-                  [ngModel]="form().rothBalance"
-                  (ngModelChange)="patch('rothBalance', $event)"
-                  min="0" step="1000" />
-              </div>
-            </label>
-            <label class="field">
-              <span class="field-label">Taxable Brokerage</span>
-              <div class="input-wrap dollar">
-                <span class="input-prefix">$</span>
-                <input type="number" class="field-input"
-                  [ngModel]="form().taxableBalance"
-                  (ngModelChange)="patch('taxableBalance', $event)"
-                  min="0" step="1000" />
-              </div>
-            </label>
-            <label class="field">
-              <span class="field-label">HSA</span>
-              <div class="input-wrap dollar">
-                <span class="input-prefix">$</span>
-                <input type="number" class="field-input"
-                  [ngModel]="form().hsaBalance"
-                  (ngModelChange)="patch('hsaBalance', $event)"
-                  min="0" step="100" />
-              </div>
-            </label>
+            }
+          </div>
+          <div class="drag-summary">
+            Portfolio-weighted drag: <strong>{{ weightedDragPct().toFixed(2) }}%</strong>/yr
+            · Effective return after drag: <strong>{{ effectiveReturnPct().toFixed(2) }}%</strong>
           </div>
         </div>
 
@@ -270,6 +266,20 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       border-radius: 12px; padding: 20px;
     }
     .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-sub { font-size: 11px; color: var(--dark-text-muted); margin: -8px 0 14px; line-height: 1.5; }
+
+    .account-grid { display: flex; flex-direction: column; gap: 8px; }
+    .account-head, .account-row {
+      display: grid; grid-template-columns: 1.6fr 1.4fr 1fr 1fr; gap: 10px; align-items: center;
+    }
+    .account-head { font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 0 2px 4px; border-bottom: 1px solid var(--dark-bg-secondary); }
+    .acct-name { font-size: 13px; color: var(--dark-text); font-weight: 500; }
+    .drag-summary {
+      margin-top: 14px; padding: 10px 12px;
+      background: var(--dark-bg-secondary); border-radius: 6px;
+      font-size: 12px; color: var(--dark-text-sec);
+    }
+    .drag-summary strong { color: var(--dark-amber); font-variant-numeric: tabular-nums; }
 
     .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .field { display: flex; flex-direction: column; gap: 4px; }
@@ -373,7 +383,43 @@ export class SettingsScreenComponent implements OnInit {
     rothBalance: null,
     taxableBalance: null,
     hsaBalance: null,
+    traditionalLoadPct: 0,
+    rothLoadPct: 0,
+    taxableLoadPct: 0,
+    hsaLoadPct: 0,
+    traditionalFeesPct: 0,
+    rothFeesPct: 0,
+    taxableFeesPct: 0,
+    hsaFeesPct: 0,
     updatedAt: '',
+  });
+
+  readonly accountRows = [
+    { key: 'traditional', label: 'Traditional IRA / 401k', balanceKey: 'traditionalBalance' as const, loadKey: 'traditionalLoadPct' as const, feesKey: 'traditionalFeesPct' as const },
+    { key: 'roth',        label: 'Roth IRA / Roth 401k',   balanceKey: 'rothBalance' as const,        loadKey: 'rothLoadPct' as const,        feesKey: 'rothFeesPct' as const },
+    { key: 'taxable',     label: 'Taxable Brokerage',      balanceKey: 'taxableBalance' as const,     loadKey: 'taxableLoadPct' as const,     feesKey: 'taxableFeesPct' as const },
+    { key: 'hsa',         label: 'HSA',                    balanceKey: 'hsaBalance' as const,         loadKey: 'hsaLoadPct' as const,         feesKey: 'hsaFeesPct' as const },
+  ];
+
+  /** Portfolio-weighted annual drag % (load + fees, balance-weighted). */
+  readonly weightedDragPct = computed(() => {
+    const f = this.form();
+    const balances = this.accountRows.map(r => Number(f[r.balanceKey]) || 0);
+    const totalBal = balances.reduce((a, b) => a + b, 0);
+    if (totalBal <= 0) return 0;
+    let drag = 0;
+    for (let i = 0; i < this.accountRows.length; i++) {
+      const r = this.accountRows[i];
+      const w = balances[i] / totalBal;
+      drag += w * ((Number(f[r.loadKey]) || 0) + (Number(f[r.feesKey]) || 0));
+    }
+    return drag;
+  });
+
+  /** Effective return = expected return - weighted drag. */
+  readonly effectiveReturnPct = computed(() => {
+    const base = Number(this.form().expectedReturn) || 0;
+    return Math.max(0, base - this.weightedDragPct());
   });
 
   allocTotal(): number {

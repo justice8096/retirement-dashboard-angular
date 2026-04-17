@@ -1,10 +1,14 @@
-import { Component, inject, computed, OnInit } from '@angular/core';
+import { Component, inject, computed, signal, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { ApiService } from '@services/api.service';
+import { HouseholdProfile } from '@models/api.model';
 
 @Component({
   selector: 'app-taxes-screen',
   standalone: true,
+  imports: [FormsModule],
   template: `
     <div class="taxes-screen">
       <div class="screen-header">
@@ -15,10 +19,30 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
         </div>
       </div>
 
+      <!-- Annual income input drives income-tax computation -->
+      <div class="income-bar">
+        <label class="income-field">
+          <span class="income-label">Annual Income (for tax calc)</span>
+          <input type="number" class="income-input" min="0" step="1000"
+            [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="annualIncome()" (ngModelChange)="annualIncome.set(+$event)" />
+        </label>
+        <span class="income-hint">
+          Defaults from household target; edit to test scenarios. Income tax uses
+          federal + state brackets where available.
+        </span>
+      </div>
+
+      @if (!loc.selectedIds().size) {
+        <div class="filter-banner">
+          Showing all locations — pick some on the <strong>Locations → Overview</strong> tab to narrow this view.
+        </div>
+      }
+
       @if (loc.loading()) {
         <div class="status-msg">Loading location data…</div>
       } @else if (!taxData().length) {
-        <div class="status-msg">No tax data available. Load locations first.</div>
+        <div class="status-msg">No locations match. Load or select locations first.</div>
       } @else {
         <div class="tax-grid">
           @for (item of taxData(); track item.name) {
@@ -29,21 +53,46 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
               </div>
               <div class="tax-body">
                 <div class="tax-row">
-                  <span class="tax-label">Monthly Tax Estimate</span>
+                  <span class="tax-label">
+                    Monthly Tax Estimate
+                    <span class="src-badge" [class]="'src-' + item.source"
+                          [title]="sourceTitle(item.source)">
+                      {{ sourceLabel(item.source) }}
+                    </span>
+                  </span>
                   <span class="tax-value" [class]="dyscalculia.numberSpacingClass()">
                     {{ fmt(item.monthlyTax) }}
                   </span>
                 </div>
-                @if (item.vatRate !== null) {
+                @if (item.source === 'brackets') {
+                  @if (item.federalAnnual > 0) {
+                    <div class="tax-row tax-sub">
+                      <span class="tax-label">↳ Federal (annual)</span>
+                      <span class="tax-value">{{ fmt(item.federalAnnual) }}</span>
+                    </div>
+                  }
+                  @if (item.stateAnnual > 0) {
+                    <div class="tax-row tax-sub">
+                      <span class="tax-label">↳ State (annual)</span>
+                      <span class="tax-value">{{ fmt(item.stateAnnual) }}</span>
+                    </div>
+                  }
+                }
+                @if (item.salesRate !== null) {
                   <div class="tax-row">
-                    <span class="tax-label">VAT / Sales Tax</span>
-                    <span class="tax-value">{{ item.vatRate }}%</span>
+                    <span class="tax-label">Sales Tax</span>
+                    <span class="tax-value">{{ pct(item.salesRate) }}%</span>
+                  </div>
+                } @else if (item.vatRate !== null) {
+                  <div class="tax-row">
+                    <span class="tax-label">VAT</span>
+                    <span class="tax-value">{{ pct(item.vatRate) }}%</span>
                   </div>
                 }
-                @if (item.socialRate !== null) {
+                @if (item.socialRate !== null && item.socialRate > 0) {
                   <div class="tax-row">
                     <span class="tax-label">Social Charges</span>
-                    <span class="tax-value">{{ item.socialRate }}%</span>
+                    <span class="tax-value">{{ pct(item.socialRate) }}%</span>
                   </div>
                 }
                 @if (item.notes) {
@@ -80,36 +129,114 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
     .tax-label { font-size: 11px; color: var(--dark-text-sec); }
     .tax-value { font-size: 13px; font-weight: 600; color: var(--dark-amber); }
     .tax-notes { font-size: 10px; color: var(--dark-text-muted); line-height: 1.4; padding-top: 4px; border-top: 1px solid var(--dark-bg-secondary); }
+    .src-badge {
+      font-size: 9px; padding: 1px 5px; margin-left: 6px; border-radius: 3px;
+      font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .src-brackets      { background: rgba(76, 175, 80, 0.15); color: var(--dark-green); }
+    .src-stored        { background: rgba(92, 156, 230, 0.15); color: var(--dark-blue); }
+    .src-vat-converged { background: rgba(156, 111, 222, 0.15); color: var(--dark-purple); }
+    .src-none          { background: var(--dark-bg-secondary); color: var(--dark-text-muted); }
+
+    .tax-sub .tax-label { padding-left: 12px; color: var(--dark-text-muted); font-size: 10px; }
+    .tax-sub .tax-value { font-size: 11px; color: var(--dark-text-sec); font-weight: 500; }
+
+    .income-bar {
+      padding: 14px 16px; background: var(--dark-bg-card);
+      border: 1px solid var(--dark-border); border-radius: 10px;
+      display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    }
+    .income-field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+    .income-label { font-size: 11px; color: var(--dark-text-muted); }
+    .income-input {
+      padding: 7px 10px; border-radius: 6px; border: 1px solid var(--dark-border);
+      background: var(--dark-bg-secondary); color: var(--dark-text);
+      font-size: 15px; font-weight: 600; outline: none;
+    }
+    .income-input:focus { border-color: var(--dark-amber); }
+    .income-hint { font-size: 11px; color: var(--dark-text-muted); max-width: 400px; line-height: 1.5; }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .filter-banner {
+      padding: 10px 14px; background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
+      border-left: 3px solid var(--dark-amber); border-radius: 6px;
+      font-size: 12px; color: var(--dark-text-sec);
+    }
+    .filter-banner strong { color: var(--dark-text); }
   `],
 })
 export class TaxesScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly api = inject(ApiService);
 
-  readonly taxData = computed(() =>
-    this.loc.fullLocations()
-      .map(l => ({
-        id: l.id,
-        name: l.name,
-        country: l.country,
-        monthlyTax: l.monthlyCosts['taxes']?.typical ?? 0,
-        vatRate: l.taxes?.vatRate ?? null,
-        socialRate: l.taxes?.socialChargesRate ?? null,
-        notes: l.taxes?.notes ?? '',
-      }))
-      .filter(t => t.monthlyTax > 0)
-      .sort((a, b) => a.monthlyTax - b.monthlyTax)
-  );
+  /** Proxy onto the shared LocationService signal so edits fan out to Compare, Overview, etc. */
+  readonly annualIncome = this.loc.annualIncome;
+
+  readonly taxData = computed(() => {
+    const income = this.annualIncome();
+    return this.loc.selectedFullLocations()
+      .map(l => {
+        const tax = this.loc.computeIncomeTax(l, income);
+        return {
+          id: l.id,
+          name: l.name,
+          country: l.country,
+          monthlyTax: tax.monthlyTax,
+          federalAnnual: tax.federalAnnual,
+          stateAnnual: tax.stateAnnual,
+          source: tax.source,
+          vatRate: l.taxes?.vatRate ?? null,
+          socialRate: l.taxes?.socialChargesRate ?? null,
+          salesRate: l.taxes?.salesTax?.rate ?? null,
+          notes: l.taxes?.notes ?? '',
+        };
+      })
+      .sort((a, b) => a.monthlyTax - b.monthlyTax);
+  });
 
   ngOnInit(): void {
     this.loc.loadFull();
+    // Seed annual income from the household target — shared across Taxes,
+    // Compare, and Overview via LocationService.annualIncome.
+    this.api.getHousehold().subscribe({
+      next: (h: HouseholdProfile) => {
+        if (h.targetAnnualIncome && h.targetAnnualIncome > 0) {
+          this.annualIncome.set(h.targetAnnualIncome);
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  sourceLabel(s: string): string {
+    switch (s) {
+      case 'brackets':      return 'computed';
+      case 'stored':        return 'data';
+      case 'vat-converged': return 'vat est.';
+      default:              return '—';
+    }
+  }
+
+  sourceTitle(s: string): string {
+    switch (s) {
+      case 'brackets':      return 'Computed from federal + state income tax brackets';
+      case 'stored':        return 'Value stored in location data';
+      case 'vat-converged': return 'Estimated from VAT × taxable spending base';
+      default:              return 'No tax data available';
+    }
   }
 
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
-      : '$' + amount.toLocaleString();
+      : '$' + Math.round(amount).toLocaleString();
+  }
+
+  /** Normalize rate (decimal 0.22 or whole 22 → "22"). */
+  pct(rate: number): string {
+    const n = Number(rate) || 0;
+    const whole = n > 1 ? n : n * 100;
+    return whole.toFixed(whole >= 10 ? 0 : 1);
   }
 }

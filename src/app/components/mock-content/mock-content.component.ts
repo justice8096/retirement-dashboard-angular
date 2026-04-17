@@ -29,6 +29,7 @@ import { FeesScreenComponent } from '@components/screens/fees-screen/fees-screen
 /* ─── Setup screens ─────────────────────────────────────────────── */
 import { AssumptionsScreenComponent } from '@components/screens/assumptions-screen/assumptions-screen.component';
 import { SettingsScreenComponent } from '@components/screens/settings-screen/settings-screen.component';
+import { ItemsScreenComponent } from '@components/screens/items-screen/items-screen.component';
 import { FireSetupScreenComponent } from '@components/screens/fire-setup-screen/fire-setup-screen.component';
 
 /* ─── Simulate screens ──────────────────────────────────────────── */
@@ -63,7 +64,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
     WithdrawalScreenComponent, RothScreenComponent,
     FeesScreenComponent,
     /* Setup */
-    AssumptionsScreenComponent, SettingsScreenComponent, FireSetupScreenComponent,
+    AssumptionsScreenComponent, SettingsScreenComponent, ItemsScreenComponent, FireSetupScreenComponent,
     /* Simulate */
     MontecarloScreenComponent, ScenariosScreenComponent, FireCalcScreenComponent,
     /* Location compare */
@@ -126,6 +127,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         <!-- Setup -->
         @case ('setup/assumptions')   { <app-assumptions-screen /> }
         @case ('setup/settings')      { <app-settings-screen /> }
+        @case ('setup/items')         { <app-items-screen /> }
         @case ('setup/fire-setup')    { <app-fire-setup-screen /> }
 
         <!-- Simulate -->
