@@ -1,5 +1,6 @@
 import { Component, inject, input, computed } from '@angular/core';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { DyslexiaService } from '@services/dyslexia.service';
 import { Category, Screen } from '@models/navigation.model';
 import { ChartDataPoint } from '@models/stat.model';
 
@@ -7,7 +8,7 @@ import { ChartDataPoint } from '@models/stat.model';
   selector: 'app-chart-placeholder',
   standalone: true,
   template: `
-    @if (!dyscalculia.isEnabled()) {
+    @if (!showChart()) {
       <div class="placeholder">
         <div class="placeholder-icon">{{ cat()?.icon }}</div>
         <div class="placeholder-title">{{ screen()?.label || 'Select a screen' }}</div>
@@ -38,7 +39,7 @@ import { ChartDataPoint } from '@models/stat.model';
                   <span class="bar-value"
                     [class]="dyscalculia.numberSpacingClass()"
                     [style.color]="d.color">
-                    {{ dyscalculia.formatCurrency(d.value) }}
+                    {{ formatValue(d.value) }}
                   </span>
                 }
               </div>
@@ -54,22 +55,23 @@ import { ChartDataPoint } from '@models/stat.model';
                   }
                 </div>
               </div>
-              @if (dyscalculia.settings().magnitudeAnchors && d.anchor) {
+              @if (showAnchors() && d.anchor) {
                 <div class="bar-anchor">{{ d.anchor }}</div>
               }
             </div>
           }
         </div>
 
-        <!-- Text summary -->
-        @if (dyscalculia.settings().showTextSummaries) {
+        <!-- Text summary — shown by default per Dashboard Dyslexia F-008,
+             flips to opt-out only if user explicitly disables summaries. -->
+        @if (showSummary()) {
           <div class="text-summary">
             <div class="summary-title">What this chart shows</div>
             <p class="summary-text">
               Housing is the biggest expense, making up roughly half the total.
               Food is the second largest cost. Medical and transportation together
               are about as much as food alone. The total across these four categories
-              is {{ dyscalculia.formatCurrency(totalValue) }}.
+              is {{ formatValue(totalValue) }}.
             </p>
           </div>
         }
@@ -88,7 +90,7 @@ import { ChartDataPoint } from '@models/stat.model';
       color: var(--dark-text);
       font-weight: 600;
     }
-    .placeholder-hint { font-size: 12px; margin-top: 4px; }
+    .placeholder-hint { font-size: 14px; margin-top: 4px; }
 
     /* Chart */
     .chart-area { width: 100%; }
@@ -104,12 +106,12 @@ import { ChartDataPoint } from '@models/stat.model';
       font-weight: 600;
     }
     .chart-subtitle {
-      font-size: 11px;
+      font-size: 14px;
       color: var(--dark-text-sec);
       margin-top: 2px;
     }
     .chart-badge {
-      font-size: 9px;
+      font-size: 12px;
       color: var(--dark-teal);
       padding: 2px 8px;
       background: rgba(42, 123, 123, 0.1);
@@ -128,8 +130,8 @@ import { ChartDataPoint } from '@models/stat.model';
       margin-bottom: 4px;
       align-items: baseline;
     }
-    .bar-name { font-size: 12px; color: var(--dark-text); }
-    .bar-value { font-size: 12px; font-weight: 600; }
+    .bar-name { font-size: 14px; color: var(--dark-text); }
+    .bar-value { font-size: 14px; font-weight: 600; }
     .bar-track {
       height: 24px;
       background: var(--dark-bg-secondary);
@@ -148,12 +150,12 @@ import { ChartDataPoint } from '@models/stat.model';
       &.no-transition { transition: none; }
     }
     .bar-inline-value {
-      font-size: 10px;
+      font-size: 12px;
       color: #fff;
       font-weight: 600;
     }
     .bar-anchor {
-      font-size: 9px;
+      font-size: 12px;
       color: var(--dark-text-muted);
       margin-top: 2px;
       font-style: italic;
@@ -168,20 +170,23 @@ import { ChartDataPoint } from '@models/stat.model';
       border: 1px solid rgba(42, 123, 123, 0.15);
     }
     .summary-title {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--dark-teal);
       font-weight: 600;
       margin-bottom: 4px;
     }
     .summary-text {
-      font-size: 11px;
+      font-size: 14px;
       color: var(--dark-text-sec);
-      line-height: 1.5;
+      line-height: var(--prose-line-height, 1.5);
+      letter-spacing: var(--prose-letter-spacing, 0);
+      word-spacing: var(--prose-word-spacing, 0);
     }
   `],
 })
 export class ChartPlaceholderComponent {
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly dyslexia = inject(DyslexiaService);
 
   readonly cat = input<Category | null>(null);
   readonly screen = input<Screen | undefined>(undefined);
@@ -199,4 +204,25 @@ export class ChartPlaceholderComponent {
   readonly showLabeled = computed(() =>
     this.dyscalculia.settings().chartStyle === 'bar-labeled'
   );
+
+  /** Chart area renders when either accessibility track is on. */
+  readonly showChart = computed(() =>
+    this.dyscalculia.isEnabled() || this.dyslexia.isEnabled(),
+  );
+
+  /** Text summary shown by default when dyslexia is on, or by dyscalculia setting. */
+  readonly showSummary = computed(() =>
+    this.dyslexia.isEnabled() || this.dyscalculia.settings().showTextSummaries,
+  );
+
+  /** Real-world anchors shown when explicitly requested by dyscalculia setting. */
+  readonly showAnchors = computed(() =>
+    this.dyscalculia.settings().magnitudeAnchors,
+  );
+
+  formatValue(amount: number): string {
+    return this.dyscalculia.isEnabled()
+      ? this.dyscalculia.formatCurrency(amount)
+      : '$' + amount.toLocaleString();
+  }
 }

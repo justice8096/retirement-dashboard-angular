@@ -21,7 +21,14 @@ html {
   @include mat.color-variants-backwards-compatibility($dark-theme);
 }
 
-/* ─── Design Tokens (Dark Theme) ─────────────────────────────────────── */
+/* ─── Dyslexia alt fonts (fallback stacks bundled at runtime) ────────── */
+/*
+ * Atkinson Hyperlegible and OpenDyslexic are loaded from Google Fonts /
+ * cdn.jsdelivr.net via <link> in index.html. The stacks here ensure
+ * degradation to Inter when offline.
+ */
+
+/* ─── Design Tokens (Dark Theme — default) ────────────────────────────── */
 :root {
   --dark-bg: #0B1426;
   --dark-bg-card: #162040;
@@ -37,7 +44,15 @@ html {
   --dark-purple: #9C6FDE;
   --dark-teal: #2A7B7B;
   --dark-red: #E57373;
+  --dark-neutral: #8B9DC3;       /* replaces red for soft concerns */
   --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  /* Dyslexia prose controls — overridden by DyslexiaService when enabled.
+   * Prose-oriented utilities pick these up via var(... , fallback). */
+  --app-font-family: var(--font-sans);
+  --prose-line-height: 1.5;
+  --prose-letter-spacing: 0;
+  --prose-word-spacing: 0;
 
   /* ─── Material Overrides ─────────────────────────────────────────── */
   --mat-sys-primary: var(--dark-blue);
@@ -69,6 +84,53 @@ html {
   --mat-chip-selected-trailing-icon-color: #fff;
 }
 
+/* ─── Dyslexia Contrast Modes ─────────────────────────────────────────
+ * Applied by DyslexiaService.applyToDocument() on :root. Overrides the
+ * dark-theme tokens defined above so only CSS variables change — Angular
+ * Material picks up the new palette without theme recompilation.
+ * Per BDA guidance: avoid pure white-on-black / black-on-white.
+ */
+
+/* Softer dark: keep dark bg, dial back text luminosity from #E8ECF4 to #C9D1E3 */
+html.dx-contrast-softer-dark {
+  --dark-bg: #10182A;
+  --dark-bg-card: #1B274A;
+  --dark-bg-secondary: #15213D;
+  --dark-border: #28406A;
+  --dark-text: #C9D1E3;
+  --dark-text-sec: #8391AE;
+}
+
+/* Cream / sepia — warm off-white with muted dark-slate text */
+html.dx-contrast-cream {
+  --dark-bg: #FDF6E3;
+  --dark-bg-card: #F3E9C8;
+  --dark-bg-secondary: #F8EFD3;
+  --dark-border: #D9CCA3;
+  --dark-text: #2A3244;
+  --dark-text-sec: #4A5367;
+  --dark-text-muted: #6F7787;
+  --dark-blue: #2E5F99;
+  --dark-green: #2F7034;
+  --dark-red: #A34846;
+  --dark-amber: #8A5A1F;
+}
+
+/* Light: soft off-white with dark-slate — not pure #FFFFFF / #000000 */
+html.dx-contrast-light {
+  --dark-bg: #F4F4F1;
+  --dark-bg-card: #E9E9E4;
+  --dark-bg-secondary: #EEEEEA;
+  --dark-border: #CCCCC4;
+  --dark-text: #1F2430;
+  --dark-text-sec: #3E4557;
+  --dark-text-muted: #6A7080;
+  --dark-blue: #2E5F99;
+  --dark-green: #2F7034;
+  --dark-red: #A34846;
+  --dark-amber: #8A5A1F;
+}
+
 /* ─── Base Reset ─────────────────────────────────────────────────────── */
 *,
 *::before,
@@ -81,13 +143,27 @@ html {
 html, body {
   height: 100%;
   overflow: hidden;
-  font-family: var(--font-sans);
+  font-family: var(--app-font-family, var(--font-sans));
   background: var(--dark-bg);
   color: var(--dark-text);
 }
 
 button {
   font-family: inherit;
+}
+
+/* Prose — paragraphs, hints, descriptions — picks up dyslexia overrides */
+p,
+.prose,
+.param-hint,
+.desc,
+.toggle-desc,
+.header-sub,
+.result-sub,
+.info-text {
+  line-height: var(--prose-line-height, 1.5);
+  letter-spacing: var(--prose-letter-spacing, 0);
+  word-spacing: var(--prose-word-spacing, 0);
 }
 
 /* ─── Dyscalculia Number Spacing Utilities ────────────────────────────── */
@@ -99,6 +175,46 @@ button {
 }
 .number-spacing-grouped {
   letter-spacing: 0.08em;
+}
+
+/* ─── Dyslexia Reading Aids ──────────────────────────────────────────── */
+
+/* Bionic bolding — components render <strong> tags via DyslexiaService.
+ * This rule ensures the bolded prefix is visibly heavier when the aid is on. */
+html.dx-aid-bionic .bionic-text strong {
+  font-weight: 800;
+  color: var(--dark-text);
+}
+
+/* Reading ruler — a subtle horizontal band that follows the cursor via
+ * mousemove handler on the root component. Managed by JS, styled here. */
+html.dx-aid-ruler .dx-ruler {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 32px;
+  pointer-events: none;
+  background: rgba(92, 156, 230, 0.08);
+  border-top: 1px solid rgba(92, 156, 230, 0.25);
+  border-bottom: 1px solid rgba(92, 156, 230, 0.25);
+  z-index: 9999;
+  transition: top 60ms linear;
+}
+html:not(.dx-aid-ruler) .dx-ruler { display: none; }
+
+/* Reading progress bar — shown when dyslexia.showReadingProgress = true */
+.dx-reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: var(--dark-blue);
+  z-index: 9998;
+  transition: width 80ms linear;
+}
+html:not(.dx-enabled) .dx-reading-progress,
+html.dx-enabled:not(.dx-reading-progress-on) .dx-reading-progress {
+  display: none;
 }
 
 /* ─── Scrollbar Styling ──────────────────────────────────────────────── */
@@ -115,6 +231,10 @@ button {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+html.dx-contrast-cream ::-webkit-scrollbar-thumb,
+html.dx-contrast-light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
 }
 
 /* Firefox scrollbar */
@@ -138,9 +258,9 @@ button {
   --mdc-switch-handle-width: 16px;
 }
 
-/* Tab groups: transparent background to blend with our panels */
+/* Tab groups — dyslexia audit F-002: 14px floor on tab labels */
 .mat-mdc-tab-group {
-  --mat-tab-header-label-text-size: 12px;
+  --mat-tab-header-label-text-size: 14px;
   --mat-tab-header-label-text-weight: 500;
 }
 .mat-mdc-tab-header {
@@ -151,10 +271,10 @@ button {
   font-weight: 700;
 }
 
-/* Chips: match our compact chip sizing */
+/* Chips — dyslexia audit F-002: 14px floor on chip labels */
 .mat-mdc-chip {
   --mdc-chip-container-height: 32px;
-  --mdc-chip-label-text-size: 11px;
+  --mdc-chip-label-text-size: 14px;
   --mdc-chip-container-shape-radius: 6px;
   font-family: var(--font-sans);
 }
@@ -164,12 +284,12 @@ button {
   background: var(--dark-bg-card) !important;
   border: 1px solid var(--dark-border);
   color: var(--dark-text) !important;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-/* Buttons: match our compact sizing */
+/* Buttons — dyslexia audit F-002: 14px floor */
 .mat-mdc-button {
-  --mdc-text-button-label-text-size: 11px;
+  --mdc-text-button-label-text-size: 14px;
   font-family: var(--font-sans);
 }

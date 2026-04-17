@@ -42,8 +42,12 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
           </label>
           <label class="param">
             <span class="param-label">Withdrawal Rate (%)</span>
-            <input type="number" class="param-input" step="0.1"
+            <input type="number" class="param-input" step="0.1" min="1" max="20"
               [ngModel]="withdrawalRate()" (ngModelChange)="withdrawalRate.set($event)" />
+            <!-- Inline definition (Dyscalculia F-010). -->
+            <span class="param-hint">
+              The share of your savings you plan to spend each year. 4% is a common starting point (Trinity study).
+            </span>
           </label>
           <label class="param">
             <span class="param-label">Current Age</span>
@@ -55,12 +59,27 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 
       <!-- Results -->
       <div class="results">
-        <div class="result-card highlight">
+        <div class="result-card highlight fire-number-card">
           <div class="result-label">FIRE Number</div>
-          <div class="result-value lg" [class]="dyscalculia.numberSpacingClass()">
+          <div class="result-value lg fire-number-value" [class]="dyscalculia.numberSpacingClass()">
             {{ fmt(fireNumber()) }}
           </div>
-          <div class="result-explain">{{ annualExpenses().toLocaleString() }} × {{ Math.round(100 / withdrawalRate()) }}</div>
+          <!-- Step-ladder explanation (Dyscalculia F-001): plain-language
+               walkthrough of FIRE = expenses × (100 / withdrawal rate). -->
+          <ol class="result-explain-steps" aria-label="How the FIRE Number is calculated">
+            <li>
+              You spend about
+              <strong>{{ fmt(annualExpenses()) }}</strong> per year.
+            </li>
+            <li>
+              At a <strong>{{ withdrawalRate() }}%</strong> withdrawal rate,
+              you need <strong>{{ multiplier() }}×</strong> your yearly spending.
+            </li>
+            <li>
+              That's
+              <strong>{{ fmt(annualExpenses()) }} × {{ multiplier() }} = {{ fmt(fireNumber()) }}</strong>.
+            </li>
+          </ol>
         </div>
         <div class="result-card">
           <div class="result-label">Years to FIRE</div>
@@ -123,8 +142,37 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
     .result-card.highlight { border-color: var(--dark-amber); }
     .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
     .result-value { font-size: 15px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
-    .result-value.lg { font-size: 24px; }
-    .result-explain { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
+    .result-value.lg { font-size: 24px; line-height: 1.15; word-break: break-word; }
+
+    /* FIRE Number spans 2 columns so the full formatted value fits. */
+    .fire-number-card { grid-column: span 2; }
+    .fire-number-value { font-size: 28px; letter-spacing: 0.5px; }
+    @media (max-width: 520px) {
+      .fire-number-card { grid-column: span 1; }
+      .fire-number-value { font-size: 22px; }
+    }
+    .result-explain { font-size: 12px; color: var(--dark-text-muted); margin-top: 2px; }
+    .result-explain-steps {
+      list-style: decimal inside;
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(92, 156, 230, 0.06);
+      border-radius: 6px;
+      border: 1px solid rgba(92, 156, 230, 0.15);
+      font-size: 13px;
+      color: var(--dark-text-sec);
+      line-height: var(--prose-line-height, 1.5);
+      letter-spacing: var(--prose-letter-spacing, 0);
+    }
+    .result-explain-steps li { margin: 2px 0; }
+    .result-explain-steps strong { color: var(--dark-text); font-weight: 700; }
+
+    .param-hint {
+      font-size: 12px;
+      color: var(--dark-text-muted);
+      line-height: var(--prose-line-height, 1.5);
+      margin-top: 2px;
+    }
 
     .progress-bar { height: 14px; background: var(--dark-bg-secondary); border-radius: 7px; overflow: hidden; }
     .progress-fill { height: 100%; background: var(--dark-green); border-radius: 7px; transition: width 0.3s; }
@@ -145,6 +193,12 @@ export class FireCalcScreenComponent {
   readonly fireNumber = computed(() =>
     Math.round(this.annualExpenses() / (this.withdrawalRate() / 100))
   );
+
+  /** Integer multiplier (100 / withdrawalRate) used in the step-ladder. */
+  readonly multiplier = computed(() => {
+    const rate = this.withdrawalRate();
+    return rate > 0 ? Math.round(100 / rate) : 0;
+  });
 
   readonly yearsToFire = computed(() => {
     const target = this.fireNumber();

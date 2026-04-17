@@ -1,6 +1,7 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal, HostListener } from '@angular/core';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { DyslexiaService } from '@services/dyslexia.service';
 import { HeaderComponent } from '@components/header/header.component';
 import { IconRailComponent } from '@components/icon-rail/icon-rail.component';
 import { LabeledRailComponent } from '@components/labeled-rail/labeled-rail.component';
@@ -9,6 +10,10 @@ import { StatusBarComponent } from '@components/status-bar/status-bar.component'
 import { AccessibilityPanelComponent } from '@components/accessibility-panel/accessibility-panel.component';
 import { MockContentComponent } from '@components/mock-content/mock-content.component';
 import { OnboardingComponent } from '@components/onboarding/onboarding.component';
+import { ShortcutCheatsheetComponent } from '@components/shortcut-cheatsheet/shortcut-cheatsheet.component';
+import { ReadAloudButtonComponent } from '@components/read-aloud-button/read-aloud-button.component';
+import { HelpPanelComponent } from '@components/help-panel/help-panel.component';
+import { HelpService } from '@services/help.service';
 
 @Component({
   selector: 'app-root',
@@ -22,6 +27,9 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
     AccessibilityPanelComponent,
     MockContentComponent,
     OnboardingComponent,
+    ShortcutCheatsheetComponent,
+    ReadAloudButtonComponent,
+    HelpPanelComponent,
   ],
   template: `
     @if (nav.phase() === 'onboarding') {
@@ -32,6 +40,11 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
 
         @if (nav.showA11yPanel()) {
           <app-accessibility-panel />
+        }
+
+        <!-- Reading progress bar (dyslexia F-011) -->
+        @if (dyslexia.isEnabled() && dyslexia.settings().showReadingProgress) {
+          <div class="dx-reading-progress visible" [style.width.%]="scrollProgress()"></div>
         }
 
         <div class="main-layout">
@@ -48,6 +61,26 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
         </div>
 
         <app-status-bar />
+
+        <!-- Reading ruler (dyslexia F-007) -->
+        @if (dyslexia.isEnabled() && dyslexia.settings().readingAid === 'ruler') {
+          <div class="dx-ruler" [style.top.px]="rulerY()"></div>
+        }
+
+        <!-- Floating read-aloud button (dyslexia F-003) -->
+        @if (dyslexia.canReadAloud) {
+          <app-read-aloud-button />
+        }
+
+        <!-- Shortcut cheatsheet (dyslexia F-012) -->
+        @if (showShortcuts()) {
+          <app-shortcut-cheatsheet (close)="showShortcuts.set(false)" />
+        }
+
+        <!-- Per-screen help drawer -->
+        @if (help.open()) {
+          <app-help-panel />
+        }
       </div>
     }
   `,
@@ -56,7 +89,7 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
       height: 100vh;
       display: flex;
       flex-direction: column;
-      font-family: var(--font-sans);
+      font-family: var(--app-font-family, var(--font-sans));
       background: var(--dark-bg);
       color: var(--dark-text);
     }
@@ -72,7 +105,6 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
       overflow: hidden;
       min-height: 0;
     }
-    /* Angular host elements must participate in flex layout */
     app-context-bar {
       flex-shrink: 0;
     }
@@ -83,13 +115,65 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
       min-height: 0;
       overflow: hidden;
     }
+    .dx-reading-progress.visible {
+      display: block;
+    }
   `],
 })
 export class AppComponent implements OnInit {
   readonly nav = inject(NavigationService);
+  readonly dyslexia = inject(DyslexiaService);
+  readonly help = inject(HelpService);
   private readonly dyscalculia = inject(DyscalculiaService);
+
+  readonly showShortcuts = signal(false);
+  readonly rulerY = signal(0);
+  readonly scrollProgress = signal(0);
 
   ngOnInit(): void {
     this.dyscalculia.loadSaved();
+    this.dyslexia.loadSaved();
+  }
+
+  @HostListener('window:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    const inInput = this.isInInput(event.target);
+
+    // '?' opens shortcut cheatsheet (dyslexia F-012)
+    if (event.key === '?' && !inInput) {
+      event.preventDefault();
+      this.showShortcuts.update((v) => !v);
+    }
+    // F1 toggles screen-specific help
+    if (event.key === 'F1' && !inInput) {
+      event.preventDefault();
+      this.help.toggle();
+    }
+    // Escape closes cheatsheet (help panel handles its own Esc)
+    if (event.key === 'Escape' && this.showShortcuts()) {
+      this.showShortcuts.set(false);
+    }
+  }
+
+  @HostListener('window:mousemove', ['$event'])
+  onMouseMove(event: MouseEvent): void {
+    if (this.dyslexia.isEnabled() && this.dyslexia.settings().readingAid === 'ruler') {
+      this.rulerY.set(event.clientY - 16);
+    }
+  }
+
+  @HostListener('window:scroll', ['$event'])
+  onScroll(): void {
+    if (!this.dyslexia.isEnabled() || !this.dyslexia.settings().showReadingProgress) return;
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - doc.clientHeight;
+    if (max <= 0) return;
+    this.scrollProgress.set(Math.min(100, (window.scrollY / max) * 100));
+  }
+
+  private isInInput(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tag = target.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
   }
 }

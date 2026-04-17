@@ -4,13 +4,21 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatChipsModule } from '@angular/material/chips';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { DyslexiaService } from '@services/dyslexia.service';
 import { DyscalculiaSettingsComponent } from '@components/dyscalculia-settings/dyscalculia-settings.component';
+import { DyslexiaSettingsComponent } from '@components/dyslexia-settings/dyslexia-settings.component';
 import { FontSize } from '@models/navigation.model';
 
 @Component({
   selector: 'app-accessibility-panel',
   standalone: true,
-  imports: [MatTabsModule, MatSlideToggleModule, MatChipsModule, DyscalculiaSettingsComponent],
+  imports: [
+    MatTabsModule,
+    MatSlideToggleModule,
+    MatChipsModule,
+    DyscalculiaSettingsComponent,
+    DyslexiaSettingsComponent,
+  ],
   template: `
     <div class="panel">
       <mat-tab-group
@@ -54,13 +62,29 @@ import { FontSize } from '@models/navigation.model';
           </div>
         </mat-tab>
 
+        <!-- Dyslexia tab -->
+        <mat-tab>
+          <ng-template mat-tab-label>
+            <span class="tab-label">
+              📖 Reading &amp; Text
+              @if (dyslexia.isEnabled()) {
+                <span class="status-dot" aria-label="Dyslexia support enabled"></span>
+              }
+            </span>
+          </ng-template>
+
+          <div class="tab-content">
+            <app-dyslexia-settings />
+          </div>
+        </mat-tab>
+
         <!-- Dyscalculia tab -->
         <mat-tab>
           <ng-template mat-tab-label>
             <span class="tab-label">
-              🧠 Number &amp; Data Display
+              🧠 Numbers &amp; Data
               @if (dyscalculia.isEnabled()) {
-                <span class="status-dot"></span>
+                <span class="status-dot" aria-label="Dyscalculia support enabled"></span>
               }
             </span>
           </ng-template>
@@ -72,7 +96,8 @@ import { FontSize } from '@models/navigation.model';
       </mat-tab-group>
 
       <div class="hint-bar">
-        Keyboard: Ctrl+Shift+A to toggle this panel
+        Keyboard: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> toggle panel ·
+        <kbd>?</kbd> keyboard shortcuts
       </div>
     </div>
   `,
@@ -87,7 +112,7 @@ import { FontSize } from '@models/navigation.model';
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 12px;
+      font-size: 14px;
     }
     .status-dot {
       width: 8px;
@@ -107,7 +132,7 @@ import { FontSize } from '@models/navigation.model';
       flex-wrap: wrap;
     }
     .settings-title {
-      font-size: 12px;
+      font-size: 14px;
       color: var(--dark-text-sec);
       font-weight: 600;
     }
@@ -117,17 +142,27 @@ import { FontSize } from '@models/navigation.model';
       align-items: center;
     }
     .setting-label {
-      font-size: 11px;
+      font-size: 14px;
       color: var(--dark-text-sec);
     }
     .hint-bar {
       padding: 4px 20px;
-      font-size: 10px;
+      font-size: 12px;
       color: var(--dark-text-muted);
       border-top: 1px solid var(--dark-border);
     }
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--dark-text);
+      background: var(--dark-bg-secondary);
+      border: 1px solid var(--dark-border);
+      border-radius: 3px;
+    }
 
-    /* Material tab overrides */
+    /* Material tab + chip overrides — 14px floor per dyslexia audit F-002 */
     :host ::ng-deep {
       .mat-mdc-tab-header {
         background: transparent;
@@ -141,8 +176,8 @@ import { FontSize } from '@models/navigation.model';
         --mdc-chip-label-text-color: var(--dark-text-sec);
         --mdc-chip-elevated-selected-container-color: var(--dark-blue);
         --mdc-chip-selected-label-text-color: #fff;
-        --mdc-chip-container-height: 28px;
-        --mdc-chip-label-text-size: 11px;
+        --mdc-chip-container-height: 32px;
+        --mdc-chip-label-text-size: 14px;
         font-family: var(--font-sans);
       }
     }
@@ -151,6 +186,7 @@ import { FontSize } from '@models/navigation.model';
 export class AccessibilityPanelComponent {
   readonly nav = inject(NavigationService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly dyslexia = inject(DyslexiaService);
 
   readonly fontSizes: { key: FontSize; label: string }[] = [
     { key: 'normal', label: 'Aa' },
@@ -159,10 +195,14 @@ export class AccessibilityPanelComponent {
   ];
 
   get tabIndex(): number {
-    return this.nav.a11yTab() === 'display' ? 0 : 1;
+    const tab = this.nav.a11yTab();
+    if (tab === 'display') return 0;
+    if (tab === 'dyslexia') return 1;
+    return 2;
   }
 
   onTabChange(index: number): void {
-    this.nav.setA11yTab(index === 0 ? 'display' : 'dyscalculia');
+    const tab = index === 0 ? 'display' : index === 1 ? 'dyslexia' : 'dyscalculia';
+    this.nav.setA11yTab(tab);
   }
 }
