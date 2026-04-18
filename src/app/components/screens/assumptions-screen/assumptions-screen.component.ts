@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { HealthcareService } from '@services/healthcare.service';
+import { LocationService } from '@services/location.service';
 import {
   HouseholdProfile, HouseholdMember, HouseholdPet,
   MemberRole, DependentType, PetType,
@@ -198,6 +200,153 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
             <div class="empty-hint">No pets — click “Add Pet” to add one.</div>
           }
         </div>
+
+        <!-- Healthcare regime + MAGI composition -->
+        @if (healthcareDecision(); as hc) {
+          <div class="card hc-card">
+            <h3 class="card-title">Healthcare (derived from ages + MAGI)</h3>
+
+            <!-- Quick fill: derive portfolio buckets from total cash need -->
+            <div class="hc-subsection">
+              <h4 class="hc-subtitle">Quick Fill (optional)</h4>
+              <p class="hc-help">
+                Enter your total annual cash need; we'll split the portfolio draw across
+                Traditional / Roth / Taxable based on your account balances.
+              </p>
+              <div class="hc-income-grid">
+                <label class="field compact">
+                  <span class="field-label">Total Annual Need ($)</span>
+                  <input type="number" class="field-input" min="0" step="1000"
+                    [ngModel]="healthcare.totalAnnualNeed()"
+                    (ngModelChange)="healthcare.totalAnnualNeed.set(+$event)" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Apportion Strategy</span>
+                  <select class="field-input"
+                    [ngModel]="healthcare.apportionStrategy()"
+                    (ngModelChange)="healthcare.apportionStrategy.set($event)">
+                    <option value="manual">Manual — I'll enter buckets below</option>
+                    <option value="proportional">Proportional to balances</option>
+                    <option value="tax-efficient">Tax-efficient (taxable → trad → Roth)</option>
+                  </select>
+                </label>
+                <div class="field compact hc-apply-wrap">
+                  <button mat-stroked-button class="hc-apply-btn"
+                    [disabled]="healthcare.apportionStrategy() === 'manual'"
+                    (click)="healthcare.applyApportionment()">
+                    Fill buckets below
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Income composition: drives the MAGI calc below -->
+            <div class="hc-subsection">
+              <h4 class="hc-subtitle">Annual Income Composition</h4>
+              <div class="hc-income-grid">
+                <label class="field compact">
+                  <span class="field-label">Traditional 401k / IRA ($)</span>
+                  <input type="number" class="field-input" min="0" step="1000"
+                    [ngModel]="healthcare.income().traditionalAnnual"
+                    (ngModelChange)="healthcare.patchIncome({ traditionalAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Roth 401k / IRA ($)</span>
+                  <input type="number" class="field-input" min="0" step="1000"
+                    [ngModel]="healthcare.income().rothAnnual"
+                    (ngModelChange)="healthcare.patchIncome({ rothAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Taxable brokerage ($)</span>
+                  <input type="number" class="field-input" min="0" step="1000"
+                    [ngModel]="healthcare.income().taxableBrokerageAnnual"
+                    (ngModelChange)="healthcare.patchIncome({ taxableBrokerageAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Social Security ($/yr)</span>
+                  <input type="number" class="field-input" min="0" step="500"
+                    [ngModel]="healthcare.income().ssAnnual"
+                    (ngModelChange)="healthcare.patchIncome({ ssAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Pension / other taxable ($)</span>
+                  <input type="number" class="field-input" min="0" step="500"
+                    [ngModel]="healthcare.income().pensionAnnual"
+                    (ngModelChange)="healthcare.patchIncome({ pensionAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Filing status</span>
+                  <select class="field-input"
+                    [ngModel]="healthcare.income().filingStatus"
+                    (ngModelChange)="healthcare.patchIncome({ filingStatus: $event })">
+                    <option value="joint">Married filing jointly</option>
+                    <option value="single">Single</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <!-- Derived: Cash in / AGI / MAGI -->
+            <div class="hc-grid">
+              <div class="hc-stat">
+                <span class="hc-label">Cash In (all sources)</span>
+                <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
+                  {{ '$' + healthcare.magi().cashIn.toFixed(0) }}
+                </span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">Federal AGI</span>
+                <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
+                  {{ '$' + healthcare.magi().agi.toFixed(0) }}
+                </span>
+                <span class="hc-sub">Taxable SS: {{ '$' + healthcare.magi().taxableSS.toFixed(0) }}</span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">MAGI (for ACA)</span>
+                <span class="hc-value hc-cost" [class]="dyscalculia.numberSpacingClass()">
+                  {{ '$' + healthcare.magi().magiForAca.toFixed(0) }}
+                </span>
+                <span class="hc-sub">AGI + non-taxable SS</span>
+              </div>
+            </div>
+
+            <!-- Regime -->
+            <div class="hc-grid">
+              <div class="hc-stat">
+                <span class="hc-label">Regime</span>
+                <span class="hc-value hc-src-{{ hc.decision.source }}">
+                  {{ healthcareSourceLabel(hc.decision.source) }}
+                </span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">Monthly Cost (ref: {{ hc.location.name }})</span>
+                <span class="hc-value hc-cost" [class]="dyscalculia.numberSpacingClass()">
+                  {{ '$' + hc.decision.monthlyCost.toFixed(0) }}/mo
+                </span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">Adults &lt; 65 / 65+</span>
+                <span class="hc-value">
+                  {{ hc.decision.adultsPreMedicare }} / {{ hc.decision.adultsMedicare }}
+                </span>
+              </div>
+              @if (hc.decision.allEligibleYear) {
+                <div class="hc-stat">
+                  <span class="hc-label">All Medicare-eligible by</span>
+                  <span class="hc-value">{{ hc.decision.allEligibleYear }}</span>
+                </div>
+              }
+            </div>
+
+            @if (hc.decision.source.startsWith('aca')) {
+              <div class="hc-hint">
+                ACA premium capped at 8.5% of <strong>MAGI</strong> (enhanced subsidy rules through 2025).
+                Roth withdrawals don't count toward MAGI; Social Security counts at 100% for ACA even
+                though only {{ (magiSsTaxabilityPct() * 100).toFixed(0) }}% is federally taxed.
+              </div>
+            }
+          </div>
+        }
       }
     </div>
   `,
@@ -245,6 +394,33 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
     }
     .remove-btn:hover { color: var(--dark-red); border-color: var(--dark-red); }
 
+    .hc-card { display: flex; flex-direction: column; gap: 14px; }
+    .hc-subsection { padding-bottom: 10px; border-bottom: 1px solid var(--dark-bg-secondary); }
+    .hc-subtitle { font-size: 11px; font-weight: 600; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px; }
+    .hc-help { font-size: 11px; color: var(--dark-text-muted); margin: -4px 0 10px; line-height: 1.5; }
+    .hc-apply-wrap { justify-content: flex-end; }
+    .hc-apply-btn {
+      --mdc-outlined-button-container-height: 34px;
+      --mdc-outlined-button-label-text-size: 12px;
+      margin-top: 14px;
+    }
+    .hc-income-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    .hc-sub { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
+    .hc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+    .hc-stat { display: flex; flex-direction: column; gap: 3px; }
+    .hc-label { font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .hc-value { font-size: 14px; font-weight: 600; color: var(--dark-text); font-variant-numeric: tabular-nums; }
+    .hc-cost { color: var(--dark-amber); }
+    .hc-src-medicare         { color: var(--dark-green); }
+    .hc-src-aca-subsidized   { color: var(--dark-blue); }
+    .hc-src-aca-unsubsidized { color: var(--dark-red); }
+    .hc-src-mixed            { color: var(--dark-purple); }
+    .hc-hint {
+      margin-top: 12px; padding: 8px 10px;
+      background: var(--dark-bg-secondary); border-radius: 6px;
+      font-size: 11px; color: var(--dark-text-muted); line-height: 1.5;
+    }
+
     .derived-row { margin-top: 10px; font-size: 12px; color: var(--dark-text-sec); }
     .derived-row strong { color: var(--dark-text); }
     .empty-hint { font-size: 12px; color: var(--dark-text-muted); padding: 8px 0; }
@@ -254,6 +430,8 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
 export class AssumptionsScreenComponent implements OnInit {
   private readonly api = inject(ApiService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly healthcare = inject(HealthcareService);
+  readonly loc = inject(LocationService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -275,6 +453,33 @@ export class AssumptionsScreenComponent implements OnInit {
       next: (h) => { this.draft.set(h); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+    this.loc.loadFull();
+    this.healthcare.load();
+  }
+
+  /** Healthcare decision against the first selected location (or first full location). */
+  healthcareDecision() {
+    const pool = this.loc.selectedFullLocations();
+    const ref = pool[0] ?? this.loc.fullLocations()[0];
+    if (!ref) return null;
+    return { location: ref, decision: this.healthcare.decide(ref) };
+  }
+
+  healthcareSourceLabel(src: string): string {
+    switch (src) {
+      case 'medicare':         return 'Medicare';
+      case 'aca-subsidized':   return 'ACA (subsidized)';
+      case 'aca-unsubsidized': return 'ACA (unsubsidized)';
+      case 'mixed':            return 'Mixed (Medicare + ACA)';
+      default:                 return '—';
+    }
+  }
+
+  /** Fraction of SS that's federally taxable right now — shown in the ACA hint. */
+  magiSsTaxabilityPct(): number {
+    const m = this.healthcare.magi();
+    const ss = this.healthcare.income().ssAnnual;
+    return ss > 0 ? m.taxableSS / ss : 0;
   }
 
   patch(partial: Partial<HouseholdProfile>): void {

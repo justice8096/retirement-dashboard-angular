@@ -51,12 +51,23 @@ export interface MonthlyCosts {
   [key: string]: CostRange;
 }
 
+export interface AcaMarketplaceInfo {
+  benchmarkSilverMonthly2Adult?: number;
+  benchmarkSilverMonthlySingle?: number;
+  /** Enhanced ACA premium cap as fraction of MAGI, e.g. 0.085 = 8.5%. */
+  premiumCapPctOfIncome?: number;
+  notes?: string;
+}
+
 export interface HealthcareInfo {
   system: string;
   qualityRating: number;
   dentalIncluded: boolean;
   waitTimes: string;
   prescriptionCoverage: string;
+  notes?: string;
+  /** ACA marketplace pricing for pre-Medicare retirees. */
+  acaMarketplace?: AcaMarketplaceInfo;
 }
 
 export interface LifestyleInfo {
@@ -154,12 +165,16 @@ export interface CostCategoryMeta {
   screenId?: string;
   /**
    * Whether this category is subject to the location's VAT / social charges.
-   * Used by the iterative tax-on-total convergence in LocationService. Rough
-   * VAT convention: essentials (rent, groceries, medicine, healthcare,
-   * insurance, utilities) are typically exempt or reduced-rate and excluded
-   * from the taxable base; discretionary spending is included.
+   * Used by the iterative tax-on-total convergence in LocationService.
    */
   taxable?: boolean;
+  /**
+   * Alternate categories are excluded from default cost sums. Exactly one
+   * alternate from a mutually-exclusive group is selected at runtime. Example:
+   * `healthcarePreMedicare` is an alternate to `healthcare` — the
+   * HealthcareService picks whichever applies based on household ages + income.
+   */
+  alternate?: boolean;
 }
 
 export const COST_CATEGORIES: CostCategoryMeta[] = [
@@ -167,6 +182,7 @@ export const COST_CATEGORIES: CostCategoryMeta[] = [
   { key: 'groceries', label: 'Groceries', icon: '🛒', color: '#5C9CE6', screenId: 'groceries', taxable: false },
   { key: 'medicine', label: 'Medicine', icon: '💊', color: '#E57373', screenId: 'medicine', taxable: false },
   { key: 'healthcare', label: 'Healthcare', icon: '🏥', color: '#4CAF50', taxable: false },
+  { key: 'healthcarePreMedicare', label: 'Healthcare (Pre-Medicare / ACA)', icon: '🏥', color: '#4CAF50', taxable: false, alternate: true },
   { key: 'medicalOOP', label: 'Medical OOP', icon: '🩺', color: '#2A7B7B', taxable: false },
   { key: 'insurance', label: 'Insurance', icon: '🛡️', color: '#8B9DC3', taxable: false },
   { key: 'transportation', label: 'Transportation', icon: '🚗', color: '#9C6FDE', screenId: 'transport', taxable: true },

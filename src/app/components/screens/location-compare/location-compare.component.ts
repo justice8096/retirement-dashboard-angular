@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { HealthcareService } from '@services/healthcare.service';
 import { LocationFull, COST_CATEGORIES } from '@models/api.model';
 
 @Component({
@@ -81,6 +82,28 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                   <td class="city-col"
                     [class]="dyscalculia.numberSpacingClass()">
                     {{ fmtCents(monthlyTax(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Healthcare (effective) -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">🏥</span> Healthcare
+                  <span class="row-sub">
+                    @switch (healthcareSource(locations()[0])) {
+                      @case ('medicare') { Medicare — all adults 65+ }
+                      @case ('aca-subsidized') { ACA subsidized ({{ fmt(loc.annualIncome()) }}/yr MAGI) }
+                      @case ('aca-unsubsidized') { ACA full sticker — income above subsidy cutoff }
+                      @case ('mixed') { Mixed — one spouse Medicare, one ACA }
+                      @default { — }
+                    }
+                  </span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col"
+                    [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmtCents(healthcareMonthly(city)) }}
                   </td>
                 }
               </tr>
@@ -702,6 +725,7 @@ export class LocationCompareComponent implements OnInit {
   ngOnInit(): void {
     // Ensure full location data is loaded for comparison
     this.loc.loadFull();
+    this.healthcare.load();
   }
 
   /* ─── Helpers ─────────────────────────────────── */
@@ -724,13 +748,24 @@ export class LocationCompareComponent implements OnInit {
     return this.fmt(val);
   }
 
-  /** Monthly cost total that includes computed income tax (not just the stored value). */
+  readonly healthcare = inject(HealthcareService);
+
+  /** Monthly cost total that includes computed income tax AND effective healthcare. */
   totalWithTax(city: LocationFull): number {
-    return this.loc.totalWithIncomeTax(city).total;
+    const hc = this.healthcare.decide(city);
+    return this.loc.totalWithIncomeTax(city, { healthcareMonthly: hc.monthlyCost }).total;
   }
 
   monthlyTax(city: LocationFull): number {
     return this.loc.totalWithIncomeTax(city).monthlyTax;
+  }
+
+  healthcareMonthly(city: LocationFull): number {
+    return this.healthcare.decide(city).monthlyCost;
+  }
+
+  healthcareSource(city: LocationFull): string {
+    return this.healthcare.decide(city).source;
   }
 
   isCheapest(city: LocationFull): boolean {
