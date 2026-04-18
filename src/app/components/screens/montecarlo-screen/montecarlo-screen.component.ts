@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { HealthcareService } from '@services/healthcare.service';
 import {
   FinancialSettings, WithdrawalStrategy, LocationFull,
   HouseholdProfile, HouseholdMember,
@@ -306,6 +307,157 @@ const HIST_BINS = 40;
           }
         </div>
 
+        <!-- Multi-location schedule -->
+        <div class="card moves-card">
+          <h3 class="card-title">Location Schedule</h3>
+          <p class="card-sub">
+            Model multiple moves over the retirement horizon. Year 0 is your primary location
+            (selected above); add additional moves at later years. FX baseline resets at each
+            move; inflation accumulates across segments so "$X in today's dollars" stays consistent.
+          </p>
+
+          <div class="timeline-row primary-row">
+            <span class="tl-year">Year 0</span>
+            <span class="tl-loc">{{ selectedLoc()?.name || '—' }}</span>
+            <div class="tl-cost-col">
+              <span class="tl-cost" [class]="dyscalculia.numberSpacingClass()">
+                {{ fmt(baseCost(), '/mo') }}
+              </span>
+              <span class="tl-cost-proj">today's $</span>
+            </div>
+            <span class="tl-cost"></span>
+            <span class="tl-spacer"></span>
+          </div>
+
+          @for (move of moves(); track $index; let i = $index) {
+            <div class="timeline-row">
+              <label class="tl-field">
+                <span class="tl-small-label">Year</span>
+                <input type="number" class="tl-input" min="1" [max]="years() - 1" step="1"
+                  [ngModel]="move.fromYear"
+                  (ngModelChange)="patchMove(i, { fromYear: +$event })" />
+              </label>
+              <label class="tl-field tl-field-loc">
+                <span class="tl-small-label">Move to</span>
+                <select class="tl-input"
+                  [ngModel]="move.locationId"
+                  (ngModelChange)="patchMove(i, { locationId: $event })">
+                  @for (l of loc.fullLocations(); track l.id) {
+                    <option [value]="l.id">{{ l.name }}</option>
+                  }
+                </select>
+              </label>
+              <div class="tl-cost-col">
+                <span class="tl-cost" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmt(locMonthlyCost(move.locationId), '/mo') }}
+                </span>
+                <span class="tl-cost-proj" [class]="dyscalculia.numberSpacingClass()"
+                      title="Projected using this location's weighted per-category inflation ({{ (locInflationRate(move.locationId) * 100).toFixed(1) }}%)">
+                  {{ fmt(locMonthlyCostAtYear(move.locationId, move.fromYear), '/mo') }} &#64; y{{ move.fromYear }}
+                  ({{ (locInflationRate(move.locationId) * 100).toFixed(1) }}%)
+                </span>
+              </div>
+              <label class="tl-field">
+                <span class="tl-small-label">Move cost ($)</span>
+                <input type="number" class="tl-input" min="0" step="500"
+                  [ngModel]="move.moveCostUSD"
+                  (ngModelChange)="patchMove(i, { moveCostUSD: +$event })" />
+              </label>
+              <button class="tl-remove" (click)="removeMove(i)" aria-label="Remove move">✕</button>
+            </div>
+          }
+
+          <button mat-stroked-button class="add-move-btn" (click)="addMove()">
+            + Add Move
+          </button>
+
+          @if (moves().length > 0) {
+            <label class="moves-toggle">
+              <input type="checkbox"
+                [checked]="movesEnabled()"
+                (change)="movesEnabled.set(!movesEnabled())" />
+              <span>Apply schedule to next simulation run</span>
+            </label>
+          }
+        </div>
+
+        <!-- Spouse-death scenario (deterministic) -->
+        @if (adults().length >= 1) {
+          <div class="card death-card">
+            <h3 class="card-title">Spouse-Death Scenario</h3>
+            <p class="card-sub">
+              One deterministic toggle: pick a year in the sim horizon at which one adult dies.
+              Income steps down to the survivor benefit; expenses multiply by the survivor ratio
+              (fixed costs don't halve). Probabilistic mortality is a future extension.
+            </p>
+
+            <label class="param death-toggle">
+              <input type="checkbox"
+                [checked]="spouseDeathEnabled()"
+                (change)="spouseDeathEnabled.set(!spouseDeathEnabled())" />
+              <span>Enable spouse-death scenario</span>
+            </label>
+
+            @if (spouseDeathEnabled()) {
+              <div class="death-grid">
+                <label class="param">
+                  <span class="param-label">Year of Death (from sim start)</span>
+                  <input type="range" class="param-range" min="1" [max]="years() - 1" step="1"
+                    [ngModel]="spouseDeathYear()" (ngModelChange)="spouseDeathYear.set(+$event)" />
+                  <span class="param-hint">
+                    Year {{ spouseDeathYear() }} of {{ years() }} ·
+                    ~{{ (fin()?.ssCutYear ?? 2033) - (fin()?.ssCutYear ?? 2033) + (spouseDeathYear()) }} years into retirement
+                  </span>
+                </label>
+
+                <label class="param">
+                  <span class="param-label">Who dies</span>
+                  <select class="param-input"
+                    [ngModel]="deceasedMemberIndex()"
+                    (ngModelChange)="deceasedMemberIndex.set(+$event)">
+                    @for (m of adults(); track m.id; let i = $index) {
+                      <option [value]="i">{{ m.name || 'Adult ' + (i + 1) }} ({{ m.role }})</option>
+                    }
+                  </select>
+                  <span class="param-hint">
+                    Survivor keeps the higher SS benefit of the two adults.
+                  </span>
+                </label>
+
+                <label class="param">
+                  <span class="param-label">Survivor Cost Ratio (%)</span>
+                  <input type="number" class="param-input" min="40" max="100" step="1"
+                    [ngModel]="survivorCostRatio()" (ngModelChange)="survivorCostRatio.set(+$event)" />
+                  <span class="param-hint">
+                    Typical 70–80%. Fixed costs (rent, utilities) don't halve; variable (food, healthcare) do.
+                  </span>
+                </label>
+              </div>
+
+              <div class="death-preview">
+                <div>
+                  <span class="dp-label">Survivor SS</span>
+                  <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmt(survivorMonthlySs(), '/mo') }}
+                  </span>
+                </div>
+                <div>
+                  <span class="dp-label">Survivor Income (incl. other)</span>
+                  <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmt(survivorMonthlyIncome(), '/mo') }}
+                  </span>
+                </div>
+                <div>
+                  <span class="dp-label">Post-Death Monthly</span>
+                  <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmt(baseCost() * survivorCostRatio() / 100, '/mo') }}
+                  </span>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
         <!-- Social Security summary card -->
         <div class="ss-card">
           <span class="ss-icon" aria-hidden="true">🏛️</span>
@@ -342,6 +494,18 @@ const HIST_BINS = 40;
                  [class.neutral]="toneClass(r.successRate) === 'neutral'">
               <div class="result-label">Success Rate</div>
               <div class="result-value">{{ (r.successRate * 100).toFixed(0) }}%</div>
+              <div class="success-bar"
+                   role="meter"
+                   [attr.aria-label]="'Success rate ' + (r.successRate * 100).toFixed(0) + ' percent'"
+                   [attr.aria-valuenow]="(r.successRate * 100).toFixed(0)"
+                   aria-valuemin="0"
+                   aria-valuemax="100">
+                <div class="success-bar-fill"
+                     [style.width.%]="r.successRate * 100"></div>
+                <span class="success-bar-tick tick-25"></span>
+                <span class="success-bar-tick tick-50"></span>
+                <span class="success-bar-tick tick-75"></span>
+              </div>
               <div class="result-sub">
                 {{ dyscalculia.naturalFrequency(r.successRate) }} simulated futures
                 left you above $0
@@ -497,6 +661,70 @@ const HIST_BINS = 40;
     .regime-col.bear { border-left: 3px solid var(--dark-red); }
     .regime-title { font-size: 12px; margin: 0; color: var(--dark-text); font-weight: 600; }
 
+    .moves-card { display: flex; flex-direction: column; gap: 10px; }
+    .moves-card .card-sub {
+      font-size: 11px; color: var(--dark-text-muted);
+      margin: -6px 0 8px; line-height: 1.55; max-width: 680px;
+    }
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 100px 140px 36px;
+      gap: 10px; align-items: center;
+      padding: 8px 10px;
+      background: var(--dark-bg-secondary); border-radius: 6px;
+    }
+    .primary-row { background: rgba(212, 148, 58, 0.08); border: 1px solid rgba(212, 148, 58, 0.25); }
+    .tl-year { font-size: 12px; font-weight: 600; color: var(--dark-text); }
+    .tl-loc  { font-size: 13px; color: var(--dark-text); }
+    .tl-cost { font-size: 12px; color: var(--dark-amber); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .tl-cost-col { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .tl-cost-proj {
+      font-size: 9px; color: var(--dark-text-muted); font-style: italic;
+      font-variant-numeric: tabular-nums;
+    }
+    .tl-spacer { }
+    .tl-field { display: flex; flex-direction: column; gap: 2px; }
+    .tl-field-loc { min-width: 0; } /* allow select to shrink in grid cell */
+    .tl-small-label { font-size: 9px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .tl-input {
+      padding: 5px 8px; border-radius: 4px;
+      border: 1px solid var(--dark-border); background: var(--dark-bg);
+      color: var(--dark-text); font-size: 12px; outline: none;
+    }
+    .tl-input:focus { border-color: var(--dark-amber); }
+    .tl-remove {
+      width: 28px; height: 28px; border-radius: 4px;
+      border: 1px solid var(--dark-border); background: transparent;
+      color: var(--dark-text-muted); cursor: pointer; font-size: 12px;
+    }
+    .tl-remove:hover { color: var(--dark-red); border-color: var(--dark-red); }
+    .add-move-btn { align-self: flex-start; }
+    .moves-toggle {
+      display: flex; align-items: center; gap: 8px; margin-top: 6px;
+      font-size: 12px; color: var(--dark-text);
+    }
+    .moves-toggle input { accent-color: var(--dark-amber); }
+
+    .death-card { display: flex; flex-direction: column; gap: 12px; }
+    .death-card .card-sub {
+      font-size: 11px; color: var(--dark-text-muted);
+      margin: -6px 0 4px; line-height: 1.55; max-width: 640px;
+    }
+    .death-toggle {
+      display: flex; flex-direction: row; align-items: center; gap: 8px;
+      font-size: 13px; color: var(--dark-text);
+    }
+    .death-toggle input { accent-color: var(--dark-amber); }
+    .death-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+    .param-range { width: 100%; accent-color: var(--dark-amber); }
+    .death-preview {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px; padding: 10px 12px;
+      background: var(--dark-bg-secondary); border-radius: 6px;
+    }
+    .dp-label { display: block; font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .dp-value { display: block; font-size: 14px; font-weight: 600; color: var(--dark-amber); margin-top: 2px; }
+
     .results-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -509,6 +737,38 @@ const HIST_BINS = 40;
     .result-card.success { border-color: var(--dark-green); }
     .result-card.warn    { border-color: var(--dark-amber); }
     .result-card.neutral { border-color: var(--dark-neutral); background: rgba(139, 157, 195, 0.08); }
+
+    /* Success bar — 0 to 100 proportional fill, Dyscalculia F-004:
+       relieves the burden of mapping a percentage to a mental quantity. */
+    .success-bar {
+      position: relative;
+      height: 10px;
+      background: var(--dark-bg-secondary);
+      border-radius: 5px;
+      overflow: hidden;
+      margin: 8px 0 6px;
+    }
+    .success-bar-fill {
+      height: 100%;
+      background: var(--dark-neutral);
+      border-radius: 5px;
+      transition: width 0.4s ease;
+    }
+    .result-card.success .success-bar-fill { background: var(--dark-green); }
+    .result-card.warn    .success-bar-fill { background: var(--dark-amber); }
+    .result-card.neutral .success-bar-fill { background: var(--dark-neutral); }
+    /* Quarter-point ticks for quick eyeballing — 25 / 50 / 75. */
+    .success-bar-tick {
+      position: absolute;
+      top: 0;
+      width: 1px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.12);
+      pointer-events: none;
+    }
+    .success-bar-tick.tick-25 { left: 25%; }
+    .success-bar-tick.tick-50 { left: 50%; background: rgba(255, 255, 255, 0.25); }
+    .success-bar-tick.tick-75 { left: 75%; }
 
     .calm-summary {
       background: rgba(92, 156, 230, 0.06);
@@ -612,6 +872,21 @@ export class MontecarloScreenComponent implements OnInit {
   readonly historicalPresets = HISTORICAL_PRESETS;
   readonly historicalYears = HISTORICAL_RETURNS.map(r => r.year);
 
+  /* ─── Multi-location schedule (deterministic) ───────────────────
+   * Each entry is `{ fromYear, locationId, moveCostUSD }`. fromYear must be
+   * strictly increasing. First entry is always year 0. Primary location
+   * selector at the top of the screen stays in sync with moves[0].locationId.
+   */
+  readonly moves = signal<{ fromYear: number; locationId: string; moveCostUSD: number }[]>([]);
+  readonly movesEnabled = signal(false);
+
+  /* ─── Spouse-death scenario (deterministic) ────────────────────── */
+  readonly spouseDeathEnabled = signal(false);
+  readonly spouseDeathYear = signal(10);
+  readonly survivorCostRatio = signal(75); // whole-percent on the wire
+  /** Which member is assumed to die. Index into adults[]. */
+  readonly deceasedMemberIndex = signal(0);
+
   readonly results = signal<MonteCarloResult | null>(null);
 
   /* ─── Chart dimensions ─────────────────────────────────────────── */
@@ -631,11 +906,44 @@ export class MontecarloScreenComponent implements OnInit {
     return !!l && l.currency !== 'USD';
   });
 
+  readonly healthcare = inject(HealthcareService);
+
   readonly baseCost = computed(() => {
     const l = this.selectedLoc();
     if (!l?.monthlyCosts) return 0;
-    return Object.values(l.monthlyCosts).reduce((s, c) => s + (c?.typical ?? 0), 0);
+    // Sum non-tax categories, skip alternates (healthcarePreMedicare),
+    // then swap in the effective healthcare cost from HealthcareService.
+    let sum = 0;
+    for (const [key, val] of Object.entries(l.monthlyCosts)) {
+      if (key === 'healthcarePreMedicare') continue;
+      if (key === 'healthcare') continue;
+      sum += (val?.typical ?? 0);
+    }
+    const hc = this.healthcare.decide(l);
+    return sum + hc.monthlyCost;
   });
+
+  /** Non-dependent adults in the household, in sort order. Used for spouse-death UI. */
+  readonly adults = computed(() =>
+    (this.household()?.members ?? []).filter(m => m.role !== 'dependent')
+  );
+
+  /**
+   * Monthly SS after one spouse dies = max of the two spouses' claim-age-
+   * adjusted benefits (the survivor keeps the higher benefit). If only one
+   * adult, survivor benefit = that person's own (survivor lives alone).
+   */
+  readonly survivorMonthlySs = computed(() => {
+    const adults = this.adults();
+    if (adults.length === 0) return 0;
+    const benefits = adults.map(m => estimateBenefitAtClaim(m));
+    return Math.max(...benefits);
+  });
+
+  /** Survivor monthly income = survivor SS + other income (pension etc. kept intact). */
+  readonly survivorMonthlyIncome = computed(() =>
+    this.survivorMonthlySs() + this.monthlyIncome()
+  );
 
   /** Nominal lifetime SS with compound COLA growth. */
   readonly ssLifetime = computed(() => {
@@ -763,6 +1071,7 @@ export class MontecarloScreenComponent implements OnInit {
 
   ngOnInit(): void {
     this.loading.set(true);
+    this.healthcare.load();
 
     // Load financial settings, withdrawal strategy, and locations in parallel
     this.loc.loadFull();
@@ -824,6 +1133,119 @@ export class MontecarloScreenComponent implements OnInit {
     this.meanInflation.set(+(w * 100).toFixed(2));
   }
 
+  /** Add a move to the schedule — defaults to halfway through the horizon at the cheapest location. */
+  addMove(): void {
+    const locs = this.loc.fullLocations();
+    if (!locs.length) return;
+    const defaultLoc = [...locs].sort((a, b) =>
+      (a.monthlyCostTotal ?? 0) - (b.monthlyCostTotal ?? 0)
+    )[0];
+    const current = this.moves();
+    const lastYear = current.length ? current[current.length - 1].fromYear : 0;
+    const newYear = Math.min(this.years() - 1, Math.max(lastYear + 5, Math.floor(this.years() / 2)));
+    this.moves.set([
+      ...current,
+      { fromYear: newYear, locationId: defaultLoc.id, moveCostUSD: 5000 },
+    ]);
+    this.movesEnabled.set(true);
+  }
+
+  removeMove(idx: number): void {
+    this.moves.update(list => list.filter((_, i) => i !== idx));
+  }
+
+  patchMove(idx: number, partial: Partial<{ fromYear: number; locationId: string; moveCostUSD: number }>): void {
+    this.moves.update(list => list.map((m, i) => i === idx ? { ...m, ...partial } : m));
+  }
+
+  /**
+   * Build one kernel-ready segment for a given location. Includes the richer
+   * healthcare/tax breakdown so the sim can swap ACA → Medicare per year.
+   */
+  private buildSegmentForLocation(loc: LocationFull, fromYear: number, moveCostUSD?: number) {
+    const monthlyCosts = loc.monthlyCosts ?? {};
+    // Non-healthcare, non-tax, non-alternate sum in today's $.
+    const alternateKeys = new Set(['healthcarePreMedicare']);
+    let nonHealthcareBase = 0;
+    for (const [k, v] of Object.entries(monthlyCosts)) {
+      if (k === 'healthcare' || k === 'taxes' || alternateKeys.has(k)) continue;
+      nonHealthcareBase += (v?.typical ?? 0);
+    }
+    const isUS = loc.country === 'United States';
+    const medicareMonthly = monthlyCosts['healthcare']?.typical ?? 0;
+    const acaUnsubsidizedMonthly = monthlyCosts['healthcarePreMedicare']?.typical
+      ?? loc.healthcare?.acaMarketplace?.benchmarkSilverMonthly2Adult ?? 0;
+    const foreignHealthcareMonthly = monthlyCosts['healthcare']?.typical ?? 0;
+    const acaSubsidyCapPct = loc.healthcare?.acaMarketplace?.premiumCapPctOfIncome ?? 0.085;
+    // Income tax: bracket-based using shared annualIncome — this matches the
+    // Compare/Taxes screens so all views stay consistent.
+    const tax = this.loc.computeIncomeTax(loc, this.loc.annualIncome());
+    const monthlyIncomeTax = tax.monthlyTax;
+    return {
+      fromYear,
+      baseCost: nonHealthcareBase + monthlyIncomeTax + medicareMonthly, // legacy fallback
+      isForeign: loc.currency !== 'USD',
+      moveCostUSD,
+      label: loc.name,
+      nonHealthcareBase,
+      monthlyIncomeTax,
+      medicareMonthly,
+      acaUnsubsidizedMonthly,
+      acaSubsidyCapPct,
+      foreignHealthcareMonthly,
+      isUS,
+    };
+  }
+
+  /** Build the kernel schedule from the UI state — year 0 + any enabled moves. */
+  buildSchedule() {
+    const primary = this.selectedLoc();
+    if (!primary) return undefined;
+    const all = this.loc.fullLocations();
+    const entries: ReturnType<typeof this.buildSegmentForLocation>[] = [
+      this.buildSegmentForLocation(primary, 0),
+    ];
+    if (this.movesEnabled()) {
+      for (const m of this.moves()) {
+        const loc = all.find(l => l.id === m.locationId);
+        if (!loc) continue;
+        entries.push(this.buildSegmentForLocation(loc, m.fromYear, m.moveCostUSD));
+      }
+    }
+    entries.sort((a, b) => a.fromYear - b.fromYear);
+    // Always return at least the year-0 segment so the kernel uses the
+    // rich breakdown (Medicare transition, income tax) even without moves.
+    return entries;
+  }
+
+  /** Baseline monthly cost of a catalog location in today's USD (sum of monthlyCosts). */
+  locMonthlyCost(locId: string): number {
+    const l = this.loc.fullLocations().find(x => x.id === locId);
+    if (!l) return 0;
+    return Object.values(l.monthlyCosts ?? {}).reduce((s, c) => s + (c?.typical ?? 0), 0);
+  }
+
+  /** Weighted per-category inflation for a location (decimal, e.g. 0.025). */
+  locInflationRate(locId: string): number {
+    const l = this.loc.fullLocations().find(x => x.id === locId);
+    if (!l?.monthlyCosts) return 0.025;
+    return weightedInflationFromLocation(
+      l.monthlyCosts as unknown as Record<string, { typical?: number; annualInflation?: number }>,
+    );
+  }
+
+  /**
+   * Projected monthly cost at a given simulation year — compounds today's
+   * baseline by the target location's own weighted inflation rate (not the
+   * primary's). Deterministic preview; actual MC runs sample per year.
+   */
+  locMonthlyCostAtYear(locId: string, year: number): number {
+    const today = this.locMonthlyCost(locId);
+    const rate = this.locInflationRate(locId);
+    const factor = Math.pow(1 + rate, Math.max(0, year));
+    return today * factor;
+  }
+
   /** Snap mean/vol params to a named historical period. */
   applyPreset(presetId: string): void {
     this.selectedPresetId.set(presetId);
@@ -864,6 +1286,13 @@ export class MontecarloScreenComponent implements OnInit {
           incGrowth: this.incGrowth() / 100,
           returnMode: this.returnMode(),
           historicalStartYear: this.historicalStartYear(),
+          moveSchedule: this.buildSchedule(),
+          adultBirthYears: this.adults().map(m => m.birthYear),
+          simStartYear: this.household()?.planningStartYear ?? new Date().getFullYear(),
+          magiAnnual: this.healthcare.magi().magiForAca,
+          spouseDeathYear: this.spouseDeathEnabled() ? this.spouseDeathYear() : undefined,
+          survivorMonthlyIncome: this.spouseDeathEnabled() ? this.survivorMonthlyIncome() : undefined,
+          survivorCostRatio: this.spouseDeathEnabled() ? this.survivorCostRatio() / 100 : undefined,
           regime: {
             bullMean: this.regimeBullMean() / 100,
             bullVol: this.regimeBullVol() / 100,

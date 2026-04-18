@@ -288,15 +288,29 @@ export class LocationService {
    * Uses `this.annualIncome()` — so changing that signal fans out to every
    * screen that shows a total.
    */
-  totalWithIncomeTax(loc: LocationFull): {
+  totalWithIncomeTax(loc: LocationFull, opts?: { healthcareMonthly?: number }): {
     total: number;
     baseMonthly: number;
     monthlyTax: number;
     taxSource: 'brackets' | 'stored' | 'vat-converged' | 'none';
   } {
-    const baseMonthly = Object.entries(loc.monthlyCosts ?? {})
-      .filter(([k]) => k !== 'taxes')
+    // Skip `taxes` (re-added via computeIncomeTax) AND any category flagged
+    // as an alternate (e.g. healthcarePreMedicare) — those get resolved by
+    // the HealthcareService into the `healthcare` slot.
+    const alternateKeys = new Set(
+      COST_CATEGORIES.filter(c => c.alternate).map(c => c.key),
+    );
+    const costs = loc.monthlyCosts ?? {};
+    let baseMonthly = Object.entries(costs)
+      .filter(([k]) => k !== 'taxes' && !alternateKeys.has(k))
       .reduce((s, [, v]) => s + (v?.typical ?? 0), 0);
+
+    // Optional healthcare swap: replace the stored Medicare line with the
+    // caller-supplied effective cost (e.g. ACA pricing for pre-65 adults).
+    if (opts?.healthcareMonthly != null) {
+      baseMonthly = baseMonthly - (costs['healthcare']?.typical ?? 0) + opts.healthcareMonthly;
+    }
+
     const tax = this.computeIncomeTax(loc, this.annualIncome());
     return {
       total: baseMonthly + tax.monthlyTax,
