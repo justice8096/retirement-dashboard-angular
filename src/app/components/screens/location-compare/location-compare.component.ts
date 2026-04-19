@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { NavigationService } from '@services/navigation.service';
+import { fpl2026 } from '@app/lib/aca-constants';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { LocationFull, COST_CATEGORIES } from '@models/api.model';
@@ -1123,7 +1124,7 @@ export class LocationCompareComponent implements OnInit {
     const adults = Math.max(1,
       (this.healthcare.household()?.members ?? []).filter(m => m.role !== 'dependent').length || 2
     );
-    const fpl = 15_060 + 5_380 * (adults - 1);
+    const fpl = fpl2026(adults);
     return magi > 0 ? (magi / fpl) * 100 : 0;
   }
 
