@@ -74,9 +74,9 @@ import { ITEM_CATEGORIES, ItemCategoryKey } from '../../../data/item-catalog';
     .cat-count { font-size: 11px; color: var(--dark-text-muted); font-weight: 400; margin-left: 4px; }
     .cat-actions { display: flex; gap: 6px; }
     .sm-btn {
-      --mdc-outlined-button-container-height: 26px;
-      --mdc-outlined-button-label-text-size: 10px;
-      --mdc-outlined-button-label-text-tracking: 0;
+      --mat-button-outlined-container-height: 26px;
+      --mat-button-outlined-label-text-size: 10px;
+      --mat-button-outlined-label-text-tracking: 0;
     }
 
     .items-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }

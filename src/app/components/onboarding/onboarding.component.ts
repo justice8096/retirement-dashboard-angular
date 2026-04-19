@@ -209,11 +209,11 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
 
     :host ::ng-deep {
       .font-picker .mat-mdc-chip-option {
-        --mdc-chip-elevated-container-color: transparent;
-        --mdc-chip-label-text-color: var(--dark-text-sec);
-        --mdc-chip-elevated-selected-container-color: var(--dark-blue);
-        --mdc-chip-selected-label-text-color: #fff;
-        --mdc-chip-container-height: 28px;
+        --mat-chip-elevated-container-color: transparent;
+        --mat-chip-label-text-color: var(--dark-text-sec);
+        --mat-chip-elevated-selected-container-color: var(--dark-blue);
+        --mat-chip-selected-label-text-color: #fff;
+        --mat-chip-container-height: 28px;
         font-family: var(--font-sans);
       }
     }
@@ -341,11 +341,11 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
       min-height: 48px;
       border-radius: 12px;
       font-weight: 700;
-      --mdc-filled-button-container-color: var(--dark-bg-secondary);
-      --mdc-filled-button-label-text-color: var(--dark-text-muted);
+      --mat-button-filled-container-color: var(--dark-bg-secondary);
+      --mat-button-filled-label-text-color: var(--dark-text-muted);
       &.ready {
-        --mdc-filled-button-container-color: var(--dark-amber);
-        --mdc-filled-button-label-text-color: #000;
+        --mat-button-filled-container-color: var(--dark-amber);
+        --mat-button-filled-label-text-color: #000;
       }
     }
   `],

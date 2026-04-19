@@ -581,8 +581,8 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       line-height: 1.5;
     }
     .link-btn {
-      --mdc-text-button-label-text-color: var(--dark-amber);
-      --mdc-text-button-label-text-size: 13px;
+      --mat-button-text-label-text-color: var(--dark-amber);
+      --mat-button-text-label-text-size: 13px;
       padding: 0 4px;
       min-width: 0;
       vertical-align: baseline;
@@ -601,8 +601,8 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       margin: 0;
     }
     .clear-btn {
-      --mdc-text-button-label-text-size: 11px;
-      --mdc-text-button-label-text-color: var(--dark-blue);
+      --mat-button-text-label-text-size: 11px;
+      --mat-button-text-label-text-color: var(--dark-blue);
     }
 
     /* ─── Table scroll wrapper ────────────── */

@@ -91,8 +91,8 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
     .detail { display: flex; flex-direction: column; gap: 16px; }
 
     .back-btn {
-      --mdc-text-button-label-text-size: 12px;
-      --mdc-text-button-label-text-color: var(--dark-blue);
+      --mat-button-text-label-text-size: 12px;
+      --mat-button-text-label-text-color: var(--dark-blue);
       align-self: flex-start;
     }
 

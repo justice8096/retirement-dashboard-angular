@@ -214,14 +214,14 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
       &:focus { border-color: var(--dark-blue); }
     }
     .sort-btn {
-      --mdc-outlined-button-container-height: 32px;
-      --mdc-outlined-button-label-text-size: 11px;
-      --mdc-outlined-button-outline-color: var(--dark-border);
-      --mdc-outlined-button-label-text-color: var(--dark-text-sec);
+      --mat-button-outlined-container-height: 32px;
+      --mat-button-outlined-label-text-size: 11px;
+      --mat-button-outlined-outline-color: var(--dark-border);
+      --mat-button-outlined-label-text-color: var(--dark-text-sec);
     }
     .clear-btn {
-      --mdc-text-button-label-text-size: 11px;
-      --mdc-text-button-label-text-color: var(--dark-blue);
+      --mat-button-text-label-text-size: 11px;
+      --mat-button-text-label-text-color: var(--dark-blue);
     }
 
     /* ─── Selection bar ────────────────────────── */
@@ -331,8 +331,8 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
       text-align: right;
     }
     .row-detail-btn {
-      --mdc-text-button-label-text-size: 14px;
-      --mdc-text-button-label-text-color: var(--dark-text-muted);
+      --mat-button-text-label-text-size: 14px;
+      --mat-button-text-label-text-color: var(--dark-text-muted);
       min-width: 32px;
       padding: 0;
     }

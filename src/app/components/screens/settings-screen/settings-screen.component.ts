@@ -254,9 +254,9 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
     .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
     .save-btn {
       margin-left: auto;
-      --mdc-filled-button-container-color: var(--dark-amber);
-      --mdc-filled-button-label-text-color: #000;
-      --mdc-filled-button-label-text-size: 12px;
+      --mat-button-filled-container-color: var(--dark-amber);
+      --mat-button-filled-label-text-color: #000;
+      --mat-button-filled-label-text-size: 12px;
     }
     .save-msg { font-size: 11px; color: var(--dark-green); }
     .save-msg.error { color: var(--dark-red); }
