@@ -35,6 +35,7 @@ updates:
           - "@angular-*"
           - "zone.js"        # Angular runtime dep; moves with major versions
           - "rxjs"           # Angular peer dep; should be validated with upgrades
+          - "typescript"     # Angular 19 supports TS 5.5–5.8 only; TS 6 requires Angular 21+
         update-types:
           - "major"
           - "minor"
@@ -42,7 +43,6 @@ updates:
       dev-tooling:
         dependency-type: development
         patterns:
-          - "typescript"
           - "@types/*"
         exclude-patterns:
           # @types/* for Angular is already inside angular-family if prefixed,
