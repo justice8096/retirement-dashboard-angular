@@ -17,19 +17,37 @@ updates:
       prefix: chore(deps)
       include: scope
     groups:
-      angular:
+      # All @angular/* packages must move together — @angular/cli at vN
+      # requires @angular/core, @angular/common, @angular/material,
+      # @angular/cdk, @angular/animations, @angular/forms, @angular/router,
+      # @angular/platform-browser, @angular/platform-browser-dynamic,
+      # @angular/compiler, @angular/compiler-cli, and @angular/build
+      # at matching vN. Attempting a partial bump (e.g. CLI alone) always
+      # fails at build time.
+      #
+      # This group captures BOTH @angular/* (the runtime + tooling family)
+      # AND @angular-* (meta-packages like @angular-devkit/*) so every
+      # Angular-major upgrade arrives as one coordinated PR across 10+
+      # packages — matching what `ng update` would produce locally.
+      angular-family:
         patterns:
           - "@angular/*"
           - "@angular-*"
-      angular-material:
-        patterns:
-          - "@angular/material"
-          - "@angular/cdk"
+          - "zone.js"        # Angular runtime dep; moves with major versions
+          - "rxjs"           # Angular peer dep; should be validated with upgrades
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
       dev-tooling:
         dependency-type: development
         patterns:
           - "typescript"
           - "@types/*"
+        exclude-patterns:
+          # @types/* for Angular is already inside angular-family if prefixed,
+          # but common ones like @types/leaflet / @types/node stay here.
+          - "@types/leaflet"
 
   # GitHub Actions — weekly tag updates (SHAs are required per repo policy).
   - package-ecosystem: github-actions
