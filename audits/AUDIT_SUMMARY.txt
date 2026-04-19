@@ -1,0 +1,57 @@
+POST-COMMIT AUDIT SUMMARY
+==========================
+Date:    2026-04-19
+Commit:  86e7fd7
+Branch:  feature/aca-cliff-tax-service-refactor
+Project: retirement-dashboard-angular (Angular 19 SPA)
+
+1. SAST/DAST Scan:        PASS       - 9 findings (0 critical, 0 high, 2 medium, 4 low, 3 info)
+                                        All HIGH items are supply-chain only; app source is clean.
+                                        MEDIUM: M-01 reverse tabnabbing (5 links), M-02 no CSP.
+
+2. Supply Chain Audit:    CONDITIONAL - SLSA Level 0; 3 HIGH-severity dev-dep CVEs in tar/pacote/
+                                        @angular/cli chain (runtime bundle is clean, dev-only).
+                                        Fix path = Angular 19 -> 21 major upgrade; accept for now.
+
+3. CWE Mapping:           PASS       - 11 distinct CWEs mapped to 8 compliance frameworks
+                                        (OWASP Top 10 2021, OWASP LLM Top 10 2025, NIST SP 800-53,
+                                        EU AI Act, ISO 27001:2022, SOC 2 TSC, MITRE ATT&CK, MITRE ATLAS).
+                                        No CRITICAL hits in any framework.
+
+4. LLM Compliance:        63/100     - DEVELOPING (50-69 band)
+                                        Strongest: Consent & Authorization (85), Risk Classification (75).
+                                        Weakest:   Bias Assessment (50), Transparency (55),
+                                                   Supply Chain (55), Training Data (60).
+                                        Projected post-fix score: 77 (GOOD band).
+
+5. Contribution Analysis: 55/45      - Justice / Claude (overall weighted)
+                                        Quality grade: B.
+                                        Architecture 90/10, Code Gen 25/75, Security Audit 20/80,
+                                        Testing 85/15, Docs 30/70, Domain 70/30.
+
+Overall: CONDITIONAL PASS
+-------------------------
+No critical or high findings in the application code. The 3 HIGH dev-dep CVEs are
+non-runtime (tar/pacote path-traversal family, exploited only at npm-install time)
+and are safe to accept until the next Angular major-version upgrade cycle.
+
+Action Required: NO immediate action (no shipping-blocker findings).
+
+Recommended next-sprint items (in priority order):
+  1. Fix M-01 reverse tabnabbing  - add rel="noopener noreferrer" to 5 links. ~5 min.
+  2. Add Content-Security-Policy   - meta tag or hosting-layer header.        ~15 min.
+  3. Add README.md with AI-use     - closes biggest LLM-compliance gap.       ~30 min.
+  4. Add GitHub Actions CI         - npm ci + npm audit + build + SBOM.       ~45 min.
+  5. Add SECURITY.md               - disclosure contact + SLA.                ~15 min.
+
+Outputs written:
+  audits/sast-dast-scan.md          (282 lines)
+  audits/supply-chain-audit.md      (138 lines)
+  audits/cwe-mapping.md             (199 lines)
+  audits/llm-compliance-report.md   (161 lines)
+  audits/contribution-analysis.md   (157 lines)
+  audits/AUDIT_SUMMARY.txt          (this file)
+
+Prior audits retained:
+  audits/Dyslexia-Compliance-Audit-retirement-dashboard-angular-2026-04-16.md
+  audits/Dyscalculia-Compliance-Audit-retirement-dashboard-angular-2026-04-16.md

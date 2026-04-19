@@ -31,10 +31,14 @@ export const HELP_CONTENT: Record<string, HelpEntry> = {
         ],
       },
     ],
-    glossaryKeys: ['expected_return', 'expected_inflation', 'cagr'],
+    glossaryKeys: [
+      'expected_return', 'expected_inflation', 'cagr',
+      'aca', 'magi', 'fpl', 'subsidy_cliff', 'applicable_percentage',
+    ],
     related: ['settings', 'fire-setup', 'projections'],
     tips: [
       'Too-optimistic returns lead to false confidence. Try a lower return and see how Monte Carlo reacts.',
+      'The healthcare section uses plain-language phrases like "cutoff" for the ACA subsidy cliff and "income counted for ACA" for MAGI — open the glossary drawer for the technical terms.',
     ],
   },
 
@@ -132,7 +136,15 @@ export const HELP_CONTENT: Record<string, HelpEntry> = {
           'Tag rows list amenities or traits, one per chip.',
         ],
       },
+      {
+        heading: 'The audit banner at the top',
+        body: [
+          'Shows the household income the ACA uses, what share of the poverty line that is, and which rule set applies.',
+          'When "Income adjusts per city" is ON, each city uses its own cost of living, so your income may count as a smaller share in cheaper cities and qualify you for more help there.',
+        ],
+      },
     ],
+    glossaryKeys: ['aca', 'magi', 'fpl', 'subsidy_cliff'],
     related: ['overview', 'livability', 'neighborhoods'],
     tips: [
       'If a city is missing data, that cell says "—" rather than showing a misleading zero.',
