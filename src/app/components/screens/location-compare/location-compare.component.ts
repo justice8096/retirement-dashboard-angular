@@ -44,35 +44,41 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
             <button class="year-btn" [class.active]="viewYear() === 'steady'"
                     (click)="viewYear.set('steady')">Year 2+ (steady)</button>
             <button class="year-btn" [class.active]="viewYear() === 'transition'"
-                    (click)="viewYear.set('transition')">Year 1 (transition)</button>
-            <span class="year-toggle-hint">
-              Transition year includes
-              {{ '$' + healthcare.transitionYearExtraIncome().toLocaleString() }} one-time income
+                    (click)="viewYear.set('transition')">Year 1 (first year)</button>
+            <span class="year-toggle-hint" [class]="dyscalculia.numberSpacingClass()">
+              First year includes
+              {{ fmtYear(healthcare.transitionYearExtraIncome()) }} of one-time income
             </span>
           </div>
         }
 
         <!-- Audit banner: shows the household inputs driving the numbers -->
-        <div class="audit-banner">
+        <div class="audit-banner" [class]="dyscalculia.numberSpacingClass()">
           <span class="audit-item"><strong>Adults:</strong> {{ auditAdults() }}</span>
           <span class="audit-sep">·</span>
-          <span class="audit-item"><strong>Home MAGI:</strong> {{ fmtYear(auditMagi()) }} · {{ auditFplPct().toFixed(0) }}% FPL</span>
+          <span class="audit-item">
+            <strong>Yearly income counted for ACA:</strong>
+            {{ fmtYear(auditMagi()) }} · {{ fmtFplPct(auditFplPct()) }}
+          </span>
           <span class="audit-sep">·</span>
           <span class="audit-item">
-            <strong>ACA rules:</strong>
-            {{ healthcare.subsidyRegime() === 'cliff' ? 'Cliff (400% FPL)' : 'Enhanced (8.5% cap)' }}
+            <strong>Rule set:</strong>
+            {{ healthcare.subsidyRegime() === 'cliff' ? 'Cliff (cutoff at about $82k/yr)' : 'Enhanced (capped at 8.5% of income)' }}
           </span>
           @if (healthcare.apportionStrategy() !== 'manual') {
             <span class="audit-sep">·</span>
             <span class="audit-item audit-mode">
-              <strong>Per-location MAGI:</strong> ON (auto-apportion)
+              <strong>Income adjusts per city:</strong> ON
             </span>
           }
           <span class="audit-hint">
             @if (healthcare.apportionStrategy() !== 'manual') {
-              Each city's MAGI recomputes at its own cost-of-living — cheaper cities may drop below the 400% FPL cliff and qualify for subsidies. Hover a healthcare cell for that city's effective MAGI.
+              Each city uses its own cost of living. Your income counts as a smaller share in
+              cheaper cities, so you may fall below the cutoff there and qualify for help.
+              Hover a health-insurance cell to see that city's adjusted income.
             } @else {
-              Manual apportionment — MAGI fixed across all cities. Switch to auto on Setup → Assumptions to see per-location scaling.
+              Your income is fixed across all cities. Switch to auto-adjust on
+              Setup → Assumptions to see each city use its own cost of living.
             }
           </span>
         </div>
@@ -1015,9 +1021,17 @@ export class LocationCompareComponent implements OnInit {
     return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  /** Yearly currency — whole dollars + "/yr" suffix. For the audit banner. */
+  /** Yearly currency — whole dollars + "/yr" suffix. For the audit banner.
+   *  Threads through DyscalculiaService so spaced/words formats and the user's
+   *  number-spacing class apply consistently (Dashboard Dyscalculia F-012). */
   fmtYear(val: number): string {
-    return '$' + Math.round(val).toLocaleString() + '/yr';
+    return this.dyscalculia.formatCurrency(Math.round(val), '/yr');
+  }
+
+  /** FPL percentage formatted in plain language + threaded through dyscalculia
+   *  count formatting (Dashboard Dyslexia DFA-2026-04-19-001). */
+  fmtFplPct(pct: number): string {
+    return this.dyscalculia.formatCount(Math.round(pct), '% of the poverty line');
   }
 
   fmtCost(city: LocationFull, key: string): string {

@@ -291,22 +291,22 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               <div class="hc-stat">
                 <span class="hc-label">Cash In (all sources)</span>
                 <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
-                  {{ '$' + healthcare.magi().cashIn.toFixed(0) }}
+                  {{ fmtYearly(healthcare.magi().cashIn) }}
                 </span>
               </div>
               <div class="hc-stat">
                 <span class="hc-label">Federal AGI</span>
                 <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
-                  {{ '$' + healthcare.magi().agi.toFixed(0) }}
+                  {{ fmtYearly(healthcare.magi().agi) }}
                 </span>
-                <span class="hc-sub">Taxable SS: {{ '$' + healthcare.magi().taxableSS.toFixed(0) }}</span>
+                <span class="hc-sub">Taxable Social Security: {{ fmtYearly(healthcare.magi().taxableSS) }}</span>
               </div>
               <div class="hc-stat">
-                <span class="hc-label">MAGI (for ACA)</span>
+                <span class="hc-label">MAGI (income counted for ACA)</span>
                 <span class="hc-value hc-cost" [class]="dyscalculia.numberSpacingClass()">
-                  {{ '$' + healthcare.magi().magiForAca.toFixed(0) }}
+                  {{ fmtYearly(healthcare.magi().magiForAca) }}
                 </span>
-                <span class="hc-sub">AGI + non-taxable SS</span>
+                <span class="hc-sub">AGI + any untaxed Social Security</span>
               </div>
             </div>
 
@@ -322,7 +322,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               <div class="hc-stat">
                 <span class="hc-label">Monthly Cost (ref: {{ hc.location.name }})</span>
                 <span class="hc-value hc-cost" [class]="dyscalculia.numberSpacingClass()">
-                  {{ '$' + hc.decision.monthlyCost.toFixed(0) }}/mo
+                  {{ fmtMonthly(hc.decision.monthlyCost) }}
                 </span>
               </div>
               <div class="hc-stat">
@@ -345,13 +345,15 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               </div>
             }
 
-            <!-- Transition year: one-time income spike in sim year 0 -->
+            <!-- Transition year: one-time income spike in the first retirement year -->
             <div class="hc-subsection">
-              <h4 class="hc-subtitle">Transition Year (one-time)</h4>
+              <h4 class="hc-subtitle">First Year of Retirement (one-time income)</h4>
               <p class="hc-help">
-                One-time income in your first year of retirement — W-2 wages earned Jan→retirement,
-                severance, unused PTO payout, final-year bonus, year-of RMDs. Applied to MAGI in
-                <strong>sim year 0 only</strong>; year 1+ uses your steady-state composition.
+                Extra money you'll only earn in your first year of retirement. This might
+                include your last paychecks, severance, unused vacation payout, a final-year
+                bonus, or a last required withdrawal from a retirement account. It only counts
+                toward income in <strong>Year 1</strong>. From Year 2 on, your income goes back
+                to your steady retirement level.
               </p>
               <label class="field compact">
                 <span class="field-label">Extra income in Year 1 ($)</span>
@@ -361,60 +363,63 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                   (ngModelChange)="healthcare.transitionYearExtraIncome.set(+$event)" />
               </label>
               @if (healthcare.transitionYearExtraIncome() > 0) {
-                <div class="hc-hint">
-                  Year 1 MAGI: <strong>{{ '$' + healthcare.transitionMagi().toFixed(0) }}</strong>
-                  (steady {{ '$' + healthcare.magi().magiForAca.toFixed(0) }}
-                  + extra {{ '$' + healthcare.transitionYearExtraIncome().toFixed(0) }})
+                <div class="hc-hint" [class]="dyscalculia.numberSpacingClass()">
+                  Year 1 income counted for ACA: <strong>{{ fmtYearly(healthcare.transitionMagi()) }}</strong>
+                  (steady {{ fmtYearly(healthcare.magi().magiForAca) }}
+                  + extra {{ fmtYearly(healthcare.transitionYearExtraIncome()) }})
                 </div>
               }
             </div>
 
             @if (hc.decision.source.startsWith('aca')) {
-              <!-- Input: which subsidy-law framework to apply -->
+              <!-- Input: which set of rules to apply -->
               <div class="hc-subsection">
-                <h4 class="hc-subtitle">ACA Subsidy Rules (law setting)</h4>
+                <h4 class="hc-subtitle">Health Insurance Help Rules</h4>
                 <label class="field compact">
                   <select class="field-input"
                     [ngModel]="healthcare.subsidyRegime()"
                     (ngModelChange)="healthcare.subsidyRegime.set($event)">
-                    <option value="cliff">Cliff (pre-ARPA — in effect for 2026)</option>
-                    <option value="enhanced">Enhanced (8.5% cap — if Senate extends)</option>
+                    <option value="cliff">Cliff rules (current for 2026)</option>
+                    <option value="enhanced">Enhanced rules (if Congress extends them)</option>
                   </select>
                 </label>
                 <div class="hc-help">
-                  The ARPA/IRA enhanced subsidies expired Dec 31 2025. Until Congress extends,
-                  2026 coverage follows pre-ARPA rules: sliding applicable-pct by FPL bucket with a
-                  <strong>hard cliff at 400% FPL</strong> (~$81,760 for 2 adults).
-                  <strong>This dropdown is the law setting</strong> — the "Coverage" badge below
-                  is derived from your ages + MAGI under that law.
+                  For 2026, Congress let the enhanced health-insurance help expire. The older
+                  rules are back: help shrinks as your income rises, and stops completely once
+                  a couple earns more than about <strong>$81,760</strong> per year — a boundary
+                  called the <strong>subsidy cliff</strong>. This dropdown is the rule setting.
+                  The Coverage badge above shows what your household actually qualifies for.
                 </div>
               </div>
 
               @if (hc.decision.aboveFplCliff) {
-                <div class="hc-warn">
-                  ⚠ <strong>Above the 400% FPL cliff.</strong>
-                  MAGI {{ '$' + healthcare.magi().magiForAca.toFixed(0) }} =
-                  {{ (hc.decision.fplPct ?? 0).toFixed(0) }}% of FPL —
-                  no subsidy under cliff rules. Full sticker pricing applies.
+                <div class="hc-warn" [class]="dyscalculia.numberSpacingClass()">
+                  ⚠ <strong>Your income is above the cutoff.</strong>
+                  At {{ fmtYearly(healthcare.magi().magiForAca) }} per year
+                  ({{ fmtFplPct(hc.decision.fplPct ?? 0) }}),
+                  no help is available under the current rules. You'd pay the full price.
                 </div>
               }
 
-              <div class="hc-hint">
+              <div class="hc-hint" [class]="dyscalculia.numberSpacingClass()">
                 @if (hc.decision.regime === 'cliff') {
-                  Cliff regime: sliding applicable-pct on MAGI (2.07%–9.83%), zero subsidy above 400% FPL.
+                  Under <strong>cliff rules</strong>: your share of income paid for insurance
+                  slides from 2% up to about 10%, then help stops above the cutoff.
                 } @else {
-                  Enhanced regime: flat 8.5% of <strong>MAGI</strong> cap, no cliff.
+                  Under <strong>enhanced rules</strong>: your share is capped at 8.5% of income,
+                  with no hard cutoff.
                 }
-                Roth withdrawals don't count toward MAGI; Social Security counts at 100% for ACA even
-                though only {{ (magiSsTaxabilityPct() * 100).toFixed(0) }}% is federally taxed.
-                Current: <strong>{{ (hc.decision.fplPct ?? 0).toFixed(0) }}% of FPL</strong>.
+                Roth withdrawals don't count toward this income measure. Social Security counts
+                in full here, even though only {{ (magiSsTaxabilityPct() * 100).toFixed(0) }}%
+                of it is federally taxed. Right now your income is
+                <strong>{{ fmtFplPct(hc.decision.fplPct ?? 0) }}</strong>.
               </div>
               @if (hc.decision.acaEstimate?.disclaimer) {
                 <div class="hc-disclaimer">
                   <span class="hc-badge-level">{{ hc.decision.acaEstimate?.level ?? '—' }}-level</span>
-                  Benchmark for <strong>{{ hc.decision.acaEstimate?.rateArea ?? 'this location' }}</strong>.
+                  Estimate for <strong>{{ hc.decision.acaEstimate?.rateArea ?? 'this location' }}</strong>.
                   {{ hc.decision.acaEstimate?.disclaimer }}
-                  <a href="https://www.healthcare.gov/see-plans/" target="_blank" rel="noopener">
+                  <a href="https://www.healthcare.gov/see-plans/" target="_blank" rel="noopener noreferrer">
                     Get a real quote →
                   </a>
                 </div>
@@ -580,6 +585,11 @@ export class AssumptionsScreenComponent implements OnInit {
     const ss = this.healthcare.income().ssAnnual;
     return ss > 0 ? m.taxableSS / ss : 0;
   }
+
+  /** Currency formatters that honor the user's dyscalculia number-format preference. */
+  fmtYearly(v: number): string { return this.dyscalculia.formatCurrency(Math.round(v), '/yr'); }
+  fmtMonthly(v: number): string { return this.dyscalculia.formatCurrency(Math.round(v), '/mo'); }
+  fmtFplPct(pct: number): string { return this.dyscalculia.formatCount(Math.round(pct), '% of the poverty line'); }
 
   patch(partial: Partial<HouseholdProfile>): void {
     this.draft.update(d => d ? { ...d, ...partial } : d);
