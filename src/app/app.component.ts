@@ -162,7 +162,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  @HostListener('window:scroll', ['$event'])
+  @HostListener('window:scroll')
   onScroll(): void {
     if (!this.dyslexia.isEnabled() || !this.dyslexia.settings().showReadingProgress) return;
     const doc = document.documentElement;
