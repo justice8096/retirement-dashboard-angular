@@ -381,39 +381,39 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                 </tr>
                 <tr>
                   <td class="label-col sticky-col row-label">
-                    <span class="row-icon">🌤️</span> Type
+                    <span class="row-icon">🌡️</span> Summer High
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
                       <div class="metric-cell">
-                        <span class="metric-name">Type</span>
-                        <span class="metric-text-val">{{ city.climate?.type ?? '–' }}</span>
+                        <span class="metric-name">Summer High</span>
+                        <span class="metric-text-val">{{ climateHigh(city) }}</span>
                       </div>
                     </td>
                   }
                 </tr>
                 <tr>
                   <td class="label-col sticky-col row-label">
-                    <span class="row-icon">🌡️</span> Avg High
+                    <span class="row-icon">❄️</span> Winter Low
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
                       <div class="metric-cell">
-                        <span class="metric-name">Avg High</span>
-                        <span class="metric-text-val">{{ city.climate?.avgTemp?.high != null ? city.climate!.avgTemp!.high + '°F' : '–' }}</span>
+                        <span class="metric-name">Winter Low</span>
+                        <span class="metric-text-val">{{ climateLow(city) }}</span>
                       </div>
                     </td>
                   }
                 </tr>
                 <tr>
                   <td class="label-col sticky-col row-label">
-                    <span class="row-icon">❄️</span> Avg Low
+                    <span class="row-icon">☔</span> Rainy Days/Yr
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
                       <div class="metric-cell">
-                        <span class="metric-name">Avg Low</span>
-                        <span class="metric-text-val">{{ city.climate?.avgTemp?.low != null ? city.climate!.avgTemp!.low + '°F' : '–' }}</span>
+                        <span class="metric-name">Rainy Days/Yr</span>
+                        <span class="metric-text-val">{{ city.climate?.rainyDaysPerYear ?? '–' }}</span>
                       </div>
                     </td>
                   }
@@ -440,15 +440,31 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     </td>
                   }
                 </tr>
+                @if (anyVisaIncomeReq()) {
+                  <tr>
+                    <td class="label-col sticky-col row-label">
+                      <span class="row-icon">💰</span> Income Req. (mo)
+                    </td>
+                    @for (city of locations(); track city.id) {
+                      <td class="city-col"
+                        [class]="dyscalculia.numberSpacingClass()">
+                        <div class="metric-cell">
+                          <span class="metric-name">Income Req. (mo)</span>
+                          <span class="metric-text-val">{{ visaIncomeReq(city) }}</span>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
                 <tr>
                   <td class="label-col sticky-col row-label">
-                    <span class="row-icon">📅</span> Duration
+                    <span class="row-icon">📝</span> Notes
                   </td>
                   @for (city of locations(); track city.id) {
                     <td class="city-col">
                       <div class="metric-cell">
-                        <span class="metric-name">Duration</span>
-                        <span class="metric-text-val">{{ city.visa?.duration ?? '–' }}</span>
+                        <span class="metric-name">Notes</span>
+                        <span class="metric-text-val metric-notes">{{ city.visa?.notes ?? '–' }}</span>
                       </div>
                     </td>
                   }
@@ -754,6 +770,15 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       font-size: 12px;
       color: var(--dark-text);
     }
+    .metric-notes {
+      font-size: 11px;
+      color: var(--dark-text-sec);
+      line-height: 1.4;
+      white-space: normal;
+      word-wrap: break-word;
+      max-width: 240px;
+      display: block;
+    }
 
     /* ─── Rating bar ──────────────────────── */
     .bar-row {
@@ -950,6 +975,25 @@ export class LocationCompareComponent implements OnInit {
   readonly anyVisaCost = computed(() =>
     this.locations().some(l => l.visa?.costUSD)
   );
+  readonly anyVisaIncomeReq = computed(() =>
+    this.locations().some(l => l.visa?.incomeRequirement?.monthly)
+  );
+
+  climateHigh(city: LocationFull): string {
+    const h = city.climate?.summerHighF ?? city.climate?.avgTemp?.high;
+    return h != null ? `${h}°F` : '–';
+  }
+
+  climateLow(city: LocationFull): string {
+    const l = city.climate?.winterLowF ?? city.climate?.avgTemp?.low;
+    return l != null ? `${l}°F` : '–';
+  }
+
+  visaIncomeReq(city: LocationFull): string {
+    const r = city.visa?.incomeRequirement;
+    if (!r?.monthly) return '–';
+    return `${r.currency ?? 'USD'} ${r.monthly.toLocaleString()}`;
+  }
 
   ngOnInit(): void {
     // Ensure full location data is loaded for comparison

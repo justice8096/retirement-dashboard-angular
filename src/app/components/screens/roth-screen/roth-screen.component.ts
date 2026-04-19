@@ -61,9 +61,12 @@ import { FinancialSettings } from '@models/api.model';
           <div class="param-grid">
             <label class="param">
               <span class="param-label">Annual Conversion Amount</span>
-              <input type="number" class="param-input"
+              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="conversionAmount()"
                 (ngModelChange)="conversionAmount.set($event)" />
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">
+                {{ fmt(conversionAmount()) }} · {{ dyscalculia.getAnchor(conversionAmount(), 'withdrawal-year') }}
+              </span>
             </label>
             <label class="param">
               <span class="param-label">Years to Convert</span>
@@ -138,6 +141,7 @@ import { FinancialSettings } from '@models/api.model';
     .param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .param { display: flex; flex-direction: column; gap: 4px; }
     .param-label { font-size: 11px; color: var(--dark-text-muted); }
+    .param-hint { font-size: 10px; color: var(--dark-text-muted); font-style: italic; margin-top: 2px; line-height: 1.4; }
     .param-input {
       padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary); color: var(--dark-text); font-size: 14px;

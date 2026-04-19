@@ -27,6 +27,13 @@ import { HouseholdProfile } from '@models/api.model';
           <input type="number" class="income-input" min="0" step="1000"
             [class]="dyscalculia.numberSpacingClass()"
             [ngModel]="annualIncome()" (ngModelChange)="annualIncome.set(+$event)" />
+          @if (dyscalculia.isEnabled()) {
+            <span class="income-magnitude" [class]="dyscalculia.numberSpacingClass()">
+              {{ dyscalculia.formatCurrency(annualIncome(), '/yr') }}
+              · {{ dyscalculia.formatCurrency(annualIncome() / 12, '/mo') }}
+              · {{ dyscalculia.getAnchor(annualIncome(), 'withdrawal-year') }}
+            </span>
+          }
         </label>
         <span class="income-hint">
           Defaults from household target; edit to test scenarios. Income tax uses
@@ -156,6 +163,11 @@ import { HouseholdProfile } from '@models/api.model';
     }
     .income-input:focus { border-color: var(--dark-amber); }
     .income-hint { font-size: 11px; color: var(--dark-text-muted); max-width: 400px; line-height: 1.5; }
+    .income-magnitude {
+      display: block;
+      font-size: 11px; color: var(--dark-text-sec); font-style: italic;
+      margin-top: 4px; line-height: 1.45;
+    }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
     .filter-banner {
@@ -232,7 +244,12 @@ export class TaxesScreenComponent implements OnInit {
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
-      : '$' + Math.round(amount).toLocaleString();
+      : this.fmtCents(amount);
+  }
+
+  /** Currency with cents precision — taxes display to-the-penny. */
+  fmtCents(amount: number): string {
+    return '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
   /** Normalize rate (decimal 0.22 or whole 22 → "22"). */
