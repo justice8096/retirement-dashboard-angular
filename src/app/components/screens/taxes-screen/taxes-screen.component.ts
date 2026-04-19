@@ -1,6 +1,7 @@
 import { Component, inject, computed, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
+import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ApiService } from '@services/api.service';
 import { HouseholdProfile } from '@models/api.model';
@@ -167,6 +168,7 @@ import { HouseholdProfile } from '@models/api.model';
 })
 export class TaxesScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
+  readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
   private readonly api = inject(ApiService);
 
@@ -177,15 +179,15 @@ export class TaxesScreenComponent implements OnInit {
     const income = this.annualIncome();
     return this.loc.selectedFullLocations()
       .map(l => {
-        const tax = this.loc.computeIncomeTax(l, income);
+        const result = this.tax.computeIncomeTax(l, income);
         return {
           id: l.id,
           name: l.name,
           country: l.country,
-          monthlyTax: tax.monthlyTax,
-          federalAnnual: tax.federalAnnual,
-          stateAnnual: tax.stateAnnual,
-          source: tax.source,
+          monthlyTax: result.monthlyTax,
+          federalAnnual: result.federalAnnual,
+          stateAnnual: result.stateAnnual,
+          source: result.source,
           vatRate: l.taxes?.vatRate ?? null,
           socialRate: l.taxes?.socialChargesRate ?? null,
           salesRate: l.taxes?.salesTax?.rate ?? null,
@@ -205,7 +207,7 @@ export class TaxesScreenComponent implements OnInit {
           this.annualIncome.set(h.targetAnnualIncome);
         }
       },
-      error: () => {},
+      error: (err) => console.warn('TaxesScreen: household seed fetch failed.', err),
     });
   }
 

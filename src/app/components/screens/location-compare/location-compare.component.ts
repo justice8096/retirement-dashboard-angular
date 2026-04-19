@@ -1,6 +1,7 @@
-import { Component, inject, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
+import { TaxService } from '@services/tax.service';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HealthcareService } from '@services/healthcare.service';
@@ -36,6 +37,46 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
           </button>
         </div>
 
+        <!-- Year-view toggle — shows Year 1 (transition) vs Year 2+ (steady). -->
+        @if (healthcare.transitionYearExtraIncome() > 0) {
+          <div class="year-toggle">
+            <span class="year-toggle-label">View:</span>
+            <button class="year-btn" [class.active]="viewYear() === 'steady'"
+                    (click)="viewYear.set('steady')">Year 2+ (steady)</button>
+            <button class="year-btn" [class.active]="viewYear() === 'transition'"
+                    (click)="viewYear.set('transition')">Year 1 (transition)</button>
+            <span class="year-toggle-hint">
+              Transition year includes
+              {{ '$' + healthcare.transitionYearExtraIncome().toLocaleString() }} one-time income
+            </span>
+          </div>
+        }
+
+        <!-- Audit banner: shows the household inputs driving the numbers -->
+        <div class="audit-banner">
+          <span class="audit-item"><strong>Adults:</strong> {{ auditAdults() }}</span>
+          <span class="audit-sep">·</span>
+          <span class="audit-item"><strong>Home MAGI:</strong> {{ fmtYear(auditMagi()) }} · {{ auditFplPct().toFixed(0) }}% FPL</span>
+          <span class="audit-sep">·</span>
+          <span class="audit-item">
+            <strong>ACA rules:</strong>
+            {{ healthcare.subsidyRegime() === 'cliff' ? 'Cliff (400% FPL)' : 'Enhanced (8.5% cap)' }}
+          </span>
+          @if (healthcare.apportionStrategy() !== 'manual') {
+            <span class="audit-sep">·</span>
+            <span class="audit-item audit-mode">
+              <strong>Per-location MAGI:</strong> ON (auto-apportion)
+            </span>
+          }
+          <span class="audit-hint">
+            @if (healthcare.apportionStrategy() !== 'manual') {
+              Each city's MAGI recomputes at its own cost-of-living — cheaper cities may drop below the 400% FPL cliff and qualify for subsidies. Hover a healthcare cell for that city's effective MAGI.
+            } @else {
+              Manual apportionment — MAGI fixed across all cities. Switch to auto on Setup → Assumptions to see per-location scaling.
+            }
+          </span>
+        </div>
+
         <!-- Scrollable comparison table -->
         <div class="table-scroll">
           <table class="compare-table" role="grid">
@@ -60,7 +101,7 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
               <tr class="total-row">
                 <td class="label-col sticky-col row-label">
                   <span class="row-icon">💰</span> Total Monthly
-                  <span class="row-sub">incl. est. income tax on {{ fmt(loc.annualIncome()) }}/yr</span>
+                  <span class="row-sub">as-is — with your current MAGI and the resulting ACA regime</span>
                 </td>
                 @for (city of locations(); track city.id) {
                   <td class="city-col total-cell"
@@ -68,6 +109,40 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                     [class.cheapest]="isCheapest(city)"
                     [class.priciest]="isPriciest(city)">
                     {{ fmtCents(totalWithTax(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Aspirational total — if ACA subsidy fully applied -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">✓</span> Total if ACA-subsidized
+                  <span class="row-sub">
+                    what you'd pay with healthcare capped at 8.5% × MAGI (i.e. under the 400% FPL cliff)
+                  </span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col subsidized-cell"
+                    [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmtCents(totalIfSubsidized(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Worst-case total with cliff penalty baked in -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">⚠</span> Total w/ Cliff Penalty
+                  <span class="row-sub">
+                    worst-case monthly: Total Monthly + what you'd pay extra if you drew the full
+                    city cost from taxable sources (no Roth). Equals Total Monthly when already under the cliff.
+                  </span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col penalty-cell"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [class.penalty-zero]="cliffPenaltyMonthly(city) === 0">
+                    {{ fmtCents(totalWithTax(city) + cliffPenaltyMonthly(city)) }}
                   </td>
                 }
               </tr>
@@ -102,8 +177,15 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                 </td>
                 @for (city of locations(); track city.id) {
                   <td class="city-col"
-                    [class]="dyscalculia.numberSpacingClass()">
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [title]="healthcareTooltip(city)">
                     {{ fmtCents(healthcareMonthly(city)) }}
+                    @if (acaEstimateFor(city); as est) {
+                      <span class="aca-badge"
+                            [title]="(est.rateArea ? est.rateArea + ' · ' : '') + (est.disclaimer ?? 'estimated')">
+                        ~{{ est.level?.charAt(0) ?? '?' }}
+                      </span>
+                    }
                   </td>
                 }
               </tr>
@@ -583,8 +665,61 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       border-bottom: 2px solid var(--dark-border);
     }
     .total-cell { color: var(--dark-amber); }
+    .year-toggle {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 14px;
+      background: rgba(156, 111, 222, 0.08);
+      border: 1px solid rgba(156, 111, 222, 0.25);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    .year-toggle-label { font-weight: 600; color: var(--dark-text-sec); }
+    .year-btn {
+      padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600;
+      background: transparent; color: var(--dark-text-muted);
+      border: 1px solid var(--dark-border); cursor: pointer;
+    }
+    .year-btn.active {
+      background: var(--dark-purple); color: #fff; border-color: var(--dark-purple);
+    }
+    .year-toggle-hint { font-size: 11px; color: var(--dark-text-muted); flex-basis: 100%; margin-top: 2px; }
+
+    .audit-banner {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+      padding: 10px 14px;
+      background: var(--dark-bg-secondary);
+      border-left: 3px solid var(--dark-blue);
+      border-radius: 6px;
+      font-size: 12px; color: var(--dark-text-sec);
+    }
+    .audit-item strong { color: var(--dark-text); font-weight: 600; }
+    .audit-mode strong { color: var(--dark-green); }
+    .audit-sep { color: var(--dark-text-muted); }
+    .audit-hint { flex-basis: 100%; font-size: 10px; color: var(--dark-text-muted); font-style: italic; margin-top: 2px; }
+    .aca-badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 5px;
+      font-size: 9px;
+      font-weight: 700;
+      background: rgba(212, 148, 58, 0.18);
+      color: var(--dark-amber);
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      cursor: help;
+    }
     .total-cell.cheapest { color: var(--dark-green); }
     .total-cell.priciest { color: var(--dark-red); }
+    .subsidized-cell {
+      color: var(--dark-green); font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .penalty-cell {
+      color: var(--dark-red); font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .penalty-cell.penalty-zero { color: var(--dark-text-muted); font-weight: 400; }
 
     .section-header-row td {
       padding: 12px 12px 6px;
@@ -677,8 +812,92 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
 })
 export class LocationCompareComponent implements OnInit {
   readonly loc = inject(LocationService);
+  readonly tax = inject(TaxService);
+  readonly healthcare = inject(HealthcareService);
   private readonly nav = inject(NavigationService);
   readonly dyscalculia = inject(DyscalculiaService);
+
+  /** Toggle: view Year 1 (transition) or Year 2+ (steady state) healthcare numbers. */
+  readonly viewYear = signal<'transition' | 'steady'>('steady');
+
+  /**
+   * Per-city (decision, totalWithTax) map, memoized so change-detection
+   * passes don't recompute `healthcare.decide()` 4× per city per render.
+   * Rebuilds only when `locations()`, `annualIncome`, `viewYear`, or household ages shift.
+   */
+  readonly cityFinances = computed(() => {
+    const map = new Map<string, {
+      decision: ReturnType<HealthcareService['decide']>;
+      totalWithTax: number;
+      monthlyTax: number;
+      /** Total assuming fully-subsidized ACA — what you'd pay at this city under the subsidy cap. */
+      totalIfSubsidized: number;
+      /** Monthly healthcare if fully subsidized (cap × MAGI / 12, capped at unsubsidized sticker). */
+      subsidizedHealthcareMonthly: number;
+      /** Cost penalty per month for being above the cliff (0 when already subsidized). */
+      cliffPenaltyMonthly: number;
+    }>();
+    for (const city of this.locations()) {
+      const decision = this.healthcare.decideForLocation(city, {
+        transition: this.viewYear() === 'transition',
+      });
+      const bundle = this.tax.totalWithIncomeTax(city, { healthcareMonthly: decision.monthlyCost });
+
+      // Compute "if fully subsidized" + "worst-case penalty" under CLIFF
+      // regime (2026 reality). Two scenarios side-by-side:
+      //   subsidizedMonthly — what you'd pay if you managed MAGI down to
+      //                        just under 400% FPL (the aspirational ceiling).
+      //   worstCaseMonthly  — what you'd pay if you drew the city's full
+      //                        annual cost from taxable/trad/SS (no Roth buffer,
+      //                        worst-case MAGI = city annual need). This is
+      //                        the "penalty for moving here without tax-efficient
+      //                        planning" signal.
+      const acaFull = city.monthlyCosts?.['healthcarePreMedicare']?.typical
+        ?? city.healthcare?.acaMarketplace?.benchmarkSilverMonthly2Adult
+        ?? 0;
+      const adults = Math.max(2,
+        (this.healthcare.household()?.members ?? []).filter(m => m.role !== 'dependent').length
+      );
+      const fpl = this.healthcare.fpl(adults);
+
+      // Aspirational: MAGI clamped to just under 400% FPL cliff.
+      const cliffCeilingMagi = fpl * 3.99;
+      const aspirationalMagi = Math.min(Math.max(decision.magiUsed, 0), cliffCeilingMagi);
+      const aspirationalFplPct = (aspirationalMagi / fpl) * 100;
+      const applicablePct = this.healthcare.applicablePctForCliff(aspirationalFplPct);
+      const subsidizedMonthly = applicablePct != null && aspirationalMagi > 0
+        ? Math.min(acaFull, aspirationalMagi * applicablePct / 12)
+        : acaFull;
+      const bundleIfSubsidized = this.tax.totalWithIncomeTax(city, {
+        healthcareMonthly: subsidizedMonthly,
+      });
+
+      // Worst case: user needs the full city cost annually, all from sources
+      // that hit MAGI (trad + SS + pension, no Roth). This is the cost
+      // they'd pay if they moved here without planning tax-efficient draws.
+      const cityAnnualCost = Object.values(city.monthlyCosts ?? {})
+        .reduce((s, c) => s + (c?.typical ?? 0), 0) * 12;
+      const worstCaseMagi = cityAnnualCost; // no Roth → full cost hits MAGI
+      const worstCaseFplPct = (worstCaseMagi / fpl) * 100;
+      const worstCaseApplicable = this.healthcare.applicablePctForCliff(worstCaseFplPct);
+      const perAdultFull = city.healthcare?.acaMarketplace?.benchmarkSilverMonthlySingle
+        ?? acaFull / 2;
+      const worstCaseHealthcareMonthly = worstCaseApplicable != null
+        ? Math.min(perAdultFull * adults, worstCaseMagi * worstCaseApplicable / 12)
+        : perAdultFull * adults; // above cliff → full sticker
+      const cliffPenaltyMonthly = Math.max(0, worstCaseHealthcareMonthly - subsidizedMonthly);
+
+      map.set(city.id, {
+        decision,
+        totalWithTax: bundle.total,
+        monthlyTax: bundle.monthlyTax,
+        totalIfSubsidized: bundleIfSubsidized.total,
+        subsidizedHealthcareMonthly: subsidizedMonthly,
+        cliffPenaltyMonthly,
+      });
+    }
+    return map;
+  });
 
   /** Full data for each selected location, with computed total if missing */
   readonly locations = computed(() => {
@@ -693,17 +912,27 @@ export class LocationCompareComponent implements OnInit {
         const summary = summaries.find(s => s.id === l.id);
         const computed = summary?.monthlyCostTotal
           ?? Object.values(l.monthlyCosts)
-              .reduce((sum, cr) => sum + ((cr as any)?.typical ?? 0), 0);
+              .reduce((sum, cr) => sum + (cr?.typical ?? 0), 0);
         return { ...l, monthlyCostTotal: computed };
       });
   });
 
   /** Cost rows that have data in at least one selected location */
+  /**
+   * Monthly-cost rows shown in the table. Excludes keys that the Compare
+   * table surfaces via smarter rows at the top:
+   *   - `healthcare`            → shown via our effective "Healthcare" row
+   *   - `healthcarePreMedicare` → alternate (not in default sums)
+   *   - `taxes`                 → shown via our computed "Income Tax" row
+   * Excluding them here prevents the user seeing two different numbers for
+   * the same concept.
+   */
+  private readonly hiddenCostKeys = new Set(['healthcare', 'healthcarePreMedicare', 'taxes']);
   readonly costRows = computed(() => {
     const locs = this.locations();
-    return COST_CATEGORIES.filter(cat =>
-      locs.some(l => (l.monthlyCosts[cat.key]?.typical ?? 0) > 0)
-    );
+    return COST_CATEGORIES
+      .filter(cat => !this.hiddenCostKeys.has(cat.key))
+      .filter(cat => locs.some(l => (l.monthlyCosts[cat.key]?.typical ?? 0) > 0));
   });
 
   readonly hasLifestyle = computed(() =>
@@ -742,30 +971,95 @@ export class LocationCompareComponent implements OnInit {
     return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  /** Yearly currency — whole dollars + "/yr" suffix. For the audit banner. */
+  fmtYear(val: number): string {
+    return '$' + Math.round(val).toLocaleString() + '/yr';
+  }
+
   fmtCost(city: LocationFull, key: string): string {
     const val = city.monthlyCosts[key]?.typical ?? 0;
     if (!val) return '–';
     return this.fmt(val);
   }
 
-  readonly healthcare = inject(HealthcareService);
-
-  /** Monthly cost total that includes computed income tax AND effective healthcare. */
+  /** Monthly cost total including computed income tax + effective healthcare. */
   totalWithTax(city: LocationFull): number {
-    const hc = this.healthcare.decide(city);
-    return this.loc.totalWithIncomeTax(city, { healthcareMonthly: hc.monthlyCost }).total;
+    return this.cityFinances().get(city.id)?.totalWithTax ?? 0;
+  }
+
+  /** "What-if under the cliff" total — assumes ACA subsidy fully applies. */
+  totalIfSubsidized(city: LocationFull): number {
+    return this.cityFinances().get(city.id)?.totalIfSubsidized ?? 0;
+  }
+
+  /** Monthly cost of being above the 400% FPL cliff vs under. 0 if already subsidized. */
+  cliffPenaltyMonthly(city: LocationFull): number {
+    return this.cityFinances().get(city.id)?.cliffPenaltyMonthly ?? 0;
   }
 
   monthlyTax(city: LocationFull): number {
-    return this.loc.totalWithIncomeTax(city).monthlyTax;
+    return this.cityFinances().get(city.id)?.monthlyTax ?? 0;
   }
 
   healthcareMonthly(city: LocationFull): number {
-    return this.healthcare.decide(city).monthlyCost;
+    return this.cityFinances().get(city.id)?.decision.monthlyCost ?? 0;
   }
 
   healthcareSource(city: LocationFull): string {
-    return this.healthcare.decide(city).source;
+    return this.cityFinances().get(city.id)?.decision.source ?? 'none';
+  }
+
+  /**
+   * Returns the ACA estimate metadata (rateArea, level, disclaimer) for a
+   * city when the household's healthcare regime is ACA-based. null for
+   * Medicare-only households — no benchmark is in play.
+   */
+  acaEstimateFor(city: LocationFull) {
+    const decision = this.cityFinances().get(city.id)?.decision;
+    if (!decision || !decision.source.startsWith('aca')) return null;
+    return decision.acaEstimate ?? null;
+  }
+
+  /**
+   * Build a multi-line tooltip explaining the healthcare cell — surfaces the
+   * location-specific MAGI, FPL%, regime (cliff/enhanced), and coverage
+   * source so the user can see why a cheaper city produces a different
+   * subsidy outcome than a more expensive one.
+   */
+  healthcareTooltip(city: LocationFull): string {
+    const d = this.cityFinances().get(city.id)?.decision;
+    if (!d) return '';
+    const lines = [
+      `Coverage: ${d.source}`,
+      `MAGI for this city: $${Math.round(d.magiUsed).toLocaleString()}`,
+      `FPL: ${(d.fplPct ?? 0).toFixed(0)}%`,
+      `Adults <65 / 65+: ${d.adultsPreMedicare} / ${d.adultsMedicare}`,
+    ];
+    if (d.aboveFplCliff) lines.push('Above 400% FPL cliff → no subsidy');
+    if (d.subsidyEligible) lines.push('Subsidy active');
+    return lines.join('\n');
+  }
+
+  /* ─── Audit banner helpers — surface the inputs driving the numbers ── */
+
+  auditAdults(): string {
+    const adults = (this.healthcare.household()?.members ?? [])
+      .filter(m => m.role !== 'dependent');
+    if (!adults.length) return 'none set';
+    const yr = this.healthcare.household()?.planningStartYear ?? new Date().getFullYear();
+    return adults.map(m => `${m.name || 'adult'} (${yr - m.birthYear})`).join(', ');
+  }
+
+  auditCashIn(): number { return this.healthcare.magi().cashIn; }
+  auditMagi(): number { return this.healthcare.magi().magiForAca; }
+
+  auditFplPct(): number {
+    const magi = this.healthcare.magi().magiForAca;
+    const adults = Math.max(1,
+      (this.healthcare.household()?.members ?? []).filter(m => m.role !== 'dependent').length || 2
+    );
+    const fpl = 15_060 + 5_380 * (adults - 1);
+    return magi > 0 ? (magi / fpl) * 100 : 0;
   }
 
   isCheapest(city: LocationFull): boolean {

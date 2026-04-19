@@ -118,6 +118,19 @@ export interface MonteCarloParams {
   simStartYear?: number;
   /** MAGI for ACA subsidy calc. Held constant across the sim (v1 simplification). */
   magiAnnual?: number;
+  /**
+   * Transition-year MAGI override — applied in sim year 0 only. Captures the
+   * spike from mid-year retirement W-2 / severance / final bonuses / year-of
+   * RMDs that push MAGI above what it'll be in steady state. Year 1+ uses
+   * `magiAnnual`.
+   */
+  transitionMagiAnnual?: number;
+  /**
+   * ACA subsidy regime: 'cliff' (pre-ARPA — 2026 reality, sliding 2.07–9.83%
+   * with hard 400% FPL cliff) or 'enhanced' (flat 8.5% of MAGI cap, no cliff).
+   * Default 'enhanced' for backward compatibility with existing callers.
+   */
+  subsidyRegime?: 'cliff' | 'enhanced';
 
   /**
    * Multi-location schedule. Each entry sets a new cost-of-living baseline at
@@ -164,6 +177,26 @@ export interface MonteCarloResult {
   p95: number;
 }
 
+/* ─── ACA subsidy helpers (mirror HealthcareService) ──────────────── */
+// Duplicated here because monte-carlo.ts is a pure lib (no Angular DI). Keep
+// the tables in sync with healthcare.service.ts — same numbers, same source
+// (2024 FPL for continental US; IRC §36B applicable-pct sliding scale).
+const FPL_2024_BASE_MC = 15_060;
+const FPL_2024_PER_ADDL_MC = 5_380;
+function fplMc(size: number): number {
+  return FPL_2024_BASE_MC + FPL_2024_PER_ADDL_MC * Math.max(0, size - 1);
+}
+function applicablePctCliffMc(fplPct: number): number | null {
+  if (fplPct < 100) return null;
+  if (fplPct < 133) return 0.0207;
+  if (fplPct < 150) return 0.0310 + (fplPct - 133) / 17 * (0.0414 - 0.0310);
+  if (fplPct < 200) return 0.0414 + (fplPct - 150) / 50 * (0.0652 - 0.0414);
+  if (fplPct < 250) return 0.0652 + (fplPct - 200) / 50 * (0.0833 - 0.0652);
+  if (fplPct < 300) return 0.0833 + (fplPct - 250) / 50 * (0.0983 - 0.0833);
+  if (fplPct < 400) return 0.0983;
+  return null; // 400% FPL cliff — no subsidy
+}
+
 /**
  * Effective monthly cost for a segment at a given sim year — in today's $.
  *   - If the segment has a richer breakdown (nonHealthcareBase + healthcare
@@ -190,11 +223,28 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams): num
       const acaCount = nAdults - medicareCount;
       const medicarePerAdult = (m.medicareMonthly ?? 0) / nAdults;
       const acaFullPerAdult = (m.acaUnsubsidizedMonthly ?? 0) / nAdults;
-      const magi = p.magiAnnual ?? 0;
-      const cap = m.acaSubsidyCapPct ?? 0.085;
-      const acaPerAdult = acaCount > 0 && magi > 0
-        ? Math.min(acaFullPerAdult, (magi * cap / 12) / acaCount)
-        : acaFullPerAdult;
+      // Year-aware MAGI: transition value in year 0, steady state thereafter.
+      const magi = (y === 0 && p.transitionMagiAnnual != null)
+        ? p.transitionMagiAnnual
+        : (p.magiAnnual ?? 0);
+      const regime = p.subsidyRegime ?? 'enhanced';
+
+      // Annual subsidy cap — regime-dependent:
+      //   enhanced: flat cap × MAGI (default 8.5%)
+      //   cliff:    sliding applicable-pct by FPL bucket; null above 400% FPL
+      let annualCap: number;
+      if (regime === 'cliff') {
+        const fplPct = magi > 0 ? (magi / fplMc(nAdults)) * 100 : 0;
+        const pct = applicablePctCliffMc(fplPct);
+        annualCap = pct != null ? magi * pct : Number.POSITIVE_INFINITY; // above cliff → no subsidy
+      } else {
+        const cap = m.acaSubsidyCapPct ?? 0.085;
+        annualCap = magi * cap;
+      }
+
+      const acaPerAdult = acaCount > 0 && magi > 0 && isFinite(annualCap)
+        ? Math.min(acaFullPerAdult, (annualCap / 12) / acaCount)
+        : acaFullPerAdult; // above cliff (or zero MAGI) → full sticker
       healthcare = medicareCount * medicarePerAdult + acaCount * acaPerAdult;
     }
   } else {

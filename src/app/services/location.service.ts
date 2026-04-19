@@ -2,7 +2,7 @@ import { Injectable, inject, signal, computed } from '@angular/core';
 import { ApiService } from './api.service';
 import {
   LocationSummary, LocationFull, LocationQuery, MonthlyCosts, CostRange, COST_CATEGORIES, DetailedCosts,
-  NeighborhoodsSupplement, Neighborhood, IncomeTaxTable,
+  NeighborhoodsSupplement, Neighborhood, SupplementType,
 } from '@models/api.model';
 
 export type SortField = 'name' | 'monthlyCostTotal' | 'country';
@@ -127,109 +127,30 @@ export class LocationService {
       .sort((a, b) => b.value - a.value);
   }
 
-  /**
-   * Iterative tax-on-total calculation. Sums the location's monthly costs,
-   * separates taxable from non-taxable categories (via `CostCategoryMeta.taxable`),
-   * and applies `vatRate + socialChargesRate` from `TaxInfo`. Iterates until the
-   * total changes by ≤ $3.00 between passes (cap 20 iterations for safety).
-   *
-   * Since only the fixed `taxableBase` is taxed, this converges in 1 iteration
-   * today — the loop is future-proofing for scenarios where tax itself becomes
-   * part of the taxable base.
-   */
-  computeConvergedTotal(loc: LocationFull): {
-    total: number;
-    taxableBase: number;
-    untaxedBase: number;
-    tax: number;
-    iterations: number;
-    converged: boolean;
-  } {
-    // Normalize rates: some locations store as decimal (0.2 = 20%), others as
-    // whole-number percent (22 = 22%). Anything > 1 is treated as whole-%.
-    const normalize = (r: number | undefined | null): number => {
-      const n = Number(r ?? 0);
-      if (!isFinite(n) || n <= 0) return 0;
-      return n > 1 ? n / 100 : n;
-    };
-    const rate = normalize(loc.taxes?.vatRate) + normalize(loc.taxes?.socialChargesRate);
-    let taxableBase = 0;
-    let untaxedBase = 0;
-    for (const cat of COST_CATEGORIES) {
-      if (cat.key === 'taxes') continue;
-      const v = loc.monthlyCosts[cat.key]?.typical ?? 0;
-      if (cat.taxable) taxableBase += v;
-      else untaxedBase += v;
-    }
-    let total = taxableBase + untaxedBase;
-    let tax = 0;
-    let iterations = 0;
-    let converged = false;
-    for (let i = 0; i < 20; i++) {
-      iterations = i + 1;
-      const newTax = taxableBase * rate;
-      const newTotal = taxableBase + untaxedBase + newTax;
-      if (Math.abs(newTotal - total) <= 3) {
-        tax = newTax;
-        total = newTotal;
-        converged = true;
-        break;
-      }
-      tax = newTax;
-      total = newTotal;
-    }
-    return { total, taxableBase, untaxedBase, tax, iterations, converged };
-  }
-
-  /**
-   * Converged totals for the currently-selected locations — includes both the
-   * VAT convergence (for consumption tax) AND the bracket-based income tax on
-   * `this.annualIncome()`. The `total` field is the full monthly picture:
-   * base categories + computed income tax + VAT-on-taxable.
-   */
-  readonly convergedTotals = computed(() => {
-    const income = this.annualIncome();
-    return this.selectedFullLocations().map(l => {
-      const conv = this.computeConvergedTotal(l);
-      const inc = this.computeIncomeTax(l, income);
-      // Avoid double-counting: if computeIncomeTax returned a 'stored' value
-      // that's already in conv.total (via untaxedBase), don't add it again.
-      const addIncomeTax = inc.source === 'brackets' ? inc.monthlyTax : 0;
-      return {
-        id: l.id,
-        name: l.name,
-        country: l.country,
-        currency: l.currency,
-        total: conv.total + addIncomeTax,
-        taxableBase: conv.taxableBase,
-        untaxedBase: conv.untaxedBase,
-        tax: conv.tax + addIncomeTax,
-        incomeTax: inc.monthlyTax,
-        incomeTaxSource: inc.source,
-        iterations: conv.iterations,
-        converged: conv.converged,
-      };
-    });
-  });
+  /* Tax helpers live in `TaxService` — injected directly by screens that
+   * need them. Keeps LocationService focused on location state + filtering
+   * + cost composition. See src/app/services/tax.service.ts. */
 
   /* ─── Supplement data ──────────────────────────────────────────── */
   readonly supplementCache = signal<Record<string, Record<string, unknown>>>({});
 
-  loadSupplement(locId: string, dataType: string): void {
+  loadSupplement(locId: string, dataType: SupplementType): void {
     const cacheKey = `${locId}:${dataType}`;
     if (this.supplementCache()[cacheKey]) return;
-    this.api.getLocationSupplement(locId, dataType as any).subscribe({
+    this.api.getLocationSupplement(locId, dataType).subscribe({
       next: (data) => {
         this.supplementCache.update(cache => ({
           ...cache,
           [cacheKey]: data as Record<string, unknown>,
         }));
       },
-      error: () => {},
+      error: (err) => {
+        console.warn(`LocationService: supplement fetch failed (${dataType} for ${locId}).`, err);
+      },
     });
   }
 
-  getSupplement(locId: string, dataType: string): Record<string, unknown> | null {
+  getSupplement(locId: string, dataType: SupplementType): Record<string, unknown> | null {
     return this.supplementCache()[`${locId}:${dataType}`] ?? null;
   }
 
@@ -265,93 +186,27 @@ export class LocationService {
     }
   }
 
-  /** Apply a bracket table to annual taxable income. Deductions applied first. */
-  private applyBrackets(table: IncomeTaxTable | undefined, annualIncome: number): number {
-    if (!table?.brackets?.length) return 0;
-    const deduction = (table.standardDeduction ?? 0) + (table.deduction ?? 0);
-    const taxable = Math.max(0, annualIncome - deduction);
-    if (taxable <= 0) return 0;
-    let tax = 0;
-    for (const b of table.brackets) {
-      const top = b.max ?? Number.POSITIVE_INFINITY;
-      if (taxable <= b.min) break;
-      const span = Math.min(taxable, top) - b.min;
-      if (span > 0) tax += span * b.rate;
-    }
-    return tax;
-  }
-
   /**
-   * Monthly cost total with the computed income tax swapped in for whatever
-   * stored tax value came from the API. Returns:
-   *   baseMonthly (all non-tax categories) + computed monthly tax
-   * Uses `this.annualIncome()` — so changing that signal fans out to every
-   * screen that shows a total.
+   * Sum of a location's monthly costs excluding `healthcare`, `taxes`, and any
+   * category flagged as `alternate` (e.g. `healthcarePreMedicare`). This is
+   * the "rest of the bill" that callers combine with an effective healthcare
+   * cost + computed income tax to get a realistic total.
+   *
+   * Single source of truth for the "what counts in baseline cost" rule —
+   * used by `totalWithIncomeTax` below, by HealthcareService.locationTotalWithHealthcare,
+   * and by the MC screen's segment builder.
    */
-  totalWithIncomeTax(loc: LocationFull, opts?: { healthcareMonthly?: number }): {
-    total: number;
-    baseMonthly: number;
-    monthlyTax: number;
-    taxSource: 'brackets' | 'stored' | 'vat-converged' | 'none';
-  } {
-    // Skip `taxes` (re-added via computeIncomeTax) AND any category flagged
-    // as an alternate (e.g. healthcarePreMedicare) — those get resolved by
-    // the HealthcareService into the `healthcare` slot.
+  nonHealthcareBaseMonthly(loc: LocationFull): number {
+    const costs = loc.monthlyCosts ?? {};
     const alternateKeys = new Set(
       COST_CATEGORIES.filter(c => c.alternate).map(c => c.key),
     );
-    const costs = loc.monthlyCosts ?? {};
-    let baseMonthly = Object.entries(costs)
-      .filter(([k]) => k !== 'taxes' && !alternateKeys.has(k))
-      .reduce((s, [, v]) => s + (v?.typical ?? 0), 0);
-
-    // Optional healthcare swap: replace the stored Medicare line with the
-    // caller-supplied effective cost (e.g. ACA pricing for pre-65 adults).
-    if (opts?.healthcareMonthly != null) {
-      baseMonthly = baseMonthly - (costs['healthcare']?.typical ?? 0) + opts.healthcareMonthly;
+    let sum = 0;
+    for (const [key, val] of Object.entries(costs)) {
+      if (key === 'taxes' || key === 'healthcare' || alternateKeys.has(key)) continue;
+      sum += (val?.typical ?? 0);
     }
-
-    const tax = this.computeIncomeTax(loc, this.annualIncome());
-    return {
-      total: baseMonthly + tax.monthlyTax,
-      baseMonthly,
-      monthlyTax: tax.monthlyTax,
-      taxSource: tax.source,
-    };
-  }
-
-  /**
-   * Computes estimated monthly income tax for a location given annual income.
-   * Uses federal + state brackets when available (US locations), otherwise
-   * falls back to the stored `monthlyCosts.taxes.typical` if non-zero, then
-   * to the VAT convergence estimate.
-   */
-  computeIncomeTax(loc: LocationFull, annualIncome: number): {
-    monthlyTax: number;
-    federalAnnual: number;
-    stateAnnual: number;
-    source: 'brackets' | 'stored' | 'vat-converged' | 'none';
-  } {
-    const t = loc.taxes;
-    if (t?.federalIncomeTax?.brackets?.length || t?.stateIncomeTax?.brackets?.length) {
-      const fed = this.applyBrackets(t.federalIncomeTax, annualIncome);
-      const state = this.applyBrackets(t.stateIncomeTax, annualIncome);
-      return {
-        monthlyTax: (fed + state) / 12,
-        federalAnnual: fed,
-        stateAnnual: state,
-        source: 'brackets',
-      };
-    }
-    const stored = loc.monthlyCosts['taxes']?.typical ?? 0;
-    if (stored > 0) {
-      return { monthlyTax: stored, federalAnnual: 0, stateAnnual: 0, source: 'stored' };
-    }
-    const conv = this.computeConvergedTotal(loc);
-    if (conv.tax > 0) {
-      return { monthlyTax: conv.tax, federalAnnual: 0, stateAnnual: 0, source: 'vat-converged' };
-    }
-    return { monthlyTax: 0, federalAnnual: 0, stateAnnual: 0, source: 'none' };
+    return sum;
   }
 
   /* ─── Actions ───────────────────────────────────────────────────── */
@@ -375,21 +230,21 @@ export class LocationService {
     if (this.fullLocations().length) return;
     this.api.getLocations({ fields: 'full', limit: 200 }).subscribe({
       next: (res) => this.fullLocations.set(res.data as LocationFull[]),
-      error: () => {},
+      error: (err) => console.warn('LocationService: full locations fetch failed.', err),
     });
   }
 
   loadCountries(): void {
     this.api.getCountries().subscribe({
       next: (data) => this.countries.set(data),
-      error: () => {},
+      error: (err) => console.warn('LocationService: countries fetch failed.', err),
     });
   }
 
   loadRegions(): void {
     this.api.getRegions().subscribe({
       next: (data) => this.regions.set(data),
-      error: () => {},
+      error: (err) => console.warn('LocationService: regions fetch failed.', err),
     });
   }
 

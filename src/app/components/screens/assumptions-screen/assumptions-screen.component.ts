@@ -310,13 +310,14 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               </div>
             </div>
 
-            <!-- Regime -->
+            <!-- Derived — what your household actually qualifies for under current ages + MAGI + law -->
             <div class="hc-grid">
               <div class="hc-stat">
-                <span class="hc-label">Regime</span>
+                <span class="hc-label">Coverage (derived)</span>
                 <span class="hc-value hc-src-{{ hc.decision.source }}">
                   {{ healthcareSourceLabel(hc.decision.source) }}
                 </span>
+                <span class="hc-sub">from ages + MAGI + law setting</span>
               </div>
               <div class="hc-stat">
                 <span class="hc-label">Monthly Cost (ref: {{ hc.location.name }})</span>
@@ -338,12 +339,86 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               }
             </div>
 
+            @if (hc.decision.usedFallback) {
+              <div class="hc-warn">
+                ⚠ {{ hc.decision.fallbackReason }}
+              </div>
+            }
+
+            <!-- Transition year: one-time income spike in sim year 0 -->
+            <div class="hc-subsection">
+              <h4 class="hc-subtitle">Transition Year (one-time)</h4>
+              <p class="hc-help">
+                One-time income in your first year of retirement — W-2 wages earned Jan→retirement,
+                severance, unused PTO payout, final-year bonus, year-of RMDs. Applied to MAGI in
+                <strong>sim year 0 only</strong>; year 1+ uses your steady-state composition.
+              </p>
+              <label class="field compact">
+                <span class="field-label">Extra income in Year 1 ($)</span>
+                <input type="number" class="field-input" min="0" step="1000"
+                  [class]="dyscalculia.numberSpacingClass()"
+                  [ngModel]="healthcare.transitionYearExtraIncome()"
+                  (ngModelChange)="healthcare.transitionYearExtraIncome.set(+$event)" />
+              </label>
+              @if (healthcare.transitionYearExtraIncome() > 0) {
+                <div class="hc-hint">
+                  Year 1 MAGI: <strong>{{ '$' + healthcare.transitionMagi().toFixed(0) }}</strong>
+                  (steady {{ '$' + healthcare.magi().magiForAca.toFixed(0) }}
+                  + extra {{ '$' + healthcare.transitionYearExtraIncome().toFixed(0) }})
+                </div>
+              }
+            </div>
+
             @if (hc.decision.source.startsWith('aca')) {
+              <!-- Input: which subsidy-law framework to apply -->
+              <div class="hc-subsection">
+                <h4 class="hc-subtitle">ACA Subsidy Rules (law setting)</h4>
+                <label class="field compact">
+                  <select class="field-input"
+                    [ngModel]="healthcare.subsidyRegime()"
+                    (ngModelChange)="healthcare.subsidyRegime.set($event)">
+                    <option value="cliff">Cliff (pre-ARPA — in effect for 2026)</option>
+                    <option value="enhanced">Enhanced (8.5% cap — if Senate extends)</option>
+                  </select>
+                </label>
+                <div class="hc-help">
+                  The ARPA/IRA enhanced subsidies expired Dec 31 2025. Until Congress extends,
+                  2026 coverage follows pre-ARPA rules: sliding applicable-pct by FPL bucket with a
+                  <strong>hard cliff at 400% FPL</strong> (~$81,760 for 2 adults).
+                  <strong>This dropdown is the law setting</strong> — the "Coverage" badge below
+                  is derived from your ages + MAGI under that law.
+                </div>
+              </div>
+
+              @if (hc.decision.aboveFplCliff) {
+                <div class="hc-warn">
+                  ⚠ <strong>Above the 400% FPL cliff.</strong>
+                  MAGI {{ '$' + healthcare.magi().magiForAca.toFixed(0) }} =
+                  {{ (hc.decision.fplPct ?? 0).toFixed(0) }}% of FPL —
+                  no subsidy under cliff rules. Full sticker pricing applies.
+                </div>
+              }
+
               <div class="hc-hint">
-                ACA premium capped at 8.5% of <strong>MAGI</strong> (enhanced subsidy rules through 2025).
+                @if (hc.decision.regime === 'cliff') {
+                  Cliff regime: sliding applicable-pct on MAGI (2.07%–9.83%), zero subsidy above 400% FPL.
+                } @else {
+                  Enhanced regime: flat 8.5% of <strong>MAGI</strong> cap, no cliff.
+                }
                 Roth withdrawals don't count toward MAGI; Social Security counts at 100% for ACA even
                 though only {{ (magiSsTaxabilityPct() * 100).toFixed(0) }}% is federally taxed.
+                Current: <strong>{{ (hc.decision.fplPct ?? 0).toFixed(0) }}% of FPL</strong>.
               </div>
+              @if (hc.decision.acaEstimate?.disclaimer) {
+                <div class="hc-disclaimer">
+                  <span class="hc-badge-level">{{ hc.decision.acaEstimate?.level ?? '—' }}-level</span>
+                  Benchmark for <strong>{{ hc.decision.acaEstimate?.rateArea ?? 'this location' }}</strong>.
+                  {{ hc.decision.acaEstimate?.disclaimer }}
+                  <a href="https://www.healthcare.gov/see-plans/" target="_blank" rel="noopener">
+                    Get a real quote →
+                  </a>
+                </div>
+              }
             }
           </div>
         }
@@ -419,6 +494,30 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
       margin-top: 12px; padding: 8px 10px;
       background: var(--dark-bg-secondary); border-radius: 6px;
       font-size: 11px; color: var(--dark-text-muted); line-height: 1.5;
+    }
+    .hc-warn {
+      margin-top: 6px; padding: 10px 12px;
+      background: rgba(229, 115, 115, 0.08);
+      border: 1px solid rgba(229, 115, 115, 0.35);
+      border-left: 3px solid var(--dark-red);
+      border-radius: 6px;
+      font-size: 12px; color: var(--dark-text); line-height: 1.55;
+    }
+    .hc-disclaimer {
+      margin-top: 6px; padding: 8px 10px;
+      background: rgba(212, 148, 58, 0.08);
+      border: 1px solid rgba(212, 148, 58, 0.25);
+      border-radius: 6px;
+      font-size: 11px; color: var(--dark-text-muted); line-height: 1.55;
+    }
+    .hc-disclaimer strong { color: var(--dark-text); }
+    .hc-disclaimer a { color: var(--dark-amber); text-decoration: none; font-weight: 600; }
+    .hc-disclaimer a:hover { text-decoration: underline; }
+    .hc-badge-level {
+      display: inline-block; font-size: 9px; font-weight: 700;
+      padding: 1px 6px; margin-right: 6px; border-radius: 3px;
+      background: rgba(76, 175, 80, 0.15); color: var(--dark-green);
+      text-transform: uppercase; letter-spacing: 0.5px;
     }
 
     .derived-row { margin-top: 10px; font-size: 12px; color: var(--dark-text-sec); }

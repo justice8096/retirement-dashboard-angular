@@ -1,8 +1,9 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
+import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HealthcareService } from '@services/healthcare.service';
 import {
@@ -406,7 +407,7 @@ const HIST_BINS = 40;
                     [ngModel]="spouseDeathYear()" (ngModelChange)="spouseDeathYear.set(+$event)" />
                   <span class="param-hint">
                     Year {{ spouseDeathYear() }} of {{ years() }} ·
-                    ~{{ (fin()?.ssCutYear ?? 2033) - (fin()?.ssCutYear ?? 2033) + (spouseDeathYear()) }} years into retirement
+                    calendar year {{ (household()?.planningStartYear ?? todayYear()) + spouseDeathYear() }}
                   </span>
                 </label>
 
@@ -485,6 +486,21 @@ const HIST_BINS = 40;
 
         <!-- Results -->
         @if (results(); as r) {
+          <!-- Save this scenario for side-by-side compare on Scenarios screen -->
+          <div class="save-scenario-bar">
+            <button mat-stroked-button class="save-scenario-btn"
+                    [disabled]="savingScenario()"
+                    (click)="saveCurrentScenario()">
+              {{ savingScenario() ? 'Saving…' : '💾 Save this scenario' }}
+            </button>
+            @if (saveMsg()) {
+              <span class="save-msg" [class.err]="saveErr()">{{ saveMsg() }}</span>
+            }
+            <span class="save-hint">
+              captures location, MAGI, apportionment, moves, and results to Simulate → Scenarios
+            </span>
+          </div>
+
           <div class="results-grid">
             <!-- Success rate card (Dyscalculia F-002): calm framing, no danger red.
                  Uses the neutral tone for low scores instead of an alarming color. -->
@@ -640,6 +656,21 @@ const HIST_BINS = 40;
     }
     .param-input:focus { border-color: var(--dark-blue); }
     select.param-input { appearance: auto; }
+
+    .save-scenario-bar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 10px 14px;
+      background: rgba(92, 156, 230, 0.08);
+      border: 1px solid rgba(92, 156, 230, 0.25);
+      border-radius: 8px;
+    }
+    .save-scenario-btn {
+      --mdc-outlined-button-container-height: 32px;
+      --mdc-outlined-button-label-text-size: 12px;
+    }
+    .save-msg { font-size: 11px; color: var(--dark-green); font-weight: 600; }
+    .save-msg.err { color: var(--dark-red); }
+    .save-hint { font-size: 10px; color: var(--dark-text-muted); font-style: italic; flex-basis: 100%; }
 
     .run-btn {
       margin-top: 14px;
@@ -832,6 +863,7 @@ const HIST_BINS = 40;
 export class MontecarloScreenComponent implements OnInit {
   private readonly api = inject(ApiService);
   readonly loc = inject(LocationService);
+  readonly taxSvc = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
 
   readonly loading = signal(false);
@@ -888,6 +920,9 @@ export class MontecarloScreenComponent implements OnInit {
   readonly deceasedMemberIndex = signal(0);
 
   readonly results = signal<MonteCarloResult | null>(null);
+  readonly savingScenario = signal(false);
+  readonly saveMsg = signal<string | null>(null);
+  readonly saveErr = signal(false);
 
   /* ─── Chart dimensions ─────────────────────────────────────────── */
   readonly pathW = PATH_CHART_W;
@@ -911,16 +946,7 @@ export class MontecarloScreenComponent implements OnInit {
   readonly baseCost = computed(() => {
     const l = this.selectedLoc();
     if (!l?.monthlyCosts) return 0;
-    // Sum non-tax categories, skip alternates (healthcarePreMedicare),
-    // then swap in the effective healthcare cost from HealthcareService.
-    let sum = 0;
-    for (const [key, val] of Object.entries(l.monthlyCosts)) {
-      if (key === 'healthcarePreMedicare') continue;
-      if (key === 'healthcare') continue;
-      sum += (val?.typical ?? 0);
-    }
-    const hc = this.healthcare.decide(l);
-    return sum + hc.monthlyCost;
+    return this.loc.nonHealthcareBaseMonthly(l) + this.healthcare.decide(l).monthlyCost;
   });
 
   /** Non-dependent adults in the household, in sort order. Used for spouse-death UI. */
@@ -1095,7 +1121,7 @@ export class MontecarloScreenComponent implements OnInit {
 
     this.api.getWithdrawal().subscribe({
       next: (w) => { this.wd.set(w); },
-      error: () => {},
+      error: (err) => console.warn('MC: withdrawal strategy fetch failed.', err),
     });
 
     this.api.getHousehold().subscribe({
@@ -1107,21 +1133,27 @@ export class MontecarloScreenComponent implements OnInit {
         );
         if (ssSum > 0) this.ssMonthly.set(Math.round(ssSum));
       },
-      error: () => {},
+      error: (err) => console.warn('MC: household fetch failed.', err),
     });
 
-    // Default the location selector to the first full location when it arrives
-    queueMicrotask(() => {
-      const sub = setInterval(() => {
-        const list = this.loc.fullLocations();
-        if (list.length && !this.selectedLocationId()) {
-          this.selectedLocationId.set(list[0].id);
-          this.syncInflationFromLocation();
-        }
-        if (list.length) clearInterval(sub);
-      }, 100);
-    });
+    // Default the location selector to the first full location when it arrives.
+    // Handled by `defaultLocationEffect` (field initializer below) — auto-cleans
+    // up on component destroy, unlike the previous setInterval polling.
   }
+
+  /**
+   * Seeds `selectedLocationId` with the first full location as soon as one is
+   * available. `effect()` reruns whenever `loc.fullLocations()` changes and
+   * is torn down automatically when the component is destroyed — fixes the
+   * previous setInterval leak that survived navigation.
+   */
+  private defaultLocationEffect = effect(() => {
+    const list = this.loc.fullLocations();
+    if (list.length && !this.selectedLocationId()) {
+      this.selectedLocationId.set(list[0].id);
+      this.syncInflationFromLocation();
+    }
+  });
 
   /** Pull weighted-average inflation from the selected location. */
   private syncInflationFromLocation(): void {
@@ -1164,13 +1196,7 @@ export class MontecarloScreenComponent implements OnInit {
    */
   private buildSegmentForLocation(loc: LocationFull, fromYear: number, moveCostUSD?: number) {
     const monthlyCosts = loc.monthlyCosts ?? {};
-    // Non-healthcare, non-tax, non-alternate sum in today's $.
-    const alternateKeys = new Set(['healthcarePreMedicare']);
-    let nonHealthcareBase = 0;
-    for (const [k, v] of Object.entries(monthlyCosts)) {
-      if (k === 'healthcare' || k === 'taxes' || alternateKeys.has(k)) continue;
-      nonHealthcareBase += (v?.typical ?? 0);
-    }
+    const nonHealthcareBase = this.loc.nonHealthcareBaseMonthly(loc);
     const isUS = loc.country === 'United States';
     const medicareMonthly = monthlyCosts['healthcare']?.typical ?? 0;
     const acaUnsubsidizedMonthly = monthlyCosts['healthcarePreMedicare']?.typical
@@ -1179,7 +1205,7 @@ export class MontecarloScreenComponent implements OnInit {
     const acaSubsidyCapPct = loc.healthcare?.acaMarketplace?.premiumCapPctOfIncome ?? 0.085;
     // Income tax: bracket-based using shared annualIncome — this matches the
     // Compare/Taxes screens so all views stay consistent.
-    const tax = this.loc.computeIncomeTax(loc, this.loc.annualIncome());
+    const tax = this.taxSvc.computeIncomeTax(loc, this.loc.annualIncome());
     const monthlyIncomeTax = tax.monthlyTax;
     return {
       fromYear,
@@ -1258,6 +1284,84 @@ export class MontecarloScreenComponent implements OnInit {
     this.inflVol.set(+(s.volInflation * 100).toFixed(2));
   }
 
+  /**
+   * Save the current MC inputs + results as a named scenario. Captures the
+   * full parameter snapshot so we can reconstruct / re-run later, plus the
+   * key summary stats for at-a-glance comparison on the Scenarios screen.
+   */
+  saveCurrentScenario(): void {
+    const r = this.results();
+    if (!r) return;
+    const name = window.prompt('Name this scenario:',
+      `${this.selectedLoc()?.name ?? 'Scenario'} — ${new Date().toLocaleDateString()}`);
+    if (!name) return;
+
+    this.savingScenario.set(true);
+    this.saveMsg.set(null);
+    this.saveErr.set(false);
+
+    // Use the canonical monte_carlo_v1 envelope the backend validates.
+    // Params + extras ride along via passthrough.
+    const scenarioData = {
+      kind: 'monte_carlo_v1' as const,
+      successRate: {
+        value: r.successRate,
+        naturalFrequency: this.dyscalculia.naturalFrequency(r.successRate),
+      },
+      percentiles: {
+        p5:  { value: r.p5,     currency: 'USD' },
+        p25: { value: r.p25,    currency: 'USD' },
+        p50: { value: r.median, currency: 'USD' },
+        p75: { value: r.p75,    currency: 'USD' },
+        p95: { value: r.p95,    currency: 'USD' },
+      },
+      runs: this.runs(),
+      years: this.years(),
+      // passthrough — full param snapshot so we can rebuild later
+      params: {
+        location: { id: this.selectedLocationId(), name: this.selectedLoc()?.name },
+        portfolio: this.portfolio(),
+        ssMonthly: this.ssMonthly(),
+        monthlyIncome: this.monthlyIncome(),
+        meanReturn: this.meanReturn(),
+        volatility: this.volatility(),
+        meanInflation: this.meanInflation(),
+        inflVol: this.inflVol(),
+        currVol: this.currVol(),
+        fxDrift: this.fxDrift(),
+        incGrowth: this.incGrowth(),
+        returnMode: this.returnMode(),
+        historicalStartYear: this.historicalStartYear(),
+        apportionStrategy: this.healthcare.apportionStrategy(),
+        magiAnnual: this.healthcare.magi().magiForAca,
+        subsidyRegime: this.healthcare.subsidyRegime(),
+        transitionExtraIncome: this.healthcare.transitionYearExtraIncome(),
+        movesEnabled: this.movesEnabled(),
+        moves: this.moves(),
+        spouseDeathEnabled: this.spouseDeathEnabled(),
+        spouseDeathYear: this.spouseDeathYear(),
+        survivorCostRatio: this.survivorCostRatio(),
+      },
+      savedAt: new Date().toISOString(),
+    };
+
+    this.api.createScenario({
+      name,
+      scenarioData,
+    }).subscribe({
+      next: () => {
+        this.savingScenario.set(false);
+        this.saveMsg.set('✓ Saved. View on Simulate → Scenarios.');
+        setTimeout(() => this.saveMsg.set(null), 4000);
+      },
+      error: (err) => {
+        this.savingScenario.set(false);
+        this.saveErr.set(true);
+        this.saveMsg.set('Save failed: ' + (err?.error?.error ?? err?.message ?? 'unknown'));
+      },
+    });
+  }
+
   runSimulation(): void {
     const f = this.fin();
     const l = this.selectedLoc();
@@ -1290,6 +1394,10 @@ export class MontecarloScreenComponent implements OnInit {
           adultBirthYears: this.adults().map(m => m.birthYear),
           simStartYear: this.household()?.planningStartYear ?? new Date().getFullYear(),
           magiAnnual: this.healthcare.magi().magiForAca,
+          transitionMagiAnnual: this.healthcare.transitionYearExtraIncome() > 0
+            ? this.healthcare.transitionMagi()
+            : undefined,
+          subsidyRegime: this.healthcare.subsidyRegime(),
           spouseDeathYear: this.spouseDeathEnabled() ? this.spouseDeathYear() : undefined,
           survivorMonthlyIncome: this.spouseDeathEnabled() ? this.survivorMonthlyIncome() : undefined,
           survivorCostRatio: this.spouseDeathEnabled() ? this.survivorCostRatio() / 100 : undefined,
@@ -1309,8 +1417,11 @@ export class MontecarloScreenComponent implements OnInit {
     }, 30);
   }
 
+  /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */
+  todayYear(): number { return new Date().getFullYear(); }
+
   fmt(amount: number, unit: '/mo' | '/yr' | '' = '/mo'): string {
-    const dollar = String.fromCharCode(36);
+    const dollar = '$';
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount, unit)
       : dollar + Math.round(amount).toLocaleString() + unit;

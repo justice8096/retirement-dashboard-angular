@@ -57,6 +57,12 @@ export interface AcaMarketplaceInfo {
   /** Enhanced ACA premium cap as fraction of MAGI, e.g. 0.085 = 8.5%. */
   premiumCapPctOfIncome?: number;
   notes?: string;
+  /** County / rating area name (for display). */
+  rateArea?: string;
+  /** How precise the benchmark price is — 'county' = per-county, 'state' = state average. */
+  estimationLevel?: 'county' | 'state';
+  /** Human-readable caveat shown alongside ACA costs in the UI. */
+  disclaimer?: string;
 }
 
 export interface HealthcareInfo {
