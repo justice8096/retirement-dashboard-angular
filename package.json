@@ -11,16 +11,16 @@
     "check:readability": "node scripts/check-readability.mjs"
   },
   "dependencies": {
-    "@angular/animations": "^19.2.0",
+    "@angular/animations": "^20.3.19",
     "@angular/cdk": "^19.2.0",
-    "@angular/common": "^19.2.0",
-    "@angular/compiler": "^19.2.0",
-    "@angular/core": "^19.2.0",
-    "@angular/forms": "^19.2.0",
+    "@angular/common": "^20.3.19",
+    "@angular/compiler": "^20.3.19",
+    "@angular/core": "^20.3.19",
+    "@angular/forms": "^20.3.19",
     "@angular/material": "^19.2.0",
-    "@angular/platform-browser": "^19.2.0",
-    "@angular/platform-browser-dynamic": "^19.2.0",
-    "@angular/router": "^19.2.0",
+    "@angular/platform-browser": "^20.3.19",
+    "@angular/platform-browser-dynamic": "^20.3.19",
+    "@angular/router": "^20.3.19",
     "@types/leaflet": "^1.9.21",
     "leaflet": "^1.9.4",
     "rxjs": "~7.8.0",
@@ -28,9 +28,9 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular/build": "^19.2.0",
-    "@angular/cli": "^19.2.0",
-    "@angular/compiler-cli": "^19.2.0",
-    "typescript": "~5.7.0"
+    "@angular/build": "^20.3.24",
+    "@angular/cli": "^20.3.24",
+    "@angular/compiler-cli": "^20.3.19",
+    "typescript": "~5.9.3"
   }
 }
