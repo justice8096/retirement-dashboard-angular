@@ -1,11 +1,12 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { ConcreteTilesComponent } from '@components/concrete-tiles/concrete-tiles.component';
 
 @Component({
   selector: 'app-fire-calc-screen',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ConcreteTilesComponent],
   template: `
     <div class="calc-screen">
       <div class="screen-header">
@@ -80,6 +81,16 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
               <strong>{{ fmt(annualExpenses()) }} × {{ multiplier() }} = {{ fmt(fireNumber()) }}</strong>.
             </li>
           </ol>
+
+          <!-- Dashboard Dyscalculia F-004 — concrete tile visual, opt-in via
+               the dyscalculia-settings "Concrete tiles" chart style. -->
+          @if (dyscalculia.isEnabled() && dyscalculia.chartStyle() === 'concrete') {
+            <app-concrete-tiles
+              class="result-tiles"
+              [amount]="fireNumber()"
+              [unitValue]="10000"
+              label="FIRE Number" />
+          }
         </div>
         <div class="result-card">
           <div class="result-label">Years to FIRE</div>

@@ -153,7 +153,7 @@ import { FinancialSettings } from '@models/api.model';
     .result { display: flex; flex-direction: column; gap: 4px; }
     .result-label { font-size: 11px; color: var(--dark-text-muted); }
     .result-value { font-size: 18px; font-weight: 700; color: var(--dark-amber); }
-    .result-value.tax { color: var(--dark-red); }
+    .result-value.tax { color: var(--dark-amber); }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
   `],

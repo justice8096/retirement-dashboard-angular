@@ -7,7 +7,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "check:readability": "node scripts/check-readability.mjs"
   },
   "dependencies": {
     "@angular/animations": "^19.2.0",

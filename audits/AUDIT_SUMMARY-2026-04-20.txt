@@ -1,0 +1,101 @@
+POST-REMEDIATION AUDIT SUMMARY
+==============================
+Date:    2026-04-20
+Branch:  feature/audit-fixes-high-medium
+Parent:  cf2ed63 (main tip)
+Project: retirement-dashboard-angular (Angular 19 SPA)
+Supersedes: audits/AUDIT_SUMMARY.txt (2026-04-19)
+
+Context: remediation cycle closing the HIGH and MEDIUM findings from
+the 2026-04-19 audit round.
+
+1. SAST/DAST Scan:         PASS      - 7 findings (0 critical, 0 high, 0 medium, 4 low, 3 info)
+                                        Delta: M-01 FIXED, M-02 FIXED (was 2 medium).
+                                        All HIGH items remain supply-chain-only.
+
+2. Supply Chain Audit:     CONDITIONAL - Unchanged. SLSA L0; same 3 HIGH dev-dep CVEs
+                                        in tar/pacote/@angular/cli (runtime bundle clean).
+                                        One new dev tool: scripts/check-readability.mjs
+                                        (zero deps, no supply-chain expansion).
+                                        Fix path remains Angular 19 -> 21 major upgrade.
+
+3. CWE Mapping:            PASS      - 11 CWEs tracked, 3 now CLOSED (CWE-1022, CWE-693,
+                                        CWE-1021). Framework-level Security Misconfiguration
+                                        cluster (A05:2021) fully cleared.
+                                        No CRITICAL hits in any framework.
+
+4. LLM Compliance:         65/100    - DEVELOPING (50-69 band); +2 from 2026-04-19.
+                                        D3 Risk Classification +3, D7 Incident Response +3,
+                                        D2 Training Data +2, D8 Bias Assessment +2.
+                                        Still no README / SECURITY.md / CI / SBOM.
+                                        Projected post-governance score: 77-80.
+
+5. Dyscalculia Compliance: 93/100 A  - +8 from 85/100 (A-). Six of eight prior findings
+                                        closed (F-004, F-006, F-012, F-013, F-014, F-015).
+                                        Open: F-008 (partial - voice entry shipped, break
+                                        reminders + Assumptions wizard still pending),
+                                        F-011 (localStorage-only prefs).
+
+6. Dyslexia Compliance:    93/100 A  - +9 from 84/100 (A-). DFA-001 HIGH closed, all four
+                                        MEDIUM items closed (DFA-002 / -003 / -004 / -005).
+                                        Open: 3 LOW items (font weight, pause/resume,
+                                        reading-progress default).
+
+7. Contribution Analysis:  25/75     - Justice / Claude for this remediation delta.
+                                        Cumulative blended: 52/48 (up from 55/45).
+                                        Grade for delta: B+ (disciplined HIGH/MEDIUM closure,
+                                        build green, no new deps).
+
+Overall: PASS
+-------------
+No critical or high findings in application code. The 3 HIGH dev-dep CVEs
+remain accepted pending the Angular major upgrade cycle.
+
+Remediation Highlights (this cycle):
+  Security
+    - rel="noopener noreferrer" on 5 external links (M-01)
+    - Content-Security-Policy meta tag in src/index.html (M-02)
+
+  Dyscalculia
+    - formatCurrencyPrecise helper; fmtCents migrated in Compare + Taxes (F-013)
+    - Red severity migrated to neutral/amber on data cells (F-014)
+    - getAnchor contexts: magi, fpl-pct, cliff-penalty + audit-banner wiring (F-015)
+    - Monte Carlo calm/progressive-reveal mode with mcMode setting (F-006)
+    - Voice-to-number affordance on appNumeric="currency|rate|percent" (F-008 partial)
+    - ConcreteTilesComponent + chartStyle='concrete' (F-004)
+
+  Dyslexia
+    - Compare audit-banner copy broken into short sentences (DFA-001)
+    - .metric-notes 11px -> 13px + prose spacing vars (DFA-002)
+    - Help-panel chip spacing vars (DFA-003)
+    - max-width: 70ch clamp on prose under html.dx-enabled (DFA-005)
+    - scripts/check-readability.mjs + npm run check:readability (DFA-004)
+
+Recommended next-sprint items (in priority order):
+  1. Commit + land these fixes so score lifts don't revert.             ~5 min.
+  2. Add README.md + SECURITY.md + docs/AI-USE.md.                      ~60 min.
+  3. Add .github/workflows with npm ci + audit + build + SBOM + readability. ~75 min.
+  4. Close remaining LOW SAST items (L-01/L-02/L-03/L-04, I-03).        ~1-2 hrs.
+  5. Close remaining dyscalculia opens (F-011 cross-device, F-008 rest). ~3 hrs.
+  6. Close remaining dyslexia LOW items (DFA-006/007/008).              ~45 min.
+  7. Plan Angular 19 -> 20 -> 21 upgrade to clear dev-dep CVEs.         ~1-2 days.
+
+Outputs written (this cycle):
+  audits/sast-dast-scan-2026-04-20.md
+  audits/supply-chain-audit-2026-04-20.md
+  audits/cwe-mapping-2026-04-20.md
+  audits/llm-compliance-report-2026-04-20.md
+  audits/Dyscalculia-Compliance-Audit-retirement-dashboard-angular-2026-04-20.md
+  audits/Dyslexia-Compliance-Audit-retirement-dashboard-angular-2026-04-20.md
+  audits/contribution-analysis-2026-04-20.md
+  audits/AUDIT_SUMMARY-2026-04-20.txt        (this file)
+
+Prior audits retained for diff:
+  audits/AUDIT_SUMMARY.txt                    (2026-04-19)
+  audits/sast-dast-scan.md
+  audits/supply-chain-audit.md
+  audits/cwe-mapping.md
+  audits/llm-compliance-report.md
+  audits/contribution-analysis.md
+  audits/Dyscalculia-Compliance-Audit-retirement-dashboard-angular-2026-04-19.md
+  audits/Dyslexia-Compliance-Audit-retirement-dashboard-angular-2026-04-19.md

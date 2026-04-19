@@ -22,6 +22,11 @@ export class DyscalculiaService {
     const spacing = this.settings().numberSpacing;
     return `number-spacing-${spacing}`;
   });
+  /** Monte Carlo reveal pace. 'full' (default) shows all cards; 'calm'
+   *  progressively reveals them behind a "Show next" button. */
+  readonly mcMode = computed(() => this.settings().mcMode);
+  readonly isCalmMc = computed(() => this.settings().enabled && this.settings().mcMode === 'calm');
+  readonly chartStyle = computed(() => this.settings().chartStyle);
 
   // ─── Settings Mutation ──────────────────────────────────────────────
 
@@ -65,6 +70,44 @@ export class DyscalculiaService {
         return `$${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}${unit}`;
       default:
         return `$${value.toLocaleString()}${unit}`;
+    }
+  }
+
+  /**
+   * Currency with a user-specified decimal precision (e.g. to-the-penny tax
+   * figures). Threads through the same three format modes as `formatCurrency`
+   * so the user's `numberFormat` preference — standard / spaced / words —
+   * propagates. Dashboard Dyscalculia F-013.
+   */
+  formatCurrencyPrecise(
+    amount: number,
+    opts: { fractionDigits?: number; unit?: '/mo' | '/yr' | '' } = {},
+  ): string {
+    const fractionDigits = opts.fractionDigits ?? 2;
+    const unit = opts.unit ?? '';
+    const s = this.settings();
+    const perPhrase = unit === '/mo' ? ' per month' : unit === '/yr' ? ' per year' : '';
+    const formatOpts = { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits };
+
+    if (!s.enabled) return `$${amount.toLocaleString(undefined, formatOpts)}${unit}`;
+
+    switch (s.numberFormat) {
+      case 'words': {
+        const whole = Math.trunc(amount);
+        const cents = Math.round((Math.abs(amount) - Math.abs(whole)) * 100);
+        const centsPhrase = fractionDigits > 0 && cents > 0
+          ? ` and ${this.numberToWords(cents)} cents`
+          : '';
+        return `about ${this.numberToWords(whole)} dollars${centsPhrase}${perPhrase}`;
+      }
+      case 'spaced': {
+        // Group the integer part with spaces, keep decimal portion intact.
+        const [intPart, decPart] = amount.toFixed(fractionDigits).split('.');
+        const spacedInt = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        return `$${spacedInt}${decPart ? '.' + decPart : ''}${unit}`;
+      }
+      default:
+        return `$${amount.toLocaleString(undefined, formatOpts)}${unit}`;
     }
   }
 
@@ -131,7 +174,15 @@ export class DyscalculiaService {
    */
   getAnchor(
     amount: number,
-    context: 'monthly-cost' | 'portfolio' | 'withdrawal-year' | 'percentile' | 'general',
+    context:
+      | 'monthly-cost'
+      | 'portfolio'
+      | 'withdrawal-year'
+      | 'percentile'
+      | 'general'
+      | 'magi'
+      | 'fpl-pct'
+      | 'cliff-penalty',
     yearlySpending?: number,
   ): string {
     const abs = Math.abs(amount);
@@ -167,6 +218,32 @@ export class DyscalculiaService {
         }
         if (amount <= 0) return 'portfolio ran out of money';
         return 'portfolio ended in positive territory';
+      }
+
+      // Dashboard Dyscalculia F-015 — anchors for the MAGI / FPL / cliff audit banner.
+      case 'magi': {
+        if (abs < 30_000) return 'a low yearly income by US standards';
+        if (abs < 60_000) return 'around median US household income';
+        if (abs < 100_000) return 'a comfortable middle-class yearly income';
+        if (abs < 200_000) return 'well above the US median yearly income';
+        return 'a high yearly income by US standards';
+      }
+
+      case 'fpl-pct': {
+        // `amount` is expected as a whole-number percentage (e.g. 412 = 412% FPL).
+        if (abs < 100) return 'near the poverty line';
+        if (abs < 150) return 'just above the poverty line';
+        if (abs < 250) return 'in the range that usually qualifies for the largest subsidy';
+        if (abs < 400) return 'eligible for some subsidy (tapering as income rises)';
+        return 'above the subsidy cutoff — no help available under cliff rules';
+      }
+
+      case 'cliff-penalty': {
+        if (abs <= 0) return 'no extra cost — already below the cutoff';
+        if (abs < 200) return 'a small monthly premium bump';
+        if (abs < 600) return 'a meaningful monthly premium bump';
+        if (abs < 1_200) return 'a large monthly premium bump — comparable to a car payment';
+        return 'a very large monthly premium bump — comparable to rent';
       }
 
       default:

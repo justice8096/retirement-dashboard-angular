@@ -166,6 +166,24 @@ p,
   word-spacing: var(--prose-word-spacing, 0);
 }
 
+/* Dyslexia audit DFA-2026-04-19-005 — BDA 60–80 char line-length guidance.
+ * Only clamp when the dyslexia track is ON, so default dashboard density
+ * is preserved for readers who don't need line-length support. */
+html.dx-enabled p,
+html.dx-enabled .prose,
+html.dx-enabled .param-hint,
+html.dx-enabled .desc,
+html.dx-enabled .toggle-desc,
+html.dx-enabled .header-sub,
+html.dx-enabled .result-sub,
+html.dx-enabled .info-text,
+html.dx-enabled .hc-help,
+html.dx-enabled .hc-hint,
+html.dx-enabled .hc-warn,
+html.dx-enabled .hc-disclaimer {
+  max-width: 70ch;
+}
+
 /* ─── Dyscalculia Number Spacing Utilities ────────────────────────────── */
 .number-spacing-normal {
   letter-spacing: normal;

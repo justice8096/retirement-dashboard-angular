@@ -59,7 +59,7 @@ import { LocalService, LocationFull } from '@models/api.model';
                     @if (svc.sources?.length) {
                       <div class="svc-sources">
                         @for (src of svc.sources; track src.url) {
-                          <a [href]="src.url" target="_blank" class="src-link">{{ src.title }}</a>
+                          <a [href]="src.url" target="_blank" rel="noopener noreferrer" class="src-link">{{ src.title }}</a>
                         }
                       </div>
                     }
