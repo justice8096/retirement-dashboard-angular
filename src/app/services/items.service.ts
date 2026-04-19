@@ -69,7 +69,7 @@ export class ItemsService {
 
   private persist(): void {
     this.api.updatePreferences({ itemSelections: this.selections() }).subscribe({
-      error: () => {},
+      error: (err) => console.warn('ItemsService: persist selections failed.', err),
     });
   }
 }

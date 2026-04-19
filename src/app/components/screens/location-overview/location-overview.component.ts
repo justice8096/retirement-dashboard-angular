@@ -2,6 +2,7 @@ import { Component, inject, OnInit, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
+import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 
 @Component({
@@ -149,17 +150,17 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
         </div>
       }
 
-      <!-- Converged totals (iterative tax-on-taxable-base) -->
-      @if (loc.convergedTotals().length) {
+      <!-- Converged totals (VAT on taxable categories + bracket-based income tax) -->
+      @if (tax.convergedTotals().length) {
         <div class="converged-card">
           <div class="converged-head">
             <h3 class="converged-title">💰 Converged Monthly Totals (tax-adjusted)</h3>
             <span class="converged-sub">
-              VAT + social charges applied to taxable categories only · converges when change ≤ $3
+              VAT + social charges on taxable categories; federal + state income tax when brackets available.
             </span>
           </div>
           <div class="converged-rows">
-            @for (r of loc.convergedTotals(); track r.id) {
+            @for (r of tax.convergedTotals(); track r.id) {
               <div class="converged-row">
                 <span class="cr-name">{{ r.name }}</span>
                 <span class="cr-country">{{ r.country }}</span>
@@ -167,7 +168,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
                   {{ fmtCost(r.total) }}
                 </span>
                 <span class="cr-tax" [class]="dyscalculia.numberSpacingClass()"
-                      [title]="'Converged in ' + r.iterations + ' iteration(s)'">
+                      [title]="'Tax source: ' + r.incomeTaxSource">
                   tax {{ fmtCost(r.tax) }}
                 </span>
               </div>
@@ -376,6 +377,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 })
 export class LocationOverviewComponent implements OnInit {
   readonly loc = inject(LocationService);
+  readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
 
   /** Regions filtered by selected country */

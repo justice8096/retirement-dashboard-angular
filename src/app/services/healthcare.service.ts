@@ -5,6 +5,45 @@ import { HouseholdProfile, LocationFull, FinancialSettings } from '@models/api.m
 
 export type ApportionStrategy = 'proportional' | 'tax-efficient' | 'manual';
 
+/**
+ * ACA subsidy regime:
+ *   - `cliff`    : pre-ARPA rules. Sliding applicable-percentage by FPL bucket
+ *                  (2.07–9.83%). Hard cliff at 400% FPL — zero subsidy above.
+ *                  This is what's actually in effect for 2026 plan year.
+ *   - `enhanced` : ARPA/IRA expanded rules. Flat 8.5% of MAGI cap, no cliff.
+ *                  Expired Dec 31 2025. Awaiting Senate action to re-enable.
+ */
+export type SubsidyRegime = 'cliff' | 'enhanced';
+
+/**
+ * Continental-US Federal Poverty Level 2024 (applies to 2026 coverage year
+ * plan pricing / subsidy calcs). Alaska and Hawaii have higher FPLs — not
+ * modeled separately; would need per-state adjustment if you add AK/HI.
+ */
+const FPL_2024_BASE = 15_060;        // household of 1
+const FPL_2024_PER_ADDL = 5_380;     // each additional person
+function fplForHousehold(size: number): number {
+  return FPL_2024_BASE + FPL_2024_PER_ADDL * Math.max(0, size - 1);
+}
+
+/**
+ * Pre-ARPA applicable-percentage sliding scale. Returns the fraction of MAGI
+ * the enrollee is expected to contribute toward the benchmark silver plan.
+ * Returns null above 400% FPL — the subsidy cliff.
+ *
+ * Thresholds interpolate linearly within each bucket (matches IRS §36B).
+ */
+function applicablePctCliff(fplPct: number): number | null {
+  if (fplPct < 100) return null;                    // Medicaid territory in most states
+  if (fplPct < 133) return 0.0207;                  // flat 2.07%
+  if (fplPct < 150) return 0.0310 + (fplPct - 133) / 17 * (0.0414 - 0.0310);
+  if (fplPct < 200) return 0.0414 + (fplPct - 150) / 50 * (0.0652 - 0.0414);
+  if (fplPct < 250) return 0.0652 + (fplPct - 200) / 50 * (0.0833 - 0.0652);
+  if (fplPct < 300) return 0.0833 + (fplPct - 250) / 50 * (0.0983 - 0.0833);
+  if (fplPct < 400) return 0.0983;                  // flat 9.83%
+  return null;                                      // CLIFF — no subsidy
+}
+
 export type HealthcareSource = 'medicare' | 'aca-subsidized' | 'aca-unsubsidized' | 'mixed' | 'none';
 
 export interface HealthcareDecision {
@@ -19,6 +58,25 @@ export interface HealthcareDecision {
   subsidyEligible: boolean;
   /** MAGI used for the ACA premium cap (see IncomeBreakdown.magiForAca). */
   magiUsed: number;
+  /** Precision + caveat for the underlying ACA benchmark price (when source = aca-*). */
+  acaEstimate?: {
+    rateArea?: string;
+    level?: 'county' | 'state';
+    disclaimer?: string;
+  };
+  /**
+   * True when the decision used a fallback assumption because household data
+   * was missing or had invalid birth years. UI should prompt the user to
+   * fill in Setup → Assumptions rather than trust the number blindly.
+   */
+  usedFallback?: boolean;
+  fallbackReason?: string;
+  /** Which ACA regime was applied (cliff pre-ARPA, enhanced post-ARPA). */
+  regime?: SubsidyRegime;
+  /** MAGI as a percentage of Federal Poverty Level — informs cliff lookup. */
+  fplPct?: number;
+  /** True when MAGI is above the 400% FPL cliff under cliff-regime. */
+  aboveFplCliff?: boolean;
 }
 
 /**
@@ -80,6 +138,40 @@ export class HealthcareService {
   readonly totalAnnualNeed = signal<number>(0);
 
   /**
+   * ACA subsidy regime — defaults to `cliff` (pre-ARPA rules, in effect for
+   * 2026). Flip to `enhanced` if Congress extends the ARPA/IRA expansion.
+   */
+  readonly subsidyRegime = signal<SubsidyRegime>('cliff');
+
+  /**
+   * Transition-year income — extra MAGI in sim year 0 only, on top of the
+   * steady-state composition. Captures W-2 wages earned Jan-retirement,
+   * severance, unused PTO payout, final-year bonuses, and any year-of-
+   * retirement RMDs. Not a common steady-state expense — it's a one-year
+   * spike that can blow up ACA subsidies if the user retires mid-year.
+   */
+  readonly transitionYearExtraIncome = signal<number>(0);
+
+  /** MAGI used for ACA calc in year 0 of a simulation or "Year 1" view. */
+  readonly transitionMagi = computed(() =>
+    this.magi().magiForAca + this.transitionYearExtraIncome()
+  );
+
+  /**
+   * Applicable-percentage under the cliff regime. Exposed so callers (e.g.
+   * the Compare "if subsidized" row) can compute an aspirational cost
+   * without reimplementing the bucket table.
+   */
+  applicablePctForCliff(fplPct: number): number | null {
+    return applicablePctCliff(fplPct);
+  }
+
+  /** Federal Poverty Level for a household of N adults (continental US, 2024). */
+  fpl(householdSize: number): number {
+    return fplForHousehold(householdSize);
+  }
+
+  /**
    * Income composition — editable on the Assumptions screen. On first load the
    * composition is seeded from FinancialSettings + household (SS), with
    * everything else parked in `traditionalAnnual` so existing behavior is
@@ -109,22 +201,37 @@ export class HealthcareService {
   /** MAGI + derived breakdown for the current income composition. */
   readonly magi = computed<MagiResult>(() => this.computeMagi(this.income()));
 
-  /** Conservative MAGI threshold where ACA subsidies fully stop helping for a 2-adult household. */
-  private readonly SUBSIDY_BENEFIT_CUTOFF = 200_000;
+  /* The old SUBSIDY_BENEFIT_CUTOFF constant was redundant: whenever MAGI × 8.5%
+   * exceeds the unsubsidized premium, Math.min() below pins the subsidized
+   * price to the full sticker and `perAdultAcaSubsidized < perAdultAcaFull`
+   * becomes false anyway. Removed to drop one magic number. */
 
   load(): void {
     if (this.loaded()) return;
+    // Load both in parallel; mark `loaded` only when both settle (success or
+    // failure). Prevents downstream code from reading `household()` as null
+    // when the fetch is still in flight.
+    let pending = 2;
+    const settle = () => { if (--pending === 0) this.loaded.set(true); };
+
     this.api.getHousehold().subscribe({
       next: (h) => {
         this.household.set(h);
         this.seedIncomeFromHousehold(h);
         this.totalAnnualNeed.set(Number(h.targetAnnualIncome) || this.loc.annualIncome());
+        settle();
       },
-      error: () => {},
+      error: (err) => {
+        console.warn('HealthcareService: household fetch failed; regime decisions will fall back to defaults.', err);
+        settle();
+      },
     });
     this.api.getFinancial().subscribe({
-      next: (f) => { this.financial.set(f); this.loaded.set(true); },
-      error: () => this.loaded.set(true),
+      next: (f) => { this.financial.set(f); settle(); },
+      error: (err) => {
+        console.warn('HealthcareService: financial fetch failed; auto-apportionment disabled.', err);
+        settle();
+      },
     });
   }
 
@@ -137,22 +244,16 @@ export class HealthcareService {
    *   tax-efficient  — fill taxable first, then traditional, then Roth last
    *                    (classic "draw taxable first" retirement advice)
    */
-  applyApportionment(): void {
-    const total = this.totalAnnualNeed();
-    const cur = this.income();
-    const residual = Math.max(0, total - cur.ssAnnual - cur.pensionAnnual);
-    const f = this.financial();
-    const balances = {
-      traditional: Number(f?.traditionalBalance) || 0,
-      roth: Number(f?.rothBalance) || 0,
-      taxable: Number(f?.taxableBalance) || 0,
-    };
+  /**
+   * Pure apportionment — returns {trad, roth, taxable} draws given a total
+   * residual need (after SS + pension), the active strategy, and balances.
+   * Extracted so `decideForLocation` can re-apportion at a location-specific
+   * total without mutating the global `income` signal.
+   */
+  private apportion(residual: number, strategy: ApportionStrategy, balances: { traditional: number; roth: number; taxable: number }): { trad: number; roth: number; tax: number } {
     let trad = 0, roth = 0, tax = 0;
 
-    if (this.apportionStrategy() === 'tax-efficient') {
-      // Loose rule-of-thumb draws (4% of each bucket before spilling to next).
-      // This is deliberately approximate — it's a starting split the user can
-      // tweak. Real tax-efficient order would also consider bracket fill-up.
+    if (strategy === 'tax-efficient') {
       const taxableCap = balances.taxable * 0.04;
       tax = Math.min(residual, taxableCap);
       let left = residual - tax;
@@ -160,7 +261,6 @@ export class HealthcareService {
       trad = Math.min(left, tradCap);
       left -= trad;
       roth = left;
-      // If caps weren't enough to cover residual, fall through to proportional.
       if (tax + trad + roth < residual) {
         const total3 = balances.traditional + balances.roth + balances.taxable;
         if (total3 > 0) {
@@ -173,16 +273,29 @@ export class HealthcareService {
         }
       }
     } else {
-      // Default: proportional to balance.
       const total3 = balances.traditional + balances.roth + balances.taxable;
       if (total3 <= 0) {
-        trad = residual; // no balance info — dump everything in traditional
+        trad = residual;
       } else {
         trad = residual * (balances.traditional / total3);
         roth = residual * (balances.roth / total3);
         tax  = residual * (balances.taxable / total3);
       }
     }
+    return { trad, roth, tax };
+  }
+
+  applyApportionment(): void {
+    const total = this.totalAnnualNeed();
+    const cur = this.income();
+    const residual = Math.max(0, total - cur.ssAnnual - cur.pensionAnnual);
+    const f = this.financial();
+    const balances = {
+      traditional: Number(f?.traditionalBalance) || 0,
+      roth: Number(f?.rothBalance) || 0,
+      taxable: Number(f?.taxableBalance) || 0,
+    };
+    const { trad, roth, tax } = this.apportion(residual, this.apportionStrategy(), balances);
 
     this.income.update(prev => ({
       ...prev,
@@ -254,43 +367,116 @@ export class HealthcareService {
     return { cashIn, agi, magiForAca, taxableSS, taxableBase };
   }
 
+  /**
+   * Location-aware healthcare decision. When the user is in auto-apportion
+   * mode, this recomputes MAGI for each location based on that location's
+   * actual cost-of-living (not the globally-entered totalAnnualNeed). Lets
+   * Compare show "if you moved to Summerville, your MAGI would drop below
+   * the FPL cliff and you'd qualify for subsidies" without manual re-entry.
+   *
+   * In manual mode, MAGI is fixed across all locations (matches current
+   * behavior — the user has explicit control).
+   */
+  decideForLocation(location: LocationFull, opts?: { transition?: boolean }): HealthcareDecision {
+    const strategy = this.apportionStrategy();
+    const extraIncome = opts?.transition ? this.transitionYearExtraIncome() : 0;
+    if (strategy === 'manual') {
+      return this.decideWithMagi(location, this.magi().magiForAca + extraIncome);
+    }
+
+    const nonHealthcare = this.loc.nonHealthcareBaseMonthly(location);
+    const storedHealthcare = location.monthlyCosts?.['healthcare']?.typical ?? 0;
+    const locationAnnualNeed = (nonHealthcare + storedHealthcare) * 12;
+    const cur = this.income();
+    const residual = Math.max(0, locationAnnualNeed - cur.ssAnnual - cur.pensionAnnual);
+    const f = this.financial();
+    const balances = {
+      traditional: Number(f?.traditionalBalance) || 0,
+      roth: Number(f?.rothBalance) || 0,
+      taxable: Number(f?.taxableBalance) || 0,
+    };
+    const { trad, roth, tax } = this.apportion(residual, strategy, balances);
+    const locationBreakdown: IncomeBreakdown = {
+      ...cur,
+      traditionalAnnual: Math.round(trad),
+      rothAnnual: Math.round(roth),
+      taxableBrokerageAnnual: Math.round(tax),
+    };
+    const locationMagi = this.computeMagi(locationBreakdown).magiForAca + extraIncome;
+    return this.decideWithMagi(location, locationMagi);
+  }
+
   /** Effective monthly healthcare cost for a given location under current household + income. */
   decide(location: LocationFull): HealthcareDecision {
+    return this.decideWithMagi(location, this.magi().magiForAca);
+  }
+
+  /**
+   * Core decision logic. Separated from `decide()` so `decideForLocation`
+   * can pass a location-specific MAGI without mutating the global income
+   * signal.
+   */
+  private decideWithMagi(location: LocationFull, magi: number): HealthcareDecision {
     const year = this.referenceYear();
     const adults = this.adults();
-    // ACA subsidy is driven by MAGI, NOT gross cash-in. This is the key
-    // correction for 401k/SS retirees — SS counts 100% toward MAGI.
-    const magi = this.magi().magiForAca;
 
     const medicareMonthly = location.monthlyCosts['healthcare']?.typical ?? 0;
     const acaFull = location.monthlyCosts['healthcarePreMedicare']?.typical
       ?? location.healthcare?.acaMarketplace?.benchmarkSilverMonthly2Adult
       ?? 0;
+    const marketplace = location.healthcare?.acaMarketplace;
+    const acaEstimate = marketplace ? {
+      rateArea: marketplace.rateArea,
+      level: marketplace.estimationLevel,
+      disclaimer: marketplace.disclaimer,
+    } : undefined;
 
     // Count adults by Medicare eligibility (65+ in reference year).
+    // Guard against invalid birthYears (0/null/future) — those are treated
+    // as pre-Medicare (conservative default) with a fallback flag so the UI
+    // can prompt the user to fix the data.
     let adultsPre = 0;
     let adultsMed = 0;
     let latestCrossing: number | null = null;
+    let invalidBirthYears = 0;
     for (const m of adults) {
-      const age = year - m.birthYear;
+      const by = Number(m.birthYear);
+      const validBy = isFinite(by) && by > 1900 && by <= year;
+      if (!validBy) {
+        invalidBirthYears++;
+        adultsPre++;
+        continue;
+      }
+      const age = year - by;
       if (age >= 65) adultsMed++;
       else {
         adultsPre++;
-        const crossYear = m.birthYear + 65;
+        const crossYear = by + 65;
         if (latestCrossing === null || crossYear > latestCrossing) latestCrossing = crossYear;
       }
     }
 
+    // Default assumption when no household data is available: 2 adults, both
+    // pre-Medicare. Uses the location's ACA unsubsidized benchmark since
+    // that's the conservative (higher) planning figure — encourages the user
+    // to fill in Setup → Assumptions rather than silently show a misleading
+    // Medicare-only cost.
     if (adultsPre + adultsMed === 0) {
       return {
-        monthlyCost: medicareMonthly,
-        source: 'none',
-        adultsPreMedicare: 0,
+        monthlyCost: acaFull,
+        source: 'aca-unsubsidized',
+        adultsPreMedicare: 2,
         adultsMedicare: 0,
-        hasPreMedicareAdult: false,
+        hasPreMedicareAdult: true,
         allEligibleYear: null,
         subsidyEligible: false,
         magiUsed: magi,
+        acaEstimate,
+        usedFallback: true,
+        fallbackReason: 'No household members configured — assumed 2 adults, both pre-Medicare. Set birth years in Setup → Assumptions for an accurate number.',
+        regime: this.subsidyRegime(),
+        fplPct: 0,
+        aboveFplCliff: false,
       };
     }
 
@@ -303,14 +489,40 @@ export class HealthcareService {
     const acaSinglePrice = location.healthcare?.acaMarketplace?.benchmarkSilverMonthlySingle;
     const perAdultAcaFull = acaSinglePrice ?? (acaFull / 2);
 
-    // ACA subsidy calc (enhanced rules through 2025): cap premium at X% of MAGI.
+    // ACA subsidy calc — regime-dependent:
+    //   `cliff`    (default for 2026): sliding applicable-pct by FPL bucket,
+    //              hard cliff above 400% FPL → no subsidy.
+    //   `enhanced` (if Senate extends): flat 8.5% of MAGI cap, no cliff.
+    // Territories have premiumCapPctOfIncome = 0 in their location data, which
+    // disables the subsidy calc entirely (they're off the federal marketplace).
+    const regime = this.subsidyRegime();
     const cap = location.healthcare?.acaMarketplace?.premiumCapPctOfIncome ?? 0.085;
-    const annualCap = magi * cap;
-    const perAdultAcaSubsidized = adultsPre > 0
+    const fpl = fplForHousehold(adults.length || 2);
+    const fplPct = magi > 0 ? (magi / fpl) * 100 : 0;
+
+    let annualCap: number;
+    let aboveCliff = false;
+    if (cap === 0) {
+      // Off-marketplace (territories) — no federal subsidy at all.
+      annualCap = Number.POSITIVE_INFINITY;
+      aboveCliff = true;
+    } else if (regime === 'enhanced') {
+      annualCap = magi * cap;
+    } else {
+      const pct = applicablePctCliff(fplPct);
+      if (pct === null) {
+        annualCap = Number.POSITIVE_INFINITY;
+        aboveCliff = true;
+      } else {
+        annualCap = magi * pct;
+      }
+    }
+
+    const perAdultAcaSubsidized = adultsPre > 0 && isFinite(annualCap)
       ? Math.min(perAdultAcaFull, (annualCap / 12) / adultsPre)
-      : 0;
-    const subsidyEligible = magi > 0 && magi < this.SUBSIDY_BENEFIT_CUTOFF &&
-      perAdultAcaSubsidized < perAdultAcaFull;
+      : perAdultAcaFull;
+    // Subsidy helps iff the computed cap produces a price below the sticker.
+    const subsidyEligible = magi > 0 && !aboveCliff && perAdultAcaSubsidized < perAdultAcaFull;
 
     const acaPerAdult = subsidyEligible ? perAdultAcaSubsidized : perAdultAcaFull;
 
@@ -330,6 +542,14 @@ export class HealthcareService {
       allEligibleYear: latestCrossing,
       subsidyEligible,
       magiUsed: magi,
+      acaEstimate,
+      usedFallback: invalidBirthYears > 0,
+      fallbackReason: invalidBirthYears > 0
+        ? `${invalidBirthYears} household adult(s) have missing or invalid birth year — treated as pre-Medicare. Fix in Setup → Assumptions.`
+        : undefined,
+      regime,
+      fplPct,
+      aboveFplCliff: aboveCliff,
     };
   }
 
@@ -341,11 +561,6 @@ export class HealthcareService {
   /** Monthly total for a location with healthcare effectively swapped in. */
   locationTotalWithHealthcare(location: LocationFull): number {
     const decision = this.decide(location);
-    let total = 0;
-    for (const [key, val] of Object.entries(location.monthlyCosts ?? {})) {
-      if (key === 'healthcare' || key === 'healthcarePreMedicare' || key === 'taxes') continue;
-      total += (val?.typical ?? 0);
-    }
-    return total + decision.monthlyCost;
+    return this.loc.nonHealthcareBaseMonthly(location) + decision.monthlyCost;
   }
 }
