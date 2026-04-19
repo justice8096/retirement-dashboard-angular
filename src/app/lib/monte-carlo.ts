@@ -126,7 +126,7 @@ export interface MonteCarloParams {
    */
   transitionMagiAnnual?: number;
   /**
-   * ACA subsidy regime: 'cliff' (pre-ARPA — 2026 reality, sliding 2.07–9.83%
+   * ACA subsidy regime: 'cliff' (2026 reality per Rev Proc 2025-25, sliding 2.10–9.96%
    * with hard 400% FPL cliff) or 'enhanced' (flat 8.5% of MAGI cap, no cliff).
    * Default 'enhanced' for backward compatibility with existing callers.
    */

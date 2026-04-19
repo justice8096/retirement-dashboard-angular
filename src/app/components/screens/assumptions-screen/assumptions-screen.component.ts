@@ -387,7 +387,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                 <div class="hc-help">
                   For 2026, Congress let the enhanced health-insurance help expire. The older
                   rules are back: help shrinks as your income rises, and stops completely once
-                  a couple earns more than about <strong>$81,760</strong> per year — a boundary
+                  a couple earns more than about <strong>$86,240</strong> per year — a boundary
                   called the <strong>subsidy cliff</strong>. This dropdown is the rule setting.
                   The Coverage badge above shows what your household actually qualifies for.
                 </div>
