@@ -276,12 +276,12 @@ import {
         gap: 4px;
       }
       .mat-mdc-chip-option {
-        --mdc-chip-elevated-container-color: var(--dark-bg-card);
-        --mdc-chip-label-text-color: var(--dark-text-sec);
-        --mdc-chip-elevated-selected-container-color: var(--dark-blue);
-        --mdc-chip-selected-label-text-color: #fff;
-        --mdc-chip-container-height: 34px;
-        --mdc-chip-label-text-size: 14px;
+        --mat-chip-elevated-container-color: var(--dark-bg-card);
+        --mat-chip-label-text-color: var(--dark-text-sec);
+        --mat-chip-elevated-selected-container-color: var(--dark-blue);
+        --mat-chip-selected-label-text-color: #fff;
+        --mat-chip-container-height: 34px;
+        --mat-chip-label-text-size: 14px;
         font-family: var(--font-sans);
       }
     }

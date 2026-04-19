@@ -228,7 +228,7 @@ interface ScenarioView {
     }
     .compare-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .compare-title { font-size: 14px; margin: 0; color: var(--dark-text); font-weight: 600; }
-    .compare-clear { --mdc-text-button-label-text-size: 11px; }
+    .compare-clear { --mat-button-text-label-text-size: 11px; }
     .compare-scroll { overflow-x: auto; }
     .compare-table {
       width: 100%; border-collapse: collapse; font-size: 12px;
@@ -288,7 +288,7 @@ interface ScenarioView {
       background: var(--dark-bg);
     }
     .sc-date { font-size: 10px; color: var(--dark-text-muted); }
-    .sc-delete { --mdc-text-button-label-text-color: var(--dark-text-muted); font-size: 11px; }
+    .sc-delete { --mat-button-text-label-text-color: var(--dark-text-muted); font-size: 11px; }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
     .empty-state {

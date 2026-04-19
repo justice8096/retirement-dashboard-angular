@@ -87,9 +87,9 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
     .b-pro { font-size: 11px; color: var(--dark-green); }
     .b-print-btn {
       align-self: flex-start; margin-top: auto;
-      --mdc-outlined-button-container-height: 32px;
-      --mdc-outlined-button-label-text-size: 11px;
-      --mdc-outlined-button-outline-color: var(--dark-border);
+      --mat-button-outlined-container-height: 32px;
+      --mat-button-outlined-label-text-size: 11px;
+      --mat-button-outlined-outline-color: var(--dark-border);
     }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }

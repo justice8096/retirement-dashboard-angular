@@ -74,11 +74,11 @@ html {
   --mat-slide-toggle-unselected-handle-color: var(--dark-text-muted);
 
   /* Tabs */
-  --mat-tab-header-active-label-text-color: var(--dark-text);
-  --mat-tab-header-active-focus-label-text-color: var(--dark-text);
-  --mat-tab-header-inactive-label-text-color: var(--dark-text-sec);
-  --mat-tab-header-active-ripple-color: transparent;
-  --mat-tab-header-active-focus-indicator-color: var(--dark-blue);
+  --mat-tab-active-label-text-color: var(--dark-text);
+  --mat-tab-active-focus-label-text-color: var(--dark-text);
+  --mat-tab-inactive-label-text-color: var(--dark-text-sec);
+  --mat-tab-active-ripple-color: transparent;
+  --mat-tab-active-focus-indicator-color: var(--dark-blue);
 
   /* Chips */
   --mat-chip-selected-trailing-icon-color: #fff;
@@ -270,16 +270,16 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
 
 /* Slide toggles: match our compact design */
 .mat-mdc-slide-toggle {
-  --mdc-switch-track-height: 22px;
-  --mdc-switch-track-width: 40px;
-  --mdc-switch-handle-height: 16px;
-  --mdc-switch-handle-width: 16px;
+  --mat-slide-toggle-track-height: 22px;
+  --mat-slide-toggle-track-width: 40px;
+  --mat-slide-toggle-handle-height: 16px;
+  --mat-slide-toggle-handle-width: 16px;
 }
 
 /* Tab groups — dyslexia audit F-002: 14px floor on tab labels */
 .mat-mdc-tab-group {
-  --mat-tab-header-label-text-size: 14px;
-  --mat-tab-header-label-text-weight: 500;
+  --mat-tab-label-text-size: 14px;
+  --mat-tab-label-text-weight: 500;
 }
 .mat-mdc-tab-header {
   background: transparent;
@@ -291,9 +291,9 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
 
 /* Chips — dyslexia audit F-002: 14px floor on chip labels */
 .mat-mdc-chip {
-  --mdc-chip-container-height: 32px;
-  --mdc-chip-label-text-size: 14px;
-  --mdc-chip-container-shape-radius: 6px;
+  --mat-chip-container-height: 32px;
+  --mat-chip-label-text-size: 14px;
+  --mat-chip-container-shape-radius: 6px;
   font-family: var(--font-sans);
 }
 
@@ -308,6 +308,6 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
 
 /* Buttons — dyslexia audit F-002: 14px floor */
 .mat-mdc-button {
-  --mdc-text-button-label-text-size: 14px;
+  --mat-button-text-label-text-size: 14px;
   font-family: var(--font-sans);
 }

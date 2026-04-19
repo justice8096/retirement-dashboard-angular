@@ -667,7 +667,7 @@ const HIST_BINS = 40;
       border: 1px solid rgba(92, 156, 230, 0.25);
       border-radius: 8px;
     }
-    .calm-next-btn { --mdc-outlined-button-container-height: 36px; }
+    .calm-next-btn { --mat-button-outlined-container-height: 36px; }
     .calm-progress { font-size: 11px; color: var(--dark-text-muted); margin-left: auto; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
     .header-icon { font-size: 32px; }
@@ -705,8 +705,8 @@ const HIST_BINS = 40;
       border-radius: 8px;
     }
     .save-scenario-btn {
-      --mdc-outlined-button-container-height: 32px;
-      --mdc-outlined-button-label-text-size: 12px;
+      --mat-button-outlined-container-height: 32px;
+      --mat-button-outlined-label-text-size: 12px;
     }
     .save-msg { font-size: 11px; color: var(--dark-green); font-weight: 600; }
     .save-msg.err { color: var(--dark-red); }
@@ -714,8 +714,8 @@ const HIST_BINS = 40;
 
     .run-btn {
       margin-top: 14px;
-      --mdc-filled-button-container-color: var(--dark-blue);
-      --mdc-filled-button-label-text-color: #fff;
+      --mat-button-filled-container-color: var(--dark-blue);
+      --mat-button-filled-label-text-color: #fff;
     }
 
     .hist-card { display: flex; flex-direction: column; gap: 14px; }

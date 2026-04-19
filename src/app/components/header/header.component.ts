@@ -72,24 +72,24 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
       align-items: center;
     }
     .ctrl-btn {
-      --mdc-outlined-button-container-height: 32px;
-      --mdc-outlined-button-label-text-size: 11px;
-      --mdc-outlined-button-outline-color: var(--dark-border);
-      --mdc-outlined-button-label-text-color: var(--dark-text-sec);
+      --mat-button-outlined-container-height: 32px;
+      --mat-button-outlined-label-text-size: 11px;
+      --mat-button-outlined-outline-color: var(--dark-border);
+      --mat-button-outlined-label-text-color: var(--dark-text-sec);
       font-family: var(--font-sans);
     }
     .icon-btn {
-      --mdc-fab-small-container-color: var(--dark-bg-card);
-      --mdc-fab-small-container-shape: 6px;
+      --mat-fab-small-container-color: var(--dark-bg-card);
+      --mat-fab-small-container-shape: 6px;
       width: 36px;
       height: 36px;
       font-size: 14px;
       &.active-green {
-        --mdc-fab-small-container-color: var(--dark-green);
+        --mat-fab-small-container-color: var(--dark-green);
         color: #fff;
       }
       &.active-blue {
-        --mdc-fab-small-container-color: var(--dark-blue);
+        --mat-fab-small-container-color: var(--dark-blue);
         color: #fff;
       }
     }

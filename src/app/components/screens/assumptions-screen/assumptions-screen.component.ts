@@ -451,7 +451,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
     }
     .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
     .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0; }
-    .add-btn { --mdc-outlined-button-container-height: 30px; --mdc-outlined-button-label-text-size: 11px; }
+    .add-btn { --mat-button-outlined-container-height: 30px; --mat-button-outlined-label-text-size: 11px; }
 
     .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
     .field { display: flex; flex-direction: column; gap: 4px; }
@@ -484,8 +484,8 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
     .hc-help { font-size: 11px; color: var(--dark-text-muted); margin: -4px 0 10px; line-height: 1.5; }
     .hc-apply-wrap { justify-content: flex-end; }
     .hc-apply-btn {
-      --mdc-outlined-button-container-height: 34px;
-      --mdc-outlined-button-label-text-size: 12px;
+      --mat-button-outlined-container-height: 34px;
+      --mat-button-outlined-label-text-size: 12px;
       margin-top: 14px;
     }
     .hc-income-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
