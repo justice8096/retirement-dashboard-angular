@@ -2,47 +2,27 @@ import { Injectable, inject, computed, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { LocationService } from './location.service';
 import { HouseholdProfile, LocationFull, FinancialSettings } from '@models/api.model';
+import {
+  fpl2026 as fplForHousehold,
+  applicablePctCliff2026 as applicablePctCliff,
+} from '../lib/aca-constants';
 
 export type ApportionStrategy = 'proportional' | 'tax-efficient' | 'manual';
 
 /**
  * ACA subsidy regime:
- *   - `cliff`    : pre-ARPA rules. Sliding applicable-percentage by FPL bucket
- *                  (2.07–9.83%). Hard cliff at 400% FPL — zero subsidy above.
- *                  This is what's actually in effect for 2026 plan year.
- *   - `enhanced` : ARPA/IRA expanded rules. Flat 8.5% of MAGI cap, no cliff.
- *                  Expired Dec 31 2025. Awaiting Senate action to re-enable.
+ *   - `cliff`    : pre-ARPA rules (current for 2026 plan year). Sliding
+ *                  applicable-percentage by FPL bucket (2.10–9.96% per
+ *                  Rev Proc 2025-25). Hard cliff at 400% FPL — zero
+ *                  subsidy above.
+ *   - `enhanced` : ARPA/IRA expanded rules. Flat 8.5% of MAGI cap,
+ *                  no cliff. Expired Dec 31 2025; awaiting any new
+ *                  extension.
+ *
+ * All constants + math live in `src/app/lib/aca-constants.ts` so the
+ * per-year cost step in Monte Carlo can reuse them without duplication.
  */
 export type SubsidyRegime = 'cliff' | 'enhanced';
-
-/**
- * Continental-US Federal Poverty Level 2024 (applies to 2026 coverage year
- * plan pricing / subsidy calcs). Alaska and Hawaii have higher FPLs — not
- * modeled separately; would need per-state adjustment if you add AK/HI.
- */
-const FPL_2024_BASE = 15_060;        // household of 1
-const FPL_2024_PER_ADDL = 5_380;     // each additional person
-function fplForHousehold(size: number): number {
-  return FPL_2024_BASE + FPL_2024_PER_ADDL * Math.max(0, size - 1);
-}
-
-/**
- * Pre-ARPA applicable-percentage sliding scale. Returns the fraction of MAGI
- * the enrollee is expected to contribute toward the benchmark silver plan.
- * Returns null above 400% FPL — the subsidy cliff.
- *
- * Thresholds interpolate linearly within each bucket (matches IRS §36B).
- */
-function applicablePctCliff(fplPct: number): number | null {
-  if (fplPct < 100) return null;                    // Medicaid territory in most states
-  if (fplPct < 133) return 0.0207;                  // flat 2.07%
-  if (fplPct < 150) return 0.0310 + (fplPct - 133) / 17 * (0.0414 - 0.0310);
-  if (fplPct < 200) return 0.0414 + (fplPct - 150) / 50 * (0.0652 - 0.0414);
-  if (fplPct < 250) return 0.0652 + (fplPct - 200) / 50 * (0.0833 - 0.0652);
-  if (fplPct < 300) return 0.0833 + (fplPct - 250) / 50 * (0.0983 - 0.0833);
-  if (fplPct < 400) return 0.0983;                  // flat 9.83%
-  return null;                                      // CLIFF — no subsidy
-}
 
 export type HealthcareSource = 'medicare' | 'aca-subsidized' | 'aca-unsubsidized' | 'mixed' | 'none';
 

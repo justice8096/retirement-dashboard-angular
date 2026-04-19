@@ -177,25 +177,12 @@ export interface MonteCarloResult {
   p95: number;
 }
 
-/* ─── ACA subsidy helpers (mirror HealthcareService) ──────────────── */
-// Duplicated here because monte-carlo.ts is a pure lib (no Angular DI). Keep
-// the tables in sync with healthcare.service.ts — same numbers, same source
-// (2024 FPL for continental US; IRC §36B applicable-pct sliding scale).
-const FPL_2024_BASE_MC = 15_060;
-const FPL_2024_PER_ADDL_MC = 5_380;
-function fplMc(size: number): number {
-  return FPL_2024_BASE_MC + FPL_2024_PER_ADDL_MC * Math.max(0, size - 1);
-}
-function applicablePctCliffMc(fplPct: number): number | null {
-  if (fplPct < 100) return null;
-  if (fplPct < 133) return 0.0207;
-  if (fplPct < 150) return 0.0310 + (fplPct - 133) / 17 * (0.0414 - 0.0310);
-  if (fplPct < 200) return 0.0414 + (fplPct - 150) / 50 * (0.0652 - 0.0414);
-  if (fplPct < 250) return 0.0652 + (fplPct - 200) / 50 * (0.0833 - 0.0652);
-  if (fplPct < 300) return 0.0833 + (fplPct - 250) / 50 * (0.0983 - 0.0833);
-  if (fplPct < 400) return 0.0983;
-  return null; // 400% FPL cliff — no subsidy
-}
+/* ─── ACA subsidy helpers ────────────────────────────────────────────
+ * Imported from the shared `lib/aca-constants` module so the Monte
+ * Carlo kernel can't drift from `HealthcareService`. Rev Proc 2025-25
+ * 2026 applicable-percentage values (2.10-9.96%) and HHS 2026 FPL
+ * ($15,960 / $5,600) live there. */
+import { fpl2026 as fplMc, applicablePctCliff2026 as applicablePctCliffMc } from './aca-constants';
 
 /**
  * Effective monthly cost for a segment at a given sim year — in today's $.
