@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Build (development)
+        run: npx ng build --configuration development
+
+      - name: Readability lint
+        # Dyslexia audit DFA-2026-04-19-004 — flags prose above grade 9.
+        # Warn-only for now; promote to --fail-on-exceed once baseline is clean.
+        run: node scripts/check-readability.mjs
+
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format cyclonedx --sbom-type application > sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.json
+          retention-days: 90
+
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency vulnerability scan (runtime only — dev-dep CVEs accepted until Angular 19->21)
+        run: npm audit --production --audit-level=high
+
+      - name: Check for hardcoded secrets
+        run: |
+          if grep -rnE 'sk_(test|live)_[A-Za-z0-9]{15,}|whsec_[A-Za-z0-9]{15,}|pk_live_[A-Za-z0-9]{15,}' \
+            --include='*.ts' --include='*.js' --include='*.mjs' --include='*.json' --include='*.html' \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.angular \
+            src/ scripts/ 2>/dev/null; then
+            echo '::error::Potential secrets found in source tree'
+            exit 1
+          fi
+          echo "No secrets detected."
+
+      - name: Check for unsafe DOM sinks
+        run: |
+          if grep -rnE '\[innerHTML\]|bypassSecurityTrust' \
+            --include='*.ts' --include='*.html' \
+            --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.angular \
+            src/ 2>/dev/null; then
+            echo '::warning::Unsafe DOM sink pattern detected — review manually.'
+          fi
+
+  codeql-analysis:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@865f5f5c36632f18690a3d569fa0a764f2da0c3e # v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@865f5f5c36632f18690a3d569fa0a764f2da0c3e # v3
