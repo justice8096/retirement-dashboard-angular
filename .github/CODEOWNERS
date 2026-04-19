@@ -1,0 +1,19 @@
+# CODEOWNERS — every PR auto-requests review from the listed owner(s).
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Format: `<path-pattern> @<owner> [@<owner> …]`
+# First matching rule wins (so put most-specific rules at the bottom).
+
+# Default: everything requires owner review.
+*                                            @justice8096
+
+# Especially sensitive areas — same owner, listed explicitly so intent is clear.
+/LICENSE                                     @justice8096
+/SECURITY.md                                 @justice8096
+/.github/**                                  @justice8096
+/src/index.html                              @justice8096
+/src/app/services/api.service.ts             @justice8096
+/src/app/services/dyslexia.service.ts        @justice8096
+/src/app/services/dyscalculia.service.ts     @justice8096
+/src/styles.scss                             @justice8096
+/scripts/                                    @justice8096

@@ -1,0 +1,42 @@
+# Dependabot — automated dependency update PRs.
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # npm dependencies (Angular + dev tooling).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: America/New_York
+    open-pull-requests-limit: 5
+    reviewers:
+      - justice8096
+    commit-message:
+      prefix: chore(deps)
+      include: scope
+    groups:
+      angular:
+        patterns:
+          - "@angular/*"
+          - "@angular-*"
+      angular-material:
+        patterns:
+          - "@angular/material"
+          - "@angular/cdk"
+      dev-tooling:
+        dependency-type: development
+        patterns:
+          - "typescript"
+          - "@types/*"
+
+  # GitHub Actions — weekly tag updates (SHAs are required per repo policy).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    reviewers:
+      - justice8096
+    commit-message:
+      prefix: chore(ci)

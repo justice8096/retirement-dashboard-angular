@@ -1,0 +1,62 @@
+Copyright (c) 2026 Justice Chase. All rights reserved.
+
+This repository is publicly readable but is NOT open source.
+
+No license, express or implied, is granted to any person or entity to use,
+copy, modify, merge, publish, distribute, sublicense, sell, host as a
+service, or create derivative works from this software (including its
+source code, configuration, documentation, data, audits, and architecture
+decision records), in whole or in part, without the prior written
+authorization of the copyright holder.
+
+Permitted actions (automatic):
+
+  - Viewing the source code and documentation on GitHub.
+  - Forking this repository via GitHub's built-in fork mechanism for the
+    purpose of submitting pull requests back to this repository. A GitHub
+    fork does not convey any copyright license beyond what is required to
+    operate GitHub's user interface.
+
+All other uses — including, without limitation:
+
+  - Running the software (compiled or interpreted) for any purpose,
+    whether personal, educational, commercial, or otherwise;
+  - Hosting the software as a service, whether paid or free;
+  - Extracting, transcribing, or re-publishing any portion of the source
+    code, data, audits, or documentation in another project or medium;
+  - Training, fine-tuning, or benchmarking machine-learning models on
+    any portion of this repository's contents;
+  - Distributing compiled or translated versions;
+
+require prior written authorization from the copyright holder.
+
+To request authorization, contact: justice8096@gmail.com.
+
+CONTRIBUTIONS. If you submit a pull request or other contribution to this
+repository, you agree that your contribution is licensed to the copyright
+holder under the same terms as this LICENSE, and you grant the copyright
+holder a perpetual, worldwide, royalty-free license to use, modify, and
+re-license your contribution. If you are not able to grant this license,
+do not submit the contribution.
+
+NO WARRANTY. This software is provided "AS IS" and without warranty of
+any kind, express or implied, including but not limited to the warranties
+of merchantability, fitness for a particular purpose, and noninfringement.
+In no event shall the copyright holder be liable for any claim, damages,
+or other liability arising from the software or its use.
+
+EXTRACTED COMPONENTS. Individual UI components may, from time to time, be
+extracted into separate repositories under Creative Commons Zero (CC0 1.0
+Universal). Those components are governed by their own LICENSE files in
+their own repositories; this LICENSE does not apply to them. Candidate
+components include (non-exhaustive):
+
+  - src/app/directives/numeric-input.directive.ts
+  - src/app/components/concrete-tiles/
+  - src/app/services/dyscalculia.service.ts
+  - src/app/services/dyslexia.service.ts
+  - src/app/components/read-aloud-button/
+  - src/app/components/shortcut-cheatsheet/
+
+The presence of such an extract does not grant any license to this
+repository's contents beyond what is stated above.
