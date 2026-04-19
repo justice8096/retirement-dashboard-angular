@@ -59,6 +59,7 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
           <span class="audit-item">
             <strong>Yearly income counted for ACA:</strong>
             {{ fmtYear(auditMagi()) }} · {{ fmtFplPct(auditFplPct()) }}
+            <span class="audit-anchor">({{ dyscalculia.getAnchor(auditFplPct(), 'fpl-pct') }})</span>
           </span>
           <span class="audit-sep">·</span>
           <span class="audit-item">
@@ -73,12 +74,13 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
           }
           <span class="audit-hint">
             @if (healthcare.apportionStrategy() !== 'manual') {
-              Each city uses its own cost of living. Your income counts as a smaller share in
-              cheaper cities, so you may fall below the cutoff there and qualify for help.
-              Hover a health-insurance cell to see that city's adjusted income.
+              Each city uses its own cost of living.
+              Cheaper cities shrink your counted income.
+              That may drop you below the cutoff and unlock help.
+              Hover any health-insurance cell to see that city's counted income.
             } @else {
-              Your income is fixed across all cities. Switch to auto-adjust on
-              Setup → Assumptions to see each city use its own cost of living.
+              Your income is fixed across all cities.
+              Turn on auto-adjust in Setup → Assumptions to vary it by city.
             }
           </span>
         </div>
@@ -718,6 +720,7 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
     .audit-mode strong { color: var(--dark-green); }
     .audit-sep { color: var(--dark-text-muted); }
     .audit-hint { flex-basis: 100%; font-size: 10px; color: var(--dark-text-muted); font-style: italic; margin-top: 2px; }
+    .audit-anchor { color: var(--dark-text-muted); font-style: italic; margin-left: 4px; }
     .aca-badge {
       display: inline-block;
       margin-left: 6px;
@@ -732,13 +735,13 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       cursor: help;
     }
     .total-cell.cheapest { color: var(--dark-green); }
-    .total-cell.priciest { color: var(--dark-red); }
+    .total-cell.priciest { color: var(--dark-neutral); }
     .subsidized-cell {
       color: var(--dark-green); font-weight: 600;
       font-variant-numeric: tabular-nums;
     }
     .penalty-cell {
-      color: var(--dark-red); font-weight: 600;
+      color: var(--dark-amber); font-weight: 600;
       font-variant-numeric: tabular-nums;
     }
     .penalty-cell.penalty-zero { color: var(--dark-text-muted); font-weight: 400; }
@@ -756,7 +759,7 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
     }
 
     .best-in-row { color: var(--dark-green); font-weight: 600; }
-    .worst-in-row { color: var(--dark-red); }
+    .worst-in-row { color: var(--dark-neutral); }
 
     /* ─── Metric cell (label + value in each column) ─── */
     .metric-cell {
@@ -777,12 +780,14 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
       color: var(--dark-text);
     }
     .metric-notes {
-      font-size: 11px;
+      font-size: 13px;
       color: var(--dark-text-sec);
-      line-height: 1.4;
+      line-height: var(--prose-line-height, 1.5);
+      letter-spacing: var(--prose-letter-spacing, 0);
+      word-spacing: var(--prose-word-spacing, 0);
       white-space: normal;
       word-wrap: break-word;
-      max-width: 240px;
+      max-width: 300px;
       display: block;
     }
 
@@ -1016,9 +1021,11 @@ export class LocationCompareComponent implements OnInit {
     return '$' + val.toLocaleString();
   }
 
-  /** Currency with cents — for the Total Monthly + Income Tax rows. */
+  /** Currency with cents — for the Total Monthly + Income Tax rows.
+   *  Threads through DyscalculiaService so spaced / words formats are honored
+   *  (Dashboard Dyscalculia F-013). */
   fmtCents(val: number): string {
-    return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return this.dyscalculia.formatCurrencyPrecise(val, { fractionDigits: 2 });
   }
 
   /** Yearly currency — whole dollars + "/yr" suffix. For the audit banner.
@@ -1089,8 +1096,8 @@ export class LocationCompareComponent implements OnInit {
     if (!d) return '';
     const lines = [
       `Coverage: ${d.source}`,
-      `MAGI for this city: $${Math.round(d.magiUsed).toLocaleString()}`,
-      `FPL: ${(d.fplPct ?? 0).toFixed(0)}%`,
+      `MAGI for this city: ${this.fmtYear(d.magiUsed)}`,
+      `FPL: ${this.fmtFplPct(d.fplPct ?? 0)}`,
       `Adults <65 / 65+: ${d.adultsPreMedicare} / ${d.adultsMedicare}`,
     ];
     if (d.aboveFplCliff) lines.push('Above 400% FPL cliff → no subsidy');

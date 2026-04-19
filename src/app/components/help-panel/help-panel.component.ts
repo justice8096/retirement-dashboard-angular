@@ -255,6 +255,8 @@ import { CATEGORIES } from '@models/navigation.model';
       font-size: 14px;
       color: var(--dark-text-sec);
       line-height: var(--prose-line-height, 1.5);
+      letter-spacing: var(--prose-letter-spacing, 0);
+      word-spacing: var(--prose-word-spacing, 0);
       margin: 6px 0 0;
     }
     .chip-example { color: var(--dark-text-muted); }

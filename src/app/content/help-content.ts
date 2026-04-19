@@ -144,7 +144,7 @@ export const HELP_CONTENT: Record<string, HelpEntry> = {
         ],
       },
     ],
-    glossaryKeys: ['aca', 'magi', 'fpl', 'subsidy_cliff'],
+    glossaryKeys: ['aca', 'magi', 'fpl', 'subsidy_cliff', 'applicable_percentage'],
     related: ['overview', 'livability', 'neighborhoods'],
     tips: [
       'If a city is missing data, that cell says "—" rather than showing a misleading zero.',

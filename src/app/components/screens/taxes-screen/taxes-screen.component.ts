@@ -247,9 +247,11 @@ export class TaxesScreenComponent implements OnInit {
       : this.fmtCents(amount);
   }
 
-  /** Currency with cents precision — taxes display to-the-penny. */
+  /** Currency with cents precision — taxes display to-the-penny.
+   *  Threads through DyscalculiaService so spaced / words formats are honored
+   *  (Dashboard Dyscalculia F-013). */
   fmtCents(amount: number): string {
-    return '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return this.dyscalculia.formatCurrencyPrecise(amount, { fractionDigits: 2 });
   }
 
   /** Normalize rate (decimal 0.22 or whole 22 → "22"). */

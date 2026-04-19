@@ -98,7 +98,7 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
                   <div class="link-group">
                     <span class="link-label">📹 Webcams</span>
                     @for (link of supplement()!.webcams; track link.url) {
-                      <a [href]="link.url" target="_blank" class="ext-link">{{ link.title }}</a>
+                      <a [href]="link.url" target="_blank" rel="noopener noreferrer" class="ext-link">{{ link.title }}</a>
                     }
                   </div>
                 }
@@ -106,7 +106,7 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
                   <div class="link-group">
                     <span class="link-label">▶️ YouTube</span>
                     @for (link of supplement()!.youtubeChannels; track link.url) {
-                      <a [href]="link.url" target="_blank" class="ext-link">{{ link.title }}</a>
+                      <a [href]="link.url" target="_blank" rel="noopener noreferrer" class="ext-link">{{ link.title }}</a>
                     }
                   </div>
                 }
@@ -114,7 +114,7 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
                   <div class="link-group">
                     <span class="link-label">📝 Blogs</span>
                     @for (link of supplement()!.bloggers; track link.url) {
-                      <a [href]="link.url" target="_blank" class="ext-link">{{ link.title }}</a>
+                      <a [href]="link.url" target="_blank" rel="noopener noreferrer" class="ext-link">{{ link.title }}</a>
                     }
                   </div>
                 }
@@ -122,7 +122,7 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
                   <div class="link-group">
                     <span class="link-label">🏛️ Official</span>
                     @for (link of supplement()!.officialSites; track link.url) {
-                      <a [href]="link.url" target="_blank" class="ext-link">{{ link.title }}</a>
+                      <a [href]="link.url" target="_blank" rel="noopener noreferrer" class="ext-link">{{ link.title }}</a>
                     }
                   </div>
                 }

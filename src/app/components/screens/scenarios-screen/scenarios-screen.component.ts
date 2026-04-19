@@ -245,7 +245,7 @@ interface ScenarioView {
     }
     .compare-table tr.hi { background: rgba(212, 148, 58, 0.04); }
     .compare-table td.best { color: var(--dark-green); font-weight: 700; }
-    .compare-table td.worst { color: var(--dark-red); font-weight: 600; }
+    .compare-table td.worst { color: var(--dark-neutral); font-weight: 600; }
     .sr { display: flex; flex-direction: column; gap: 3px; }
     .sr-num { font-weight: 700; }
     .sr-bar { height: 6px; background: var(--dark-bg-secondary); border-radius: 3px; overflow: hidden; }
@@ -279,7 +279,7 @@ interface ScenarioView {
     .sc-value { font-size: 13px; font-weight: 600; color: var(--dark-text); text-align: right; }
     .sc-value.good { color: var(--dark-green); }
     .sc-value.warn { color: var(--dark-amber); }
-    .sc-value.bad  { color: var(--dark-red); }
+    .sc-value.bad  { color: var(--dark-neutral); }
     .sc-value.sc-loc { font-weight: 500; font-size: 12px; color: var(--dark-text-sec); }
 
     .sc-footer {

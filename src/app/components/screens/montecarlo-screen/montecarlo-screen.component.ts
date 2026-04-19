@@ -504,68 +504,94 @@ const HIST_BINS = 40;
           <div class="results-grid">
             <!-- Success rate card (Dyscalculia F-002): calm framing, no danger red.
                  Uses the neutral tone for low scores instead of an alarming color. -->
-            <div class="result-card"
-                 [class.success]="toneClass(r.successRate) === 'success'"
-                 [class.warn]="toneClass(r.successRate) === 'warn'"
-                 [class.neutral]="toneClass(r.successRate) === 'neutral'">
-              <div class="result-label">Success Rate</div>
-              <div class="result-value">{{ (r.successRate * 100).toFixed(0) }}%</div>
-              <div class="success-bar"
-                   role="meter"
-                   [attr.aria-label]="'Success rate ' + (r.successRate * 100).toFixed(0) + ' percent'"
-                   [attr.aria-valuenow]="(r.successRate * 100).toFixed(0)"
-                   aria-valuemin="0"
-                   aria-valuemax="100">
-                <div class="success-bar-fill"
-                     [style.width.%]="r.successRate * 100"></div>
-                <span class="success-bar-tick tick-25"></span>
-                <span class="success-bar-tick tick-50"></span>
-                <span class="success-bar-tick tick-75"></span>
+            @if (showStep(1)) {
+              <div class="result-card"
+                   [class.success]="toneClass(r.successRate) === 'success'"
+                   [class.warn]="toneClass(r.successRate) === 'warn'"
+                   [class.neutral]="toneClass(r.successRate) === 'neutral'">
+                <div class="result-label">Success Rate</div>
+                <div class="result-value">{{ (r.successRate * 100).toFixed(0) }}%</div>
+                <div class="success-bar"
+                     role="meter"
+                     [attr.aria-label]="'Success rate ' + (r.successRate * 100).toFixed(0) + ' percent'"
+                     [attr.aria-valuenow]="(r.successRate * 100).toFixed(0)"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                  <div class="success-bar-fill"
+                       [style.width.%]="r.successRate * 100"></div>
+                  <span class="success-bar-tick tick-25"></span>
+                  <span class="success-bar-tick tick-50"></span>
+                  <span class="success-bar-tick tick-75"></span>
+                </div>
+                <div class="result-sub">
+                  {{ dyscalculia.naturalFrequency(r.successRate) }} simulated futures
+                  left you above $0
+                </div>
               </div>
-              <div class="result-sub">
-                {{ dyscalculia.naturalFrequency(r.successRate) }} simulated futures
-                left you above $0
+            }
+            @if (showStep(2)) {
+              <div class="result-card">
+                <div class="result-label">Median End Balance</div>
+                <div class="result-value" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(r.median) }}</div>
+                <div class="result-sub">
+                  50th percentile —
+                  {{ dyscalculia.getAnchor(r.median, 'percentile', annualSpending()) }}
+                </div>
               </div>
-            </div>
-            <div class="result-card">
-              <div class="result-label">Median End Balance</div>
-              <div class="result-value" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(r.median) }}</div>
-              <div class="result-sub">
-                50th percentile —
-                {{ dyscalculia.getAnchor(r.median, 'percentile', annualSpending()) }}
+            }
+            @if (showStep(3)) {
+              <div class="result-card">
+                <div class="result-label">Worst Case (5th)</div>
+                <div class="result-value worst" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(r.p5) }}</div>
+                <div class="result-sub">
+                  5th percentile —
+                  {{ dyscalculia.getAnchor(r.p5, 'percentile', annualSpending()) }}
+                </div>
               </div>
-            </div>
-            <div class="result-card">
-              <div class="result-label">Worst Case (5th)</div>
-              <div class="result-value worst" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(r.p5) }}</div>
-              <div class="result-sub">
-                5th percentile —
-                {{ dyscalculia.getAnchor(r.p5, 'percentile', annualSpending()) }}
+            }
+            @if (showStep(4)) {
+              <div class="result-card">
+                <div class="result-label">Best Case (95th)</div>
+                <div class="result-value best" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(r.p95) }}</div>
+                <div class="result-sub">
+                  95th percentile —
+                  {{ dyscalculia.getAnchor(r.p95, 'percentile', annualSpending()) }}
+                </div>
               </div>
-            </div>
-            <div class="result-card">
-              <div class="result-label">Best Case (95th)</div>
-              <div class="result-value best" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(r.p95) }}</div>
-              <div class="result-sub">
-                95th percentile —
-                {{ dyscalculia.getAnchor(r.p95, 'percentile', annualSpending()) }}
-              </div>
-            </div>
+            }
           </div>
+
+          <!-- Calm-mode pacer: step through the results one at a time (F-006). -->
+          @if (dyscalculia.isCalmMc() && calmStep() < calmMax) {
+            <div class="calm-pacer" role="group" aria-label="Result pacer">
+              <button mat-stroked-button class="calm-next-btn" (click)="revealNext()">
+                Show next →
+              </button>
+              <button mat-button class="calm-skip-btn" (click)="revealAll()">
+                Skip to full results
+              </button>
+              <span class="calm-progress">
+                Step {{ calmStep() }} of {{ calmMax }}
+              </span>
+            </div>
+          }
 
           <!-- Plain-language Monte Carlo summary — Dyscalculia F-003 -->
-          <div class="card calm-summary">
-            <h3 class="card-title">What this means</h3>
-            <p class="summary-text">
-              In
-              <strong>{{ dyscalculia.naturalFrequency(r.successRate) }}</strong>
-              simulated futures your portfolio lasted through retirement.
-              If you'd like to see a different outcome, try adjusting spending,
-              savings, or starting age and re-run the simulation.
-            </p>
-          </div>
+          @if (showStep(5)) {
+            <div class="card calm-summary">
+              <h3 class="card-title">What this means</h3>
+              <p class="summary-text">
+                In
+                <strong>{{ dyscalculia.naturalFrequency(r.successRate) }}</strong>
+                simulated futures your portfolio lasted through retirement.
+                If you'd like to see a different outcome, try adjusting spending,
+                savings, or starting age and re-run the simulation.
+              </p>
+            </div>
+          }
 
           <!-- Paths chart -->
+          @if (showStep(6)) {
           <div class="card">
             <h3 class="card-title">Portfolio Paths (up to 50 simulations)</h3>
             <svg [attr.viewBox]="'0 0 ' + pathW + ' ' + pathH" class="chart-svg">
@@ -585,8 +611,10 @@ const HIST_BINS = 40;
               <text [attr.x]="pathW - 4" [attr.y]="pathH - 4" text-anchor="end" class="axis-text">Year {{ years() }}</text>
             </svg>
           </div>
+          }
 
           <!-- Histogram -->
+          @if (showStep(7)) {
           <div class="card">
             <h3 class="card-title">End Balance Distribution</h3>
             <svg [attr.viewBox]="'0 0 ' + histW + ' ' + histH" class="chart-svg">
@@ -604,8 +632,10 @@ const HIST_BINS = 40;
               <text [attr.x]="histW - 4" [attr.y]="histH - 4" text-anchor="end" class="axis-text">{{ fmt(histMax(), '') }}</text>
             </svg>
           </div>
+          }
 
           <!-- Percentile bars -->
+          @if (showStep(8)) {
           <div class="card">
             <h3 class="card-title">Percentile Breakdown</h3>
             <div class="pct-list">
@@ -623,12 +653,22 @@ const HIST_BINS = 40;
               }
             </div>
           </div>
+          }
         }
       }
     </div>
   `,
   styles: [`
     .mc-screen { display: flex; flex-direction: column; gap: 16px; }
+    .calm-pacer {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      padding: 12px 16px;
+      background: rgba(92, 156, 230, 0.08);
+      border: 1px solid rgba(92, 156, 230, 0.25);
+      border-radius: 8px;
+    }
+    .calm-next-btn { --mdc-outlined-button-container-height: 36px; }
+    .calm-progress { font-size: 11px; color: var(--dark-text-muted); margin-left: auto; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
     .header-icon { font-size: 32px; }
     .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
@@ -689,7 +729,7 @@ const HIST_BINS = 40;
       display: flex; flex-direction: column; gap: 10px;
     }
     .regime-col.bull { border-left: 3px solid var(--dark-green); }
-    .regime-col.bear { border-left: 3px solid var(--dark-red); }
+    .regime-col.bear { border-left: 3px solid var(--dark-neutral); }
     .regime-title { font-size: 12px; margin: 0; color: var(--dark-text); font-weight: 600; }
 
     .moves-card { display: flex; flex-direction: column; gap: 10px; }
@@ -815,7 +855,7 @@ const HIST_BINS = 40;
     .summary-text strong { color: var(--dark-amber); }
     .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .result-value { font-size: 22px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; line-height: 1.1; word-break: break-word; }
-    .result-value.worst { color: var(--dark-red); }
+    .result-value.worst { color: var(--dark-neutral); }
     .result-value.best { color: var(--dark-green); }
     .result-sub { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
 
@@ -868,6 +908,13 @@ export class MontecarloScreenComponent implements OnInit {
 
   readonly loading = signal(false);
   readonly running = signal(false);
+
+  /** Calm-mode reveal step (Dashboard Dyscalculia F-006). 0=none shown,
+   *  1=success, 2=+median, 3=+worst, 4=+best, 5=+summary, 6=+paths chart,
+   *  7=+histogram, 8=+percentile bars. Reset on every new run. Only consulted
+   *  when `dyscalculia.isCalmMc()` is true. */
+  readonly calmStep = signal(1);
+  readonly calmMax = 8;
   readonly fin = signal<FinancialSettings | null>(null);
   readonly wd = signal<WithdrawalStrategy | null>(null);
   readonly household = signal<HouseholdProfile | null>(null);
@@ -1411,10 +1458,26 @@ export class MontecarloScreenComponent implements OnInit {
           },
         });
         this.results.set(result);
+        // Calm mode (Dashboard Dyscalculia F-006): reset reveal to the first
+        // card so the user steps through the results one at a time.
+        this.calmStep.set(1);
       } finally {
         this.running.set(false);
       }
     }, 30);
+  }
+
+  /** Reveal the next calm-mode card. Capped at `calmMax`. */
+  revealNext(): void {
+    this.calmStep.update(n => Math.min(n + 1, this.calmMax));
+  }
+  /** Reveal everything at once — "Skip to full results". */
+  revealAll(): void {
+    this.calmStep.set(this.calmMax);
+  }
+  /** Predicate used by the template: true when the card at `step` should render. */
+  showStep(step: number): boolean {
+    return !this.dyscalculia.isCalmMc() || this.calmStep() >= step;
   }
 
   /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */

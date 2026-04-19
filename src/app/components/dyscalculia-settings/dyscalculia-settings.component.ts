@@ -170,6 +170,39 @@ import {
           </div>
         </div>
 
+        <!-- Voice number entry (F-008) -->
+        <div class="section">
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <span class="toggle-title">Voice number entry</span>
+              <p class="desc">
+                Adds a microphone button next to currency and rate inputs.
+                Uses your browser's built-in speech recognition (Chrome / Edge).
+              </p>
+            </div>
+            <mat-slide-toggle
+              [checked]="dyscalculia.settings().voiceEntry"
+              (change)="onToggle('voiceEntry', $event.checked, 'Voice number entry')"
+              aria-label="Voice number entry" />
+          </div>
+        </div>
+
+        <!-- Monte Carlo reveal pace (F-006) -->
+        <div class="section">
+          <span class="section-label">Monte Carlo Reveal Pace</span>
+          <mat-chip-listbox
+            aria-label="Monte Carlo reveal pace"
+            [value]="dyscalculia.settings().mcMode"
+            (change)="onChipChange('mcMode', $event.value, 'Monte Carlo Reveal Pace')">
+            <mat-chip-option value="full">Full (all at once)</mat-chip-option>
+            <mat-chip-option value="calm">Calm (step through)</mat-chip-option>
+          </mat-chip-listbox>
+          <p class="desc">
+            Calm mode shows one Monte Carlo card at a time behind a "Show next" button,
+            so results don't arrive as a single wall of charts.
+          </p>
+        </div>
+
         <!-- Info footer -->
         <div class="info-footer">
           <div class="info-title">About these settings</div>
@@ -313,6 +346,7 @@ export class DyscalculiaSettingsComponent {
   readonly chartOptions: { value: ChartStyle; label: string }[] = [
     { value: 'bar', label: 'Bar charts' },
     { value: 'bar-labeled', label: 'Labeled bars' },
+    { value: 'concrete', label: 'Concrete tiles' },
   ];
 
   readonly progressOptions: { value: ProgressStyle; label: string }[] = [

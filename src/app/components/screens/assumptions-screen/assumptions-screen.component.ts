@@ -307,6 +307,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                   {{ fmtYearly(healthcare.magi().magiForAca) }}
                 </span>
                 <span class="hc-sub">AGI + any untaxed Social Security</span>
+                <span class="hc-anchor">{{ dyscalculia.getAnchor(healthcare.magi().magiForAca, 'magi') }}</span>
               </div>
             </div>
 
@@ -398,6 +399,9 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                   At {{ fmtYearly(healthcare.magi().magiForAca) }} per year
                   ({{ fmtFplPct(hc.decision.fplPct ?? 0) }}),
                   no help is available under the current rules. You'd pay the full price.
+                  <span class="hc-anchor-inline">
+                    — {{ dyscalculia.getAnchor(hc.decision.fplPct ?? 0, 'fpl-pct') }}
+                  </span>
                 </div>
               }
 
@@ -410,7 +414,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                   with no hard cutoff.
                 }
                 Roth withdrawals don't count toward this income measure. Social Security counts
-                in full here, even though only {{ (magiSsTaxabilityPct() * 100).toFixed(0) }}%
+                in full here, even though only {{ dyscalculia.formatCount(magiSsTaxabilityWhole(), '%') }}
                 of it is federally taxed. Right now your income is
                 <strong>{{ fmtFplPct(hc.decision.fplPct ?? 0) }}</strong>.
               </div>
@@ -491,9 +495,11 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
     .hc-label { font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .hc-value { font-size: 14px; font-weight: 600; color: var(--dark-text); font-variant-numeric: tabular-nums; }
     .hc-cost { color: var(--dark-amber); }
+    .hc-anchor { font-size: 10px; color: var(--dark-text-muted); font-style: italic; margin-top: 2px; }
+    .hc-anchor-inline { color: var(--dark-text-muted); font-style: italic; font-weight: 400; }
     .hc-src-medicare         { color: var(--dark-green); }
     .hc-src-aca-subsidized   { color: var(--dark-blue); }
-    .hc-src-aca-unsubsidized { color: var(--dark-red); }
+    .hc-src-aca-unsubsidized { color: var(--dark-amber); }
     .hc-src-mixed            { color: var(--dark-purple); }
     .hc-hint {
       margin-top: 12px; padding: 8px 10px;
@@ -584,6 +590,10 @@ export class AssumptionsScreenComponent implements OnInit {
     const m = this.healthcare.magi();
     const ss = this.healthcare.income().ssAnnual;
     return ss > 0 ? m.taxableSS / ss : 0;
+  }
+  /** Whole-number version (0–100) for rendering through dyscalculia.formatCount. */
+  magiSsTaxabilityWhole(): number {
+    return Math.round(this.magiSsTaxabilityPct() * 100);
   }
 
   /** Currency formatters that honor the user's dyscalculia number-format preference. */
