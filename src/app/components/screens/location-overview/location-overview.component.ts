@@ -169,7 +169,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
                 </span>
                 <span class="cr-tax" [class]="dyscalculia.numberSpacingClass()"
                       [title]="'Tax source: ' + r.incomeTaxSource">
-                  tax {{ fmtCost(r.tax) }}
+                  tax {{ fmtTaxCents(r.tax) }}
                 </span>
               </div>
             }
@@ -438,5 +438,10 @@ export class LocationOverviewComponent implements OnInit {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
       : '$' + Math.round(amount).toLocaleString() + '/mo';
+  }
+
+  /** Tax values show to cents precision in the convergence summary. */
+  fmtTaxCents(amount: number): string {
+    return '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '/mo';
   }
 }

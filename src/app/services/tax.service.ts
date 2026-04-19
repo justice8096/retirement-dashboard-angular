@@ -16,10 +16,11 @@ export class TaxService {
 
   /**
    * Normalize a rate that might be stored as a decimal fraction (0.22) or a
-   * whole-number percent (22). Anything > 1 is treated as whole-%.
-   * Shared with the taxes/withdrawal screens — keep the rule in one place.
+   * whole-number percent (22). Anything > 1 is treated as whole-%. Returns a
+   * decimal fraction. Used only inside this service; the display-side scaling
+   * on Taxes/Withdrawal screens lives in those components.
    */
-  static normalizeRate(r: number | undefined | null): number {
+  private static normalizeRate(r: number | undefined | null): number {
     const n = Number(r ?? 0);
     if (!isFinite(n) || n <= 0) return 0;
     return n > 1 ? n / 100 : n;

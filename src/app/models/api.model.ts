@@ -130,13 +130,22 @@ export interface TaxInfo {
 
 export interface VisaInfo {
   type: string;
+  notes?: string;
+  /** Monthly income threshold for eligibility ({monthly, currency}). */
+  incomeRequirement?: { monthly?: number; currency?: string } | null;
+  // Legacy fields — not populated in current data but preserved for future use.
   duration?: string;
   renewalProcess?: string;
   costUSD?: number;
 }
 
 export interface ClimateInfo {
-  type: string;
+  winterLowF?: number;
+  summerHighF?: number;
+  rainyDaysPerYear?: number;
+  meetsWarmWinterReq?: boolean;
+  // Legacy / alternate shape — not in current data but preserved.
+  type?: string;
   avgTemp?: { high: number; low: number };
 }
 
