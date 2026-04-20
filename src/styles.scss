@@ -114,6 +114,13 @@ html.dx-contrast-cream {
   --dark-green: #2F7034;
   --dark-red: #A34846;
   --dark-amber: #8A5A1F;
+  // Accents previously left at their dark-theme luminosity — on cream
+  // backgrounds they were effectively invisible. Darken here so they
+  // stay legible as button / tag / chart-series colors.
+  --dark-amber-light: #B8801F;
+  --dark-purple: #6B3FA0;
+  --dark-teal: #1F5C5C;
+  --dark-neutral: #4A5367;
 }
 
 /* Light: soft off-white with dark-slate — not pure #FFFFFF / #000000 */
@@ -129,6 +136,10 @@ html.dx-contrast-light {
   --dark-green: #2F7034;
   --dark-red: #A34846;
   --dark-amber: #8A5A1F;
+  --dark-amber-light: #B8801F;
+  --dark-purple: #6B3FA0;
+  --dark-teal: #1F5C5C;
+  --dark-neutral: #3E4557;
 }
 
 /* ─── Base Reset ─────────────────────────────────────────────────────── */

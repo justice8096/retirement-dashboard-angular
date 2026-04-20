@@ -207,7 +207,10 @@ import {
       justify-content: space-between;
       align-items: center;
       &.enabled {
-        background: #1a2a1a;
+        // Translucent green overlay flips cleanly across dark + cream + light
+        // themes — avoids the previous hardcoded #1a2a1a (dark-on-dark, made
+        // text unreadable in light mode).
+        background: color-mix(in srgb, var(--dark-green) 14%, transparent);
         border-color: var(--dark-green);
       }
     }
