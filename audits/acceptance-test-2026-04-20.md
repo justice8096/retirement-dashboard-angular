@@ -115,7 +115,11 @@ FU-019 as a side effect.
 - [ ] RMD age 73 for 1951–1959, 75 for 1960+
 - [ ] RMD excise 25% / 10% if cured
 - [P] **Roth Conversion Planner** — tax delta reflects current bracket
-- [P] **Withdrawal Strategy** — superficial pass (UI loads, controls wired); deep math verification still pending (proportional / tax-efficient / Roth-last apportionment)
+- [P] **Withdrawal Strategy** — deep math verified 2026-04-20 via
+  `scripts/verify-apportionment.mjs`; 3 bugs found and fixed (4% cap
+  inversion, all-zero fallback asymmetry, dead leftover branch).
+  See [audits/withdrawal-apportionment-verification-2026-04-20.md](audits/withdrawal-apportionment-verification-2026-04-20.md).
+  14 / 14 cases passing; CI regression-tests on every push.
 - [ ] Contribution progress tracks toward 2026 limits
 
 ## 7. Monte Carlo (projections-screen + montecarlo-screen)

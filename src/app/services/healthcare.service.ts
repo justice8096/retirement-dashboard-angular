@@ -6,8 +6,9 @@ import {
   fpl2026 as fplForHousehold,
   applicablePctCliff2026 as applicablePctCliff,
 } from '../lib/aca-constants';
+import { apportion as apportionPure, ApportionStrategy as PureApportionStrategy } from '../lib/apportion';
 
-export type ApportionStrategy = 'proportional' | 'tax-efficient' | 'manual';
+export type ApportionStrategy = PureApportionStrategy;
 
 /**
  * ACA subsidy regime:
@@ -225,44 +226,12 @@ export class HealthcareService {
    *                    (classic "draw taxable first" retirement advice)
    */
   /**
-   * Pure apportionment — returns {trad, roth, taxable} draws given a total
-   * residual need (after SS + pension), the active strategy, and balances.
-   * Extracted so `decideForLocation` can re-apportion at a location-specific
-   * total without mutating the global `income` signal.
+   * Thin delegate around the pure `apportion` lib so callers who already hold
+   * this service don't need to import the module directly. The math + test
+   * coverage live in `src/app/lib/apportion.ts`.
    */
   private apportion(residual: number, strategy: ApportionStrategy, balances: { traditional: number; roth: number; taxable: number }): { trad: number; roth: number; tax: number } {
-    let trad = 0, roth = 0, tax = 0;
-
-    if (strategy === 'tax-efficient') {
-      const taxableCap = balances.taxable * 0.04;
-      tax = Math.min(residual, taxableCap);
-      let left = residual - tax;
-      const tradCap = balances.traditional * 0.04;
-      trad = Math.min(left, tradCap);
-      left -= trad;
-      roth = left;
-      if (tax + trad + roth < residual) {
-        const total3 = balances.traditional + balances.roth + balances.taxable;
-        if (total3 > 0) {
-          const leftover = residual - tax - trad - roth;
-          trad += leftover * (balances.traditional / total3);
-          roth += leftover * (balances.roth / total3);
-          tax  += leftover * (balances.taxable / total3);
-        } else {
-          trad = residual;
-        }
-      }
-    } else {
-      const total3 = balances.traditional + balances.roth + balances.taxable;
-      if (total3 <= 0) {
-        trad = residual;
-      } else {
-        trad = residual * (balances.traditional / total3);
-        roth = residual * (balances.roth / total3);
-        tax  = residual * (balances.taxable / total3);
-      }
-    }
-    return { trad, roth, tax };
+    return apportionPure(residual, strategy, balances);
   }
 
   applyApportionment(): void {
