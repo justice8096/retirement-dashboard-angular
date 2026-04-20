@@ -42,6 +42,17 @@ export class LocationService {
 
   /* ─── Computed ──────────────────────────────────────────────────── */
 
+  /** Returns the right label for the region-filter dropdown: US locations
+   *  surface their state (`subregion`) so the picker breaks the nine US
+   *  macros into 50 actionable states. Non-US locations stay on their
+   *  macro region so the compact Europe / Central America / South America
+   *  groupings remain usable. Falls back to `region` when `subregion`
+   *  is absent. */
+  readonly displayRegion = (l: { country: string; region: string; subregion?: string }): string => {
+    if (l.country === 'United States') return l.subregion ?? l.region;
+    return l.region;
+  };
+
   readonly filteredLocations = computed(() => {
     let locs = this.locations();
     const search = this.searchTerm().toLowerCase();
@@ -54,11 +65,12 @@ export class LocationService {
       locs = locs.filter(l =>
         l.name.toLowerCase().includes(search) ||
         l.country.toLowerCase().includes(search) ||
-        l.region.toLowerCase().includes(search)
+        l.region.toLowerCase().includes(search) ||
+        (l.subregion?.toLowerCase().includes(search) ?? false)
       );
     }
     if (country) locs = locs.filter(l => l.country === country);
-    if (region) locs = locs.filter(l => l.region === region);
+    if (region) locs = locs.filter(l => this.displayRegion(l) === region);
     if (min !== null) locs = locs.filter(l => l.monthlyCostTotal >= min);
     if (max !== null) locs = locs.filter(l => l.monthlyCostTotal <= max);
 
