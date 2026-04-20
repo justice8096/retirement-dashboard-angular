@@ -3,13 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { BrokerageFees, FxProvider } from '@models/api.model';
 import { debounceTime, Subject } from 'rxjs';
 
 @Component({
   selector: 'app-fees-screen',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, NumericInputDirective],
   template: `
     <div class="fees-screen">
       <div class="screen-header">
@@ -50,7 +51,7 @@ import { debounceTime, Subject } from 'rxjs';
             </label>
             <label class="field">
               <span class="field-label">Manual Exchange Rate Override</span>
-              <input type="number" class="field-input" step="0.0001" placeholder="Auto from city data"
+              <input appNumeric="fx" class="field-input" placeholder="Auto from city data"
                 [ngModel]="manualExchangeRate()" (ngModelChange)="updateField('manualExchangeRate', $event || null)" />
             </label>
           </div>
@@ -62,25 +63,27 @@ import { debounceTime, Subject } from 'rxjs';
           <div class="param-grid">
             <label class="param">
               <span class="param-label">Trading Commission (%)</span>
-              <input type="number" class="param-input" step="0.01"
+              <input appNumeric="percent" class="param-input" step="0.01"
                 [ngModel]="fees()?.brokerageFeePct" (ngModelChange)="updateField('brokerageFeePct', $event)" />
               <span class="param-hint">Per-trade percentage fee</span>
             </label>
             <label class="param">
               <span class="param-label">Flat Trade Fee ($)</span>
-              <input type="number" class="param-input" step="0.01"
+              <input appNumeric="currency" class="param-input" step="0.01"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="fees()?.brokerageFeeFlat" (ngModelChange)="updateField('brokerageFeeFlat', $event)" />
               <span class="param-hint">Per-trade flat fee (e.g. $4.95)</span>
             </label>
             <label class="param">
               <span class="param-label">Annual Account Fee ($)</span>
-              <input type="number" class="param-input" step="1"
+              <input appNumeric="currency" class="param-input" step="1"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="fees()?.brokerageAnnualFee" (ngModelChange)="updateField('brokerageAnnualFee', $event)" />
               <span class="param-hint">Yearly custody or maintenance fee</span>
             </label>
             <label class="param">
               <span class="param-label">Fund Expense Ratio (%)</span>
-              <input type="number" class="param-input" step="0.01"
+              <input appNumeric="percent" class="param-input" step="0.01"
                 [ngModel]="fees()?.brokerageExpenseRatio" (ngModelChange)="updateField('brokerageExpenseRatio', $event)" />
               <span class="param-hint">Weighted average fund expense ratio</span>
             </label>
@@ -94,19 +97,22 @@ import { debounceTime, Subject } from 'rxjs';
           <div class="param-grid">
             <label class="param">
               <span class="param-label">Outgoing Wire Fee ($)</span>
-              <input type="number" class="param-input" step="1"
+              <input appNumeric="currency" class="param-input" step="1"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="fees()?.wireTransferFeeUsd" (ngModelChange)="updateField('wireTransferFeeUsd', $event)" />
               <span class="param-hint">US bank outgoing wire charge</span>
             </label>
             <label class="param">
               <span class="param-label">Receiving Bank Fee ({{ localCurrency() }})</span>
-              <input type="number" class="param-input" step="1"
+              <input appNumeric="currency" class="param-input" step="1"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="fees()?.wireTransferFeeLocal" (ngModelChange)="updateField('wireTransferFeeLocal', $event)" />
               <span class="param-hint">Local bank incoming wire charge</span>
             </label>
             <label class="param">
               <span class="param-label">ACH/Domestic Transfer ($)</span>
-              <input type="number" class="param-input" step="0.01"
+              <input appNumeric="currency" class="param-input" step="0.01"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="fees()?.achTransferFee" (ngModelChange)="updateField('achTransferFee', $event)" />
               <span class="param-hint">US domestic ACH transfer fee</span>
             </label>
@@ -120,13 +126,14 @@ import { debounceTime, Subject } from 'rxjs';
           <div class="param-grid">
             <label class="param">
               <span class="param-label">FX Spread (%)</span>
-              <input type="number" class="param-input" step="0.01"
+              <input appNumeric="percent" class="param-input" step="0.01"
                 [ngModel]="fees()?.fxSpreadPct" (ngModelChange)="updateField('fxSpreadPct', $event)" />
               <span class="param-hint">Bank/broker markup on mid-market rate</span>
             </label>
             <label class="param">
               <span class="param-label">FX Fixed Fee ($)</span>
-              <input type="number" class="param-input" step="0.01"
+              <input appNumeric="currency" class="param-input" step="0.01"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="fees()?.fxFixedFee" (ngModelChange)="updateField('fxFixedFee', $event)" />
               <span class="param-hint">Flat per-conversion fee</span>
             </label>
@@ -151,7 +158,8 @@ import { debounceTime, Subject } from 'rxjs';
           <div class="calc-row">
             <label class="param">
               <span class="param-label">Amount to Transfer (USD)</span>
-              <input type="number" class="param-input lg" step="100"
+              <input appNumeric="currency" class="param-input lg" step="100"
+                [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="calcAmount()" (ngModelChange)="calcAmount.set($event)" />
             </label>
           </div>

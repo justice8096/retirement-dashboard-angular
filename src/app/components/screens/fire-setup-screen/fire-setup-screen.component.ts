@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings, RetirementPath } from '@models/api.model';
 
 @Component({
   selector: 'app-fire-setup-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective],
   template: `
     <div class="fire-screen">
       <div class="screen-header">
@@ -49,30 +50,31 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
             </label>
             <label class="field">
               <span class="field-label">FIRE Target Age</span>
-              <input type="number" class="field-input"
+              <input appNumeric="age" class="field-input"
                 [ngModel]="form().fireTargetAge"
                 (ngModelChange)="patch('fireTargetAge', $event)"
-                min="30" max="100" step="1"
+                min="30" max="100"
                 placeholder="e.g. 55" />
             </label>
             <label class="field">
               <span class="field-label">Annual Savings</span>
               <div class="input-wrap dollar">
                 <span class="input-prefix">$</span>
-                <input type="number" class="field-input"
+                <input appNumeric="currency" class="field-input"
+                  [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="form().annualSavings"
                   (ngModelChange)="patch('annualSavings', $event)"
-                  min="0" step="1000"
+                  step="1000"
                   placeholder="e.g. 50000" />
               </div>
             </label>
             <label class="field">
               <span class="field-label">Savings Rate</span>
               <div class="input-wrap pct">
-                <input type="number" class="field-input"
+                <input appNumeric="percent" class="field-input"
                   [ngModel]="form().savingsRate"
                   (ngModelChange)="patch('savingsRate', $event)"
-                  min="0" max="100" step="1"
+                  step="1"
                   placeholder="e.g. 50" />
                 <span class="input-suffix">%</span>
               </div>
@@ -81,37 +83,39 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
               <span class="field-label">Portfolio Balance</span>
               <div class="input-wrap dollar">
                 <span class="input-prefix">$</span>
-                <input type="number" class="field-input lg"
+                <input appNumeric="currency" class="field-input lg"
+                  [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="form().portfolioBalance"
                   (ngModelChange)="patch('portfolioBalance', $event)"
-                  min="0" step="10000" />
+                  step="10000" />
               </div>
             </label>
             <label class="field">
               <span class="field-label">Annual Expenses</span>
               <div class="input-wrap dollar">
                 <span class="input-prefix">$</span>
-                <input type="number" class="field-input"
+                <input appNumeric="currency" class="field-input"
+                  [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="annualExpenses()"
                   (ngModelChange)="annualExpensesOverride.set($event)"
-                  min="0" step="1000"
+                  step="1000"
                   placeholder="e.g. 60000" />
               </div>
             </label>
             <label class="field">
               <span class="field-label">Expected Return</span>
               <div class="input-wrap pct">
-                <input type="number" class="field-input"
+                <input appNumeric="percent" class="field-input"
                   [ngModel]="form().expectedReturn"
                   (ngModelChange)="patch('expectedReturn', $event)"
-                  min="0" max="20" step="0.5" />
+                  max="20" step="0.5" />
                 <span class="input-suffix">%</span>
               </div>
             </label>
             <label class="field">
               <span class="field-label">Withdrawal Rate</span>
               <div class="input-wrap pct">
-                <input type="number" class="field-input"
+                <input appNumeric="percent" class="field-input"
                   [ngModel]="withdrawalRate()"
                   (ngModelChange)="withdrawalRate.set($event)"
                   min="1" max="10" step="0.25" />

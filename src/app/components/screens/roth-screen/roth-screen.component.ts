@@ -3,12 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings } from '@models/api.model';
 
 @Component({
   selector: 'app-roth-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective],
   template: `
     <div class="roth-screen">
       <div class="screen-header">
@@ -61,7 +62,7 @@ import { FinancialSettings } from '@models/api.model';
           <div class="param-grid">
             <label class="param">
               <span class="param-label">Annual Conversion Amount</span>
-              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+              <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="conversionAmount()"
                 (ngModelChange)="conversionAmount.set($event)" />
               <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">
@@ -70,13 +71,13 @@ import { FinancialSettings } from '@models/api.model';
             </label>
             <label class="param">
               <span class="param-label">Years to Convert</span>
-              <input type="number" class="param-input"
+              <input appNumeric="age" class="param-input" min="1" max="50"
                 [ngModel]="yearsToConvert()"
                 (ngModelChange)="yearsToConvert.set($event)" />
             </label>
             <label class="param">
               <span class="param-label">Marginal Tax Rate (%)</span>
-              <input type="number" class="param-input"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="taxRate()"
                 (ngModelChange)="taxRate.set($event)" />
             </label>
