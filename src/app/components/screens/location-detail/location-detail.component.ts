@@ -19,7 +19,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
         <div class="detail-header">
           <div>
             <h2 class="loc-name">{{ location.name }}</h2>
-            <div class="loc-meta">{{ location.country }} · {{ location.region }}</div>
+            <div class="loc-meta">{{ location.country }} · {{ location.region }}@if (location.subregion) { · {{ location.subregion }} }</div>
           </div>
           <div class="loc-total"
             [class]="dyscalculia.numberSpacingClass()">

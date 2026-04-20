@@ -16,6 +16,11 @@ export interface LocationSummary {
   name: string;
   country: string;
   region: string;
+  /** Optional state / province / department within `region`. Added
+   *  2026-04-20 as part of the region-taxonomy normalization (FU-001).
+   *  Present on US locations, France regions, Ireland provinces, etc.;
+   *  absent where the source data is macro-region only. */
+  subregion?: string;
   currency: string;
   monthlyCostTotal: number;
   updatedAt: string;
@@ -154,6 +159,9 @@ export interface LocationFull {
   name: string;
   country: string;
   region: string;
+  /** Optional state / province / department within `region`. See
+   *  LocationSummary.subregion for rationale (FU-001). */
+  subregion?: string;
   cities?: string[];
   currency: string;
   exchangeRate?: number;
