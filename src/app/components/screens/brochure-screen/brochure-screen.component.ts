@@ -27,7 +27,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
             <div class="brochure-card">
               <div class="b-header">
                 <h3 class="b-name">{{ item.name }}</h3>
-                <span class="b-country">{{ item.country }} · {{ item.region }}</span>
+                <span class="b-country">{{ item.country }} · {{ item.region }}@if (item.subregion) { · {{ item.subregion }} }</span>
               </div>
               <div class="b-cost">
                 <span class="b-cost-label">Monthly Cost</span>
@@ -105,6 +105,7 @@ export class BrochureScreenComponent implements OnInit {
       name: l.name,
       country: l.country,
       region: l.region,
+      subregion: l.subregion,
       currency: l.currency,
       total: l.monthlyCostTotal ?? 0,
       climate: l.climate?.type ?? null,
@@ -157,7 +158,7 @@ export class BrochureScreenComponent implements OnInit {
   footer { margin-top: 24px; font-size: 10px; color: #999; text-align: center; }
 </style></head><body>
   <h1>${esc(loc.name)}</h1>
-  <div class="sub">${esc(loc.country)} · ${esc(loc.region)} · ${esc(loc.currency)}</div>
+  <div class="sub">${esc(loc.country)} · ${esc(loc.region)}${loc.subregion ? ' · ' + esc(loc.subregion) : ''} · ${esc(loc.currency)}</div>
   <div class="cost-hero">
     <span class="lbl">Estimated Monthly Cost</span>
     <span class="val">${this.fmt(loc.monthlyCostTotal ?? 0)}</span>

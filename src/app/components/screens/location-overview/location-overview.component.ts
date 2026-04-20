@@ -121,7 +121,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
               (change)="loc.toggleLocation(location.id)"
               [attr.aria-label]="'Select ' + location.name" />
             <span class="row-name">{{ location.name }}</span>
-            <span class="row-meta">{{ location.country }} · {{ location.region }}</span>
+            <span class="row-meta">{{ location.country }} · {{ location.region }}@if (location.subregion) { · {{ location.subregion }} }</span>
             <span class="row-cost"
               [class]="dyscalculia.numberSpacingClass()">
               {{ dyscalculia.isEnabled()

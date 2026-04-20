@@ -516,16 +516,26 @@ tracked in [retirement-api/audits/location-data-gaps-2026-04-20.md](../../retire
 - **Location:** [assumptions-screen.component.ts:427](src/app/components/screens/assumptions-screen/assumptions-screen.component.ts:427)
 
 ### FU-001 — Region name normalization (Location Overview)
-**Status update (2026-04-20):** Audit complete. **34 distinct region
-strings** across 158 locations (see
-[retirement-api/audits/location-data-gaps-2026-04-20.md](../../retirement-api/audits/location-data-gaps-2026-04-20.md)
-region table). Proposed taxonomy: **`region`** = macro region
-(continent or US-level — "US Southeast", "Southern Europe", "Central
-America"), **`subregion`** = state/province/department — would need
-a new optional field + a one-off migration script, deferred pending
-product decision. Audit report + script remain in tree so future
-decisions can re-run `node tools/audit-location-data-completeness.mjs`
-to see current state.
+**Status update (2026-04-20, afternoon):** **Closed.** Applied the
+proposed macro/subregion taxonomy:
+- `region` = macro (continent / US-region): now 12 clean values —
+  US Northeast, US Mid-Atlantic, US Southeast, US Midwest,
+  US South Central, US Southwest, US Mountain West, US Territories
+  (new), Western Europe, Southern Europe, Central America, South America.
+- `subregion` = optional state / province / department — added to 41
+  locations where the current data carried state-level detail.
+
+Migration applied via `retirement-api/tools/normalize-region-taxonomy.mjs`
+(idempotent; re-runnable). Dashboard `LocationSummary` + `LocationFull`
+models now carry `subregion?: string`. Location Overview + Location
+Detail + Brochure render `country · region · subregion` when subregion
+is present, falls back to `country · region` otherwise.
+
+Remaining follow-up: non-US locations on a macro region (Lisbon →
+"Lisboa / Algarve", Abruzzo → "Abruzzo", etc.) didn't get subregion
+synthesized because that requires local geography knowledge. Adding
+them per-location is a contribution-pipeline task alongside the
+missing supplement JSONs — not a taxonomy blocker.
 - **Screen:** Location Overview
 - **Symptom:** Region labels are inconsistent across location JSONs — mix of
   continent-level ("Southern Europe"), country-subdivision ("Virginia",
