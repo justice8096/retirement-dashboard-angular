@@ -4,12 +4,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings, RetirementPath } from '@models/api.model';
 
 @Component({
   selector: 'app-settings-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, MatSlideToggleModule],
+  imports: [FormsModule, MatButtonModule, MatSlideToggleModule, NumericInputDirective],
   template: `
     <div class="settings-screen">
       <div class="screen-header">
@@ -40,10 +41,11 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
               <span class="field-label">Total Balance</span>
               <div class="input-wrap dollar">
                 <span class="input-prefix">$</span>
-                <input type="number" class="field-input lg"
+                <input appNumeric="currency" class="field-input lg"
+                  [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="form().portfolioBalance"
                   (ngModelChange)="patch('portfolioBalance', $event)"
-                  min="0" step="10000" />
+                  step="10000" />
               </div>
             </label>
             <label class="field">
@@ -76,23 +78,24 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
                 <span class="acct-name">{{ acct.label }}</span>
                 <div class="input-wrap dollar">
                   <span class="input-prefix">$</span>
-                  <input type="number" class="field-input"
+                  <input appNumeric="currency" class="field-input"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="form()[acct.balanceKey]"
                     (ngModelChange)="patch(acct.balanceKey, $event)"
-                    min="0" step="1000" />
+                    step="1000" />
                 </div>
                 <div class="input-wrap pct">
-                  <input type="number" class="field-input"
+                  <input appNumeric="percent" class="field-input"
                     [ngModel]="form()[acct.loadKey] ?? 0"
                     (ngModelChange)="patch(acct.loadKey, $event)"
-                    min="0" max="10" step="0.05" />
+                    max="10" step="0.05" />
                   <span class="input-suffix">%</span>
                 </div>
                 <div class="input-wrap pct">
-                  <input type="number" class="field-input"
+                  <input appNumeric="percent" class="field-input"
                     [ngModel]="form()[acct.feesKey] ?? 0"
                     (ngModelChange)="patch(acct.feesKey, $event)"
-                    min="0" max="10" step="0.05" />
+                    max="10" step="0.05" />
                   <span class="input-suffix">%</span>
                 </div>
               </div>
@@ -110,56 +113,56 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
           <div class="alloc-bars">
             <div class="alloc-segment" [style.flex]="form().equityPct || 1">
               <div class="alloc-fill equity"></div>
-              <span class="alloc-label">Equity {{ form().equityPct }}%</span>
+              <span class="alloc-label">Equity {{ fmtPct(form().equityPct) }}%</span>
             </div>
             <div class="alloc-segment" [style.flex]="form().bondPct || 1">
               <div class="alloc-fill bond"></div>
-              <span class="alloc-label">Bond {{ form().bondPct }}%</span>
+              <span class="alloc-label">Bond {{ fmtPct(form().bondPct) }}%</span>
             </div>
             <div class="alloc-segment" [style.flex]="form().cashPct || 1">
               <div class="alloc-fill cash"></div>
-              <span class="alloc-label">Cash {{ form().cashPct }}%</span>
+              <span class="alloc-label">Cash {{ fmtPct(form().cashPct) }}%</span>
             </div>
             @if (form().intlPct) {
               <div class="alloc-segment" [style.flex]="form().intlPct || 1">
                 <div class="alloc-fill intl"></div>
-                <span class="alloc-label">Int'l {{ form().intlPct }}%</span>
+                <span class="alloc-label">Int'l {{ fmtPct(form().intlPct) }}%</span>
               </div>
             }
           </div>
           <div class="field-grid alloc-inputs">
             <label class="field">
               <span class="field-label">Equity %</span>
-              <input type="number" class="field-input sm"
+              <input appNumeric="percent" class="field-input sm"
                 [ngModel]="form().equityPct"
                 (ngModelChange)="patch('equityPct', $event)"
-                min="0" max="100" step="5" />
+                step="5" />
             </label>
             <label class="field">
               <span class="field-label">Bond %</span>
-              <input type="number" class="field-input sm"
+              <input appNumeric="percent" class="field-input sm"
                 [ngModel]="form().bondPct"
                 (ngModelChange)="patch('bondPct', $event)"
-                min="0" max="100" step="5" />
+                step="5" />
             </label>
             <label class="field">
               <span class="field-label">Cash %</span>
-              <input type="number" class="field-input sm"
+              <input appNumeric="percent" class="field-input sm"
                 [ngModel]="form().cashPct"
                 (ngModelChange)="patch('cashPct', $event)"
-                min="0" max="100" step="5" />
+                step="5" />
             </label>
             <label class="field">
               <span class="field-label">Int'l %</span>
-              <input type="number" class="field-input sm"
+              <input appNumeric="percent" class="field-input sm"
                 [ngModel]="form().intlPct"
                 (ngModelChange)="patch('intlPct', $event)"
-                min="0" max="100" step="5" />
+                step="5" />
             </label>
           </div>
           @if (allocTotal() !== 100) {
             <div class="alloc-warning">
-              Allocation totals {{ allocTotal() }}% — should be 100%
+              Allocation totals {{ fmtPct(allocTotal()) }}% — should be 100%
             </div>
           }
         </div>
@@ -171,30 +174,30 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
             <label class="field">
               <span class="field-label">Expected Annual Return</span>
               <div class="input-wrap pct">
-                <input type="number" class="field-input sm"
+                <input appNumeric="percent" class="field-input sm"
                   [ngModel]="form().expectedReturn"
                   (ngModelChange)="patch('expectedReturn', $event)"
-                  min="0" max="20" step="0.1" />
+                  max="20" step="0.1" />
                 <span class="input-suffix">%</span>
               </div>
             </label>
             <label class="field">
               <span class="field-label">Expected Inflation</span>
               <div class="input-wrap pct">
-                <input type="number" class="field-input sm"
+                <input appNumeric="percent" class="field-input sm"
                   [ngModel]="form().expectedInflation"
                   (ngModelChange)="patch('expectedInflation', $event)"
-                  min="0" max="15" step="0.1" />
+                  max="15" step="0.1" />
                 <span class="input-suffix">%</span>
               </div>
             </label>
             <label class="field">
               <span class="field-label">Social Security COLA</span>
               <div class="input-wrap pct">
-                <input type="number" class="field-input sm"
+                <input appNumeric="percent" class="field-input sm"
                   [ngModel]="form().ssCola"
                   (ngModelChange)="patch('ssCola', $event)"
-                  min="0" max="10" step="0.1" />
+                  max="10" step="0.1" />
                 <span class="input-suffix">%</span>
               </div>
             </label>
@@ -208,17 +211,16 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
             <div class="toggle-row">
               <mat-slide-toggle
                 [checked]="form().fxDriftEnabled"
-                (change)="patch('fxDriftEnabled', $event.checked)">
-                FX Drift
-              </mat-slide-toggle>
+                (change)="patch('fxDriftEnabled', $event.checked)" />
+              <span class="toggle-label">FX Drift</span>
               @if (form().fxDriftEnabled) {
                 <label class="inline-field">
                   <span class="field-label">Rate</span>
                   <div class="input-wrap pct compact">
-                    <input type="number" class="field-input sm"
+                    <input appNumeric="percent" class="field-input sm"
                       [ngModel]="form().fxDriftAnnualRate"
                       (ngModelChange)="patch('fxDriftAnnualRate', $event)"
-                      min="0" max="10" step="0.1" />
+                      max="10" step="0.1" />
                     <span class="input-suffix">%/yr</span>
                   </div>
                 </label>
@@ -227,16 +229,15 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
             <div class="toggle-row">
               <mat-slide-toggle
                 [checked]="form().ssCutEnabled"
-                (change)="patch('ssCutEnabled', $event.checked)">
-                Social Security Cut
-              </mat-slide-toggle>
+                (change)="patch('ssCutEnabled', $event.checked)" />
+              <span class="toggle-label">Social Security Cut</span>
               @if (form().ssCutEnabled) {
                 <label class="inline-field">
                   <span class="field-label">Year</span>
-                  <input type="number" class="field-input sm"
+                  <input appNumeric="year" class="field-input sm"
                     [ngModel]="form().ssCutYear"
                     (ngModelChange)="patch('ssCutYear', $event)"
-                    min="2025" max="2060" step="1" />
+                    min="2025" max="2060" />
                 </label>
               }
             </div>
@@ -339,6 +340,7 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       display: flex; align-items: center; gap: 16px;
       font-size: 13px; color: var(--dark-text);
     }
+    .toggle-label { font-size: 13px; color: var(--dark-text); }
     .inline-field {
       display: flex; align-items: center; gap: 6px;
     }
@@ -425,6 +427,16 @@ export class SettingsScreenComponent implements OnInit {
   allocTotal(): number {
     const f = this.form();
     return (f.equityPct ?? 0) + (f.bondPct ?? 0) + (f.cashPct ?? 0) + (f.intlPct ?? 0);
+  }
+
+  /** Display helper — trims trailing zeros on ≤2-dp rendering so whole
+   *  numbers stay clean ("60%") while fractional values show 2 dp
+   *  ("60.25%"). Keeps allocation summaries dyscalculia-friendly. */
+  fmtPct(value: number | null | undefined): string {
+    const n = Number(value ?? 0);
+    if (!Number.isFinite(n)) return '0';
+    const rounded = Math.round(n * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
   }
 
   ngOnInit(): void {

@@ -5,6 +5,7 @@ import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { LocationService } from '@services/location.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
   HouseholdProfile, HouseholdMember, HouseholdPet,
   MemberRole, DependentType, PetType,
@@ -16,7 +17,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
 @Component({
   selector: 'app-assumptions-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective],
   template: `
     <div class="assumptions-screen">
       <div class="screen-header">
@@ -44,26 +45,26 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
           <div class="field-grid">
             <label class="field">
               <span class="field-label">Target Annual Income ($)</span>
-              <input type="number" class="field-input" min="0" step="1000"
+              <input appNumeric="currency" class="field-input" step="1000"
                 [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="draft()!.targetAnnualIncome"
                 (ngModelChange)="patch({ targetAnnualIncome: +$event })" />
             </label>
             <label class="field">
               <span class="field-label">Planning Start Year</span>
-              <input type="number" class="field-input" min="2024" max="2050"
+              <input appNumeric="year" class="field-input" min="2024" max="2050"
                 [ngModel]="draft()!.planningStartYear"
                 (ngModelChange)="patch({ planningStartYear: +$event })" />
             </label>
             <label class="field">
               <span class="field-label">Planning Horizon (years)</span>
-              <input type="number" class="field-input" min="1" max="70"
+              <input appNumeric="age" class="field-input" min="1" max="70"
                 [ngModel]="draft()!.planningYears"
                 (ngModelChange)="patch({ planningYears: +$event })" />
             </label>
             <label class="field">
               <span class="field-label">Adults in Household</span>
-              <input type="number" class="field-input" min="1" max="10"
+              <input appNumeric="age" class="field-input" min="1" max="10"
                 [ngModel]="draft()!.adultsCount"
                 (ngModelChange)="patch({ adultsCount: +$event })" />
             </label>
@@ -106,20 +107,25 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                 }
                 <label class="field compact">
                   <span class="field-label">Birth Year</span>
-                  <input type="number" class="field-input" min="1920" max="2030"
+                  <input appNumeric="year" class="field-input" min="1920" max="2030"
                     [ngModel]="member.birthYear"
                     (ngModelChange)="patchMember(i, { birthYear: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">SS PIA ($/mo)</span>
-                  <input type="number" class="field-input" min="0" max="50000" step="50"
+                  <input appNumeric="currency" class="field-input" max="50000" step="50"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="member.ssPia ?? 0"
                     (ngModelChange)="patchMember(i, { ssPia: +$event || null })" />
+                  @if ((member.ssPia ?? 0) > 0) {
+                    <span class="field-echo" [class]="dyscalculia.numberSpacingClass()">
+                      = {{ fmtMonthly(member.ssPia ?? 0) }}/mo
+                    </span>
+                  }
                 </label>
                 <label class="field compact">
                   <span class="field-label">SS FRA</span>
-                  <input type="number" class="field-input" min="62" max="70"
+                  <input appNumeric="age" class="field-input" min="62" max="70"
                     [ngModel]="member.ssFra ?? 67"
                     (ngModelChange)="patchMember(i, { ssFra: +$event || null })" />
                 </label>
@@ -177,19 +183,19 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                 </label>
                 <label class="field compact">
                   <span class="field-label">Weight (lb)</span>
-                  <input type="number" class="field-input" min="1" max="2500"
+                  <input appNumeric="age" class="field-input" min="1" max="2500"
                     [ngModel]="pet.weight"
                     (ngModelChange)="patchPet(i, { weight: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Birth Year</span>
-                  <input type="number" class="field-input" min="2000" max="2030"
+                  <input appNumeric="year" class="field-input" min="2000" max="2030"
                     [ngModel]="pet.birthYear"
                     (ngModelChange)="patchPet(i, { birthYear: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Expected Lifespan</span>
-                  <input type="number" class="field-input" min="1" max="50"
+                  <input appNumeric="age" class="field-input" min="1" max="50"
                     [ngModel]="pet.expectedLifespan"
                     (ngModelChange)="patchPet(i, { expectedLifespan: +$event })" />
                 </label>
@@ -216,7 +222,8 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               <div class="hc-income-grid">
                 <label class="field compact">
                   <span class="field-label">Total Annual Need ($)</span>
-                  <input type="number" class="field-input" min="0" step="1000"
+                  <input appNumeric="currency" class="field-input" step="1000"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.totalAnnualNeed()"
                     (ngModelChange)="healthcare.totalAnnualNeed.set(+$event)" />
                 </label>
@@ -246,31 +253,36 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               <div class="hc-income-grid">
                 <label class="field compact">
                   <span class="field-label">Traditional 401k / IRA ($)</span>
-                  <input type="number" class="field-input" min="0" step="1000"
+                  <input appNumeric="currency" class="field-input" step="1000"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().traditionalAnnual"
                     (ngModelChange)="healthcare.patchIncome({ traditionalAnnual: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Roth 401k / IRA ($)</span>
-                  <input type="number" class="field-input" min="0" step="1000"
+                  <input appNumeric="currency" class="field-input" step="1000"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().rothAnnual"
                     (ngModelChange)="healthcare.patchIncome({ rothAnnual: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Taxable brokerage ($)</span>
-                  <input type="number" class="field-input" min="0" step="1000"
+                  <input appNumeric="currency" class="field-input" step="1000"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().taxableBrokerageAnnual"
                     (ngModelChange)="healthcare.patchIncome({ taxableBrokerageAnnual: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Social Security ($/yr)</span>
-                  <input type="number" class="field-input" min="0" step="500"
+                  <input appNumeric="currency" class="field-input" step="500"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().ssAnnual"
                     (ngModelChange)="healthcare.patchIncome({ ssAnnual: +$event })" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Pension / other taxable ($)</span>
-                  <input type="number" class="field-input" min="0" step="500"
+                  <input appNumeric="currency" class="field-input" step="500"
+                    [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().pensionAnnual"
                     (ngModelChange)="healthcare.patchIncome({ pensionAnnual: +$event })" />
                 </label>
@@ -358,7 +370,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
               </p>
               <label class="field compact">
                 <span class="field-label">Extra income in Year 1 ($)</span>
-                <input type="number" class="field-input" min="0" step="1000"
+                <input appNumeric="currency" class="field-input" step="1000"
                   [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="healthcare.transitionYearExtraIncome()"
                   (ngModelChange)="healthcare.transitionYearExtraIncome.set(+$event)" />
@@ -464,6 +476,10 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
     }
     .field-input:focus { border-color: var(--dark-amber); }
     .field-range { width: 100%; accent-color: var(--dark-amber); }
+    .field-echo {
+      font-size: 11px; color: var(--dark-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
 
     .editor-row {
       display: flex; gap: 10px; align-items: flex-start;

@@ -6,6 +6,7 @@ import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HealthcareService } from '@services/healthcare.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
   FinancialSettings, WithdrawalStrategy, LocationFull,
   HouseholdProfile, HouseholdMember,
@@ -81,7 +82,7 @@ const HIST_BINS = 40;
 @Component({
   selector: 'app-montecarlo-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective],
   template: `
     <div class="mc-screen">
       <div class="screen-header">
@@ -117,21 +118,21 @@ const HIST_BINS = 40;
 
             <label class="param">
               <span class="param-label">Portfolio ($)</span>
-              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+              <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="portfolio()" (ngModelChange)="portfolio.set($event)" />
               <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ fmt(portfolio()) }} · {{ dyscalculia.getAnchor(portfolio(), 'portfolio') }}</span>
             </label>
 
             <label class="param">
               <span class="param-label">Social Security ($/mo)</span>
-              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+              <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="ssMonthly()" (ngModelChange)="ssMonthly.set($event)" />
               <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Household PIA total · {{ fmt(ssMonthly() * 12, '/yr') }}</span>
             </label>
 
             <label class="param">
               <span class="param-label">Other Income ($/mo)</span>
-              <input type="number" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+              <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="monthlyIncome()" (ngModelChange)="monthlyIncome.set($event)" />
               <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Pension, part-time, annuity · {{ fmt(monthlyIncome() * 12, '/yr') }}</span>
             </label>
@@ -148,38 +149,38 @@ const HIST_BINS = 40;
 
             <label class="param">
               <span class="param-label">Years</span>
-              <input type="number" class="param-input" min="5" max="50"
+              <input appNumeric="age" class="param-input" min="5" max="50"
                 [ngModel]="years()" (ngModelChange)="years.set($event)" />
             </label>
 
             <label class="param">
               <span class="param-label">Mean Return (%)</span>
-              <input type="number" class="param-input" step="0.5"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="meanReturn()" (ngModelChange)="meanReturn.set($event)" />
             </label>
 
             <label class="param">
               <span class="param-label">Return Volatility (%)</span>
-              <input type="number" class="param-input" step="0.5"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="volatility()" (ngModelChange)="volatility.set($event)" />
             </label>
 
             <label class="param">
               <span class="param-label">Mean Inflation (%)</span>
-              <input type="number" class="param-input" step="0.5"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="meanInflation()" (ngModelChange)="meanInflation.set($event)" />
               <span class="param-hint">Weighted avg from location</span>
             </label>
 
             <label class="param">
               <span class="param-label">Inflation Vol (%)</span>
-              <input type="number" class="param-input" step="0.5"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="inflVol()" (ngModelChange)="inflVol.set($event)" />
             </label>
 
             <label class="param">
               <span class="param-label">Currency Vol (%)</span>
-              <input type="number" class="param-input" step="0.5"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="currVol()" (ngModelChange)="currVol.set($event)" />
               <span class="param-hint" [class.muted]="!isForeign()">
                 {{ isForeign() ? 'Applied to foreign costs' : 'USD location — no effect' }}
@@ -188,7 +189,7 @@ const HIST_BINS = 40;
 
             <label class="param">
               <span class="param-label">FX Drift (%/yr)</span>
-              <input type="number" class="param-input" step="0.25"
+              <input appNumeric="percent" class="param-input" step="0.25"
                 [ngModel]="fxDrift()" (ngModelChange)="fxDrift.set($event)" />
               <span class="param-hint" [class.muted]="!isForeign()">
                 {{ isForeign() ? 'Positive = USD weakens' : 'USD location — no effect' }}
@@ -197,7 +198,7 @@ const HIST_BINS = 40;
 
             <label class="param">
               <span class="param-label">Income Growth (%)</span>
-              <input type="number" class="param-input" step="0.5"
+              <input appNumeric="percent" class="param-input" step="0.5"
                 [ngModel]="incGrowth()" (ngModelChange)="incGrowth.set($event)" />
             </label>
 
@@ -272,17 +273,17 @@ const HIST_BINS = 40;
                 <h4 class="regime-title">🐂 Bull regime</h4>
                 <label class="param">
                   <span class="param-label">Mean Return (%)</span>
-                  <input type="number" class="param-input" step="0.5"
+                  <input appNumeric="percent" class="param-input" step="0.5"
                     [ngModel]="regimeBullMean()" (ngModelChange)="regimeBullMean.set(+$event)" />
                 </label>
                 <label class="param">
                   <span class="param-label">Volatility (%)</span>
-                  <input type="number" class="param-input" step="0.5"
+                  <input appNumeric="percent" class="param-input" step="0.5"
                     [ngModel]="regimeBullVol()" (ngModelChange)="regimeBullVol.set(+$event)" />
                 </label>
                 <label class="param">
                   <span class="param-label">Annual P(switch to bear) %</span>
-                  <input type="number" class="param-input" step="1" min="0" max="100"
+                  <input appNumeric="percent" class="param-input" step="1"
                     [ngModel]="regimeBullToBear()" (ngModelChange)="regimeBullToBear.set(+$event)" />
                 </label>
               </div>
@@ -290,17 +291,17 @@ const HIST_BINS = 40;
                 <h4 class="regime-title">🐻 Bear regime</h4>
                 <label class="param">
                   <span class="param-label">Mean Return (%)</span>
-                  <input type="number" class="param-input" step="0.5"
+                  <input appNumeric="percent" class="param-input" step="0.5"
                     [ngModel]="regimeBearMean()" (ngModelChange)="regimeBearMean.set(+$event)" />
                 </label>
                 <label class="param">
                   <span class="param-label">Volatility (%)</span>
-                  <input type="number" class="param-input" step="0.5"
+                  <input appNumeric="percent" class="param-input" step="0.5"
                     [ngModel]="regimeBearVol()" (ngModelChange)="regimeBearVol.set(+$event)" />
                 </label>
                 <label class="param">
                   <span class="param-label">Annual P(switch to bull) %</span>
-                  <input type="number" class="param-input" step="1" min="0" max="100"
+                  <input appNumeric="percent" class="param-input" step="1"
                     [ngModel]="regimeBearToBull()" (ngModelChange)="regimeBearToBull.set(+$event)" />
                 </label>
               </div>
@@ -334,7 +335,7 @@ const HIST_BINS = 40;
             <div class="timeline-row">
               <label class="tl-field">
                 <span class="tl-small-label">Year</span>
-                <input type="number" class="tl-input" min="1" [max]="years() - 1" step="1"
+                <input appNumeric="age" class="tl-input" min="1" [max]="years() - 1"
                   [ngModel]="move.fromYear"
                   (ngModelChange)="patchMove(i, { fromYear: +$event })" />
               </label>
@@ -360,7 +361,8 @@ const HIST_BINS = 40;
               </div>
               <label class="tl-field">
                 <span class="tl-small-label">Move cost ($)</span>
-                <input type="number" class="tl-input" min="0" step="500"
+                <input appNumeric="currency" class="tl-input" step="500"
+                  [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="move.moveCostUSD"
                   (ngModelChange)="patchMove(i, { moveCostUSD: +$event })" />
               </label>
@@ -427,7 +429,7 @@ const HIST_BINS = 40;
 
                 <label class="param">
                   <span class="param-label">Survivor Cost Ratio (%)</span>
-                  <input type="number" class="param-input" min="40" max="100" step="1"
+                  <input appNumeric="percent" class="param-input" min="40" max="100" step="1"
                     [ngModel]="survivorCostRatio()" (ngModelChange)="survivorCostRatio.set(+$event)" />
                   <span class="param-hint">
                     Typical 70–80%. Fixed costs (rent, utilities) don't halve; variable (food, healthcare) do.

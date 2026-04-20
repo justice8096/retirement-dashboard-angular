@@ -4,12 +4,13 @@ import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ApiService } from '@services/api.service';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { HouseholdProfile } from '@models/api.model';
 
 @Component({
   selector: 'app-taxes-screen',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, NumericInputDirective],
   template: `
     <div class="taxes-screen">
       <div class="screen-header">
@@ -24,7 +25,7 @@ import { HouseholdProfile } from '@models/api.model';
       <div class="income-bar">
         <label class="income-field">
           <span class="income-label">Annual Income (for tax calc)</span>
-          <input type="number" class="income-input" min="0" step="1000"
+          <input appNumeric="currency" class="income-input" step="1000"
             [class]="dyscalculia.numberSpacingClass()"
             [ngModel]="annualIncome()" (ngModelChange)="annualIncome.set(+$event)" />
           @if (dyscalculia.isEnabled()) {

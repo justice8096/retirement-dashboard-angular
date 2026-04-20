@@ -2,11 +2,12 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ConcreteTilesComponent } from '@components/concrete-tiles/concrete-tiles.component';
+import { NumericInputDirective } from '@directives/numeric-input.directive';
 
 @Component({
   selector: 'app-fire-calc-screen',
   standalone: true,
-  imports: [FormsModule, ConcreteTilesComponent],
+  imports: [FormsModule, ConcreteTilesComponent, NumericInputDirective],
   template: `
     <div class="calc-screen">
       <div class="screen-header">
@@ -23,27 +24,30 @@ import { ConcreteTilesComponent } from '@components/concrete-tiles/concrete-tile
         <div class="param-grid">
           <label class="param">
             <span class="param-label">Current Savings</span>
-            <input type="number" class="param-input"
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
               [ngModel]="currentSavings()" (ngModelChange)="currentSavings.set($event)" />
           </label>
           <label class="param">
             <span class="param-label">Annual Savings</span>
-            <input type="number" class="param-input"
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
               [ngModel]="annualSavings()" (ngModelChange)="annualSavings.set($event)" />
           </label>
           <label class="param">
             <span class="param-label">Annual Expenses</span>
-            <input type="number" class="param-input"
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
               [ngModel]="annualExpenses()" (ngModelChange)="annualExpenses.set($event)" />
           </label>
           <label class="param">
             <span class="param-label">Expected Return (%)</span>
-            <input type="number" class="param-input" step="0.1"
+            <input appNumeric="percent" class="param-input" step="0.1"
               [ngModel]="expectedReturn()" (ngModelChange)="expectedReturn.set($event)" />
           </label>
           <label class="param">
             <span class="param-label">Withdrawal Rate (%)</span>
-            <input type="number" class="param-input" step="0.1" min="1" max="20"
+            <input appNumeric="percent" class="param-input" step="0.1" min="1" max="20"
               [ngModel]="withdrawalRate()" (ngModelChange)="withdrawalRate.set($event)" />
             <!-- Inline definition (Dyscalculia F-010). -->
             <span class="param-hint">
@@ -52,7 +56,7 @@ import { ConcreteTilesComponent } from '@components/concrete-tiles/concrete-tile
           </label>
           <label class="param">
             <span class="param-label">Current Age</span>
-            <input type="number" class="param-input"
+            <input appNumeric="age" class="param-input"
               [ngModel]="currentAge()" (ngModelChange)="currentAge.set($event)" />
           </label>
         </div>
