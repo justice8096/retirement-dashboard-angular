@@ -43,12 +43,23 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
             <!-- Climate & Visa -->
             <div class="card">
               <h3 class="card-title">Practical Info</h3>
-              @if (sl.climate) {
+              @if (sl.climate; as cl) {
                 <div class="detail-row">
                   <span class="dl">🌡️ Climate</span>
-                  <span class="dv">{{ sl.climate.type }}
-                    @if (sl.climate.avgTemp) { · {{ sl.climate.avgTemp.low }}°–{{ sl.climate.avgTemp.high }}°F }
+                  <span class="dv">
+                    @if (cl.type) { {{ cl.type }} }
+                    @if (cl.winterLowF != null && cl.summerHighF != null) {
+                      · winter low {{ cl.winterLowF }}°F / summer high {{ cl.summerHighF }}°F
+                    } @else if (cl.avgTemp) {
+                      · {{ cl.avgTemp.low }}°–{{ cl.avgTemp.high }}°F
+                    }
+                    @if (cl.rainyDaysPerYear != null) { · {{ cl.rainyDaysPerYear }} rainy days/yr }
                   </span>
+                </div>
+              } @else {
+                <div class="detail-row muted">
+                  <span class="dl">🌡️ Climate</span>
+                  <span class="dv muted">No climate data yet for this location.</span>
                 </div>
               }
               @if (sl.visa) {
@@ -94,6 +105,12 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
             @if (supplement()) {
               <div class="card">
                 <h3 class="card-title">Resources & Links</h3>
+                @if (!supplement()!.webcams?.length &&
+                     !supplement()!.youtubeChannels?.length &&
+                     !supplement()!.bloggers?.length &&
+                     !supplement()!.officialSites?.length) {
+                  <p class="empty-hint">No resources or links added yet for this location.</p>
+                }
                 @if (supplement()!.webcams?.length) {
                   <div class="link-group">
                     <span class="link-label">📹 Webcams</span>
@@ -127,6 +144,11 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
                   </div>
                 }
               </div>
+            } @else {
+              <div class="card">
+                <h3 class="card-title">Resources & Links</h3>
+                <p class="empty-hint">No community resources contributed for this location yet.</p>
+              </div>
             }
           </div>
         } @else if (activeCity()) {
@@ -150,6 +172,8 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
     }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
     .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
+    .empty-hint { font-size: 12px; color: var(--dark-text-muted); font-style: italic; margin: 0; padding: 6px 0; }
+    .detail-row.muted .dv { color: var(--dark-text-muted); font-style: italic; }
     .link-btn {
       background: none; border: none; color: var(--dark-amber); cursor: pointer;
       font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
