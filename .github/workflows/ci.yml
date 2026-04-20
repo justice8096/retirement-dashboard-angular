@@ -36,6 +36,11 @@ jobs:
         # Warn-only for now; promote to --fail-on-exceed once baseline is clean.
         run: node scripts/check-readability.mjs
 
+      - name: Verify withdrawal apportionment math
+        # Regression-tests the apportion() logic in src/app/lib/apportion.ts
+        # against 14 canonical cases. Exits 1 on any divergence.
+        run: npm run verify:apportion
+
   sbom:
     runs-on: ubuntu-latest
     steps:
