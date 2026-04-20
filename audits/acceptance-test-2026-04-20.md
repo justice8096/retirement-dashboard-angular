@@ -177,6 +177,26 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
 - **Verify:** Search for `L.Icon.Default|markerIcon` in the map-component
   file to confirm the root cause.
 
+### FU-020 — Accessibility panel: font color unreadable on light background
+- **Screen:** Accessibility settings panel
+- **Symptom:** On a light-theme background the panel's text/labels stay a
+  light tone, yielding very low contrast against the light bg — barely
+  readable. When the global theme switches to light, the panel's typography
+  doesn't follow.
+- **Likely cause:** Hardcoded `color: var(--dark-text)` / light-on-dark
+  color tokens inside the panel's component styles rather than
+  theme-aware tokens (e.g. `--panel-text` that resolves per theme).
+- **Fix direction:** Audit `accessibility-panel` + `dyscalculia-settings`
+  + `dyslexia-settings` CSS for direct references to `--dark-text*`,
+  `--dark-bg*`, and hex-coded light colors; replace with semantic tokens
+  that flip with the theme, or gate the dark-theme values behind
+  `[data-theme="dark"]` selectors so light-theme falls back to dark
+  text. Verify all labels / section headings / hint text at AA contrast
+  (≥ 4.5:1 for body, ≥ 3:1 for large text) under both themes.
+- **Scope note:** If this pattern affects other panels/drawers, roll
+  into a broader "theme-aware token audit" — the fix there is structural
+  (token renaming), not file-by-file.
+
 ### FU-019 — Microphone / voice-entry affordance nowhere visible
 - **Scope:** Whole app (Accessibility feature F-008 — Dyscalculia)
 - **Symptom:** User cannot find the mic button anywhere.
