@@ -9,10 +9,12 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NeighborhoodsSupplement, Neighborhood, LocationFull } from '@models/api.model';
 import * as L from 'leaflet';
 
-/* Fix Leaflet default icon paths (webpack strips them) */
-const iconUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
-const shadowUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png';
-const iconRetinaUrl = 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png';
+/* Fix Leaflet default icon paths. Self-hosted in public/leaflet/ (copied from
+ * node_modules/leaflet/dist/images/) — the previous unpkg.com URLs were blocked
+ * by the dashboard's CSP img-src directive, rendering pins as broken images. */
+const iconUrl = 'leaflet/marker-icon.png';
+const shadowUrl = 'leaflet/marker-shadow.png';
+const iconRetinaUrl = 'leaflet/marker-icon-2x.png';
 L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, iconSize: [25, 41], iconAnchor: [12, 41] });
 
 /** Hardcoded geocode fallback for common cities */

@@ -203,7 +203,18 @@ const HIST_BINS = 40;
             </label>
 
           </div>
-          <button mat-flat-button class="run-btn" [disabled]="running()" (click)="runSimulation()">
+          @if (results() && simDirty() && !running()) {
+            <div class="stale-banner">
+              <span class="stale-icon">⟳</span>
+              <span class="stale-text">
+                Inputs changed — the results below are from the previous run.
+                Click <strong>Run Simulation</strong> to refresh.
+              </span>
+            </div>
+          }
+          <button mat-flat-button class="run-btn"
+            [class.stale]="results() && simDirty() && !running()"
+            [disabled]="running()" (click)="runSimulation()">
             {{ running() ? 'Running…' : 'Run Simulation' }}
           </button>
         </div>
@@ -719,6 +730,28 @@ const HIST_BINS = 40;
       --mat-button-filled-container-color: var(--dark-blue);
       --mat-button-filled-label-text-color: #fff;
     }
+    /* FU-012 — pulsing glow when results are stale so the user notices the
+       action they need to take after editing inputs. */
+    .run-btn.stale {
+      animation: run-btn-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes run-btn-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(92, 156, 230, 0.45); }
+      50% { box-shadow: 0 0 0 6px rgba(92, 156, 230, 0); }
+    }
+    .stale-banner {
+      display: flex; align-items: center; gap: 10px;
+      margin-top: 14px; padding: 10px 12px; border-radius: 8px;
+      background: rgba(232, 184, 109, 0.12);
+      border: 1px solid var(--dark-amber);
+      color: var(--dark-text);
+      font-size: 12px;
+    }
+    .stale-icon {
+      font-size: 16px; color: var(--dark-amber); font-weight: 700;
+      line-height: 1;
+    }
+    .stale-text { flex: 1; line-height: 1.5; }
 
     .hist-card { display: flex; flex-direction: column; gap: 14px; }
     .hist-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
@@ -973,6 +1006,11 @@ export class MontecarloScreenComponent implements OnInit {
   readonly saveMsg = signal<string | null>(null);
   readonly saveErr = signal(false);
 
+  /** True when a sim input changed since the last completed run. Surfaces a
+   *  stale-results banner + button glow (FU-012) so users know they need to
+   *  rerun to refresh the chart / percentiles. Cleared on successful run. */
+  readonly simDirty = signal(false);
+
   /* ─── Chart dimensions ─────────────────────────────────────────── */
   readonly pathW = PATH_CHART_W;
   readonly pathH = PATH_CHART_H;
@@ -1143,6 +1181,31 @@ export class MontecarloScreenComponent implements OnInit {
   });
 
   /* ─── Lifecycle ────────────────────────────────────────────────── */
+
+  constructor() {
+    // FU-012 — mark results stale as soon as any sim input signal changes,
+    // so the template can surface a "Rerun simulation" banner. Cleared at
+    // the end of a successful run in runSimulation().
+    effect(() => {
+      // Dependency-read each input. Order doesn't matter; Angular tracks
+      // any signal read inside this effect body.
+      this.portfolio(); this.ssMonthly(); this.monthlyIncome();
+      this.runs(); this.years();
+      this.meanReturn(); this.volatility();
+      this.meanInflation(); this.inflVol(); this.currVol(); this.fxDrift();
+      this.incGrowth();
+      this.returnMode(); this.selectedLocationId(); this.historicalStartYear();
+      this.regimeBullMean(); this.regimeBullVol();
+      this.regimeBearMean(); this.regimeBearVol();
+      this.regimeBullToBear(); this.regimeBearToBull();
+      this.moves(); this.movesEnabled();
+      this.spouseDeathEnabled(); this.spouseDeathYear();
+      this.survivorCostRatio(); this.deceasedMemberIndex();
+      // Only mark stale when there's actually a prior result to be stale.
+      // This keeps the banner dormant on the initial page load.
+      if (this.results()) this.simDirty.set(true);
+    });
+  }
 
   ngOnInit(): void {
     this.loading.set(true);
@@ -1460,6 +1523,7 @@ export class MontecarloScreenComponent implements OnInit {
           },
         });
         this.results.set(result);
+        this.simDirty.set(false);
         // Calm mode (Dashboard Dyscalculia F-006): reset reveal to the first
         // card so the user steps through the results one at a time.
         this.calmStep.set(1);

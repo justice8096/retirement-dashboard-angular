@@ -42,6 +42,20 @@ import { debounceTime, Subject } from 'rxjs';
             @if (selectedCityName()) {
               <div class="city-tag">Based on: {{ selectedCityName() }}</div>
             }
+            @if (selectedCurrencies().length > 1 ||
+                 (selectedCurrencies().length === 1 && selectedCurrencies()[0]?.code !== localCurrency())) {
+              <div class="currencies-row">
+                <span class="currencies-label">Other currencies in your selected locations:</span>
+                @for (c of selectedCurrencies(); track c.code) {
+                  @if (c.code !== localCurrency()) {
+                    <span class="currency-chip">
+                      {{ c.code }}
+                      <span class="chip-rate">1 USD ≈ {{ c.rate.toFixed(4) }}</span>
+                    </span>
+                  }
+                }
+              </div>
+            }
           </div>
           <div class="field-row">
             <label class="field">
@@ -238,6 +252,20 @@ import { debounceTime, Subject } from 'rxjs';
     .rate-label { font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; }
     .rate-value { font-size: 14px; font-weight: 600; color: var(--dark-text); }
     .city-tag { font-size: 10px; color: var(--dark-blue); padding: 3px 8px; background: rgba(92, 156, 230, 0.1); border-radius: 4px; margin-left: auto; }
+    .currencies-row {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      width: 100%; padding-top: 10px; border-top: 1px solid var(--dark-border);
+      margin-top: 10px;
+    }
+    .currencies-label { font-size: 11px; color: var(--dark-text-muted); margin-right: 4px; }
+    .currency-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: var(--dark-text);
+      padding: 3px 10px; border-radius: 12px;
+      background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
+      font-variant-numeric: tabular-nums;
+    }
+    .chip-rate { font-size: 10px; color: var(--dark-text-muted); font-weight: 400; }
     .field-row { display: flex; gap: 14px; flex-wrap: wrap; }
     .field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 160px; }
     .field-label { font-size: 11px; color: var(--dark-text-muted); }
@@ -290,6 +318,23 @@ import { debounceTime, Subject } from 'rxjs';
     if (f?.manualExchangeRate) return f.manualExchangeRate;
     const loc = this.locService.selectedLocation();
     return loc?.exchangeRate ?? 1;
+  });
+
+  /** Every distinct non-USD currency across the user's selected locations.
+   *  Drives the "Other currencies you'd cross into" chips so a user with
+   *  Portugal + Mexico selected sees both EUR and MXN, not just the
+   *  primary-location currency. Sorted alphabetically for stable output. */
+  readonly selectedCurrencies = computed(() => {
+    const rows = new Map<string, number>();
+    for (const loc of this.locService.selectedFullLocations()) {
+      const code = loc.currency ?? 'USD';
+      if (code === 'USD') continue;
+      const rate = loc.exchangeRate ?? 1;
+      if (!rows.has(code)) rows.set(code, rate);
+    }
+    return [...rows.entries()]
+      .map(([code, rate]) => ({ code, rate }))
+      .sort((a, b) => a.code.localeCompare(b.code));
   });
 
   readonly manualExchangeRate = computed(() => this.fees()?.manualExchangeRate ?? null);

@@ -177,6 +177,27 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
 - **Verify:** Search for `L.Icon.Default|markerIcon` in the map-component
   file to confirm the root cause.
 
+### FU-021 — Assumptions Save: "feedingMode is only supported for dogs and cats"
+- **Screen:** Assumptions → Pets → Save
+- **Symptom:** API rejects the payload when any non-dog / non-cat pet
+  (bird, rabbit, fish, horse, reptile) carries a `feedingMode` value.
+  The validator's intent is correct — feedingMode's commercial/raw/home
+  categories only meaningfully apply to dogs and cats — but the
+  dashboard round-trips the field regardless of type.
+- **Affected pet types:** bird, rabbit, fish, horse, reptile (anything
+  other than dog / cat)
+- **Fix direction:** In the Assumptions save payload, strip or null
+  `feedingMode` unless `pet.type` is `'dog'` or `'cat'`. Matches the
+  API contract without needing a backend change.
+  - Location: [assumptions-screen.component.ts:694](src/app/components/screens/assumptions-screen/assumptions-screen.component.ts:694)
+    in the `save()` payload construction — pets.map should set
+    `feedingMode: (p.type === 'dog' || p.type === 'cat') ? p.feedingMode : null`.
+- **Consider also:** hiding the Feeding Mode input row in the UI unless
+  the current pet's type is dog or cat, so users don't set a value that
+  will be silently stripped.
+- **Related:** FU-002 / FU-019 cluster (same screen), but this is a
+  validation mismatch, not a dyscalculia issue — independent fix.
+
 ### FU-020 — Accessibility panel: font color unreadable on light background
 - **Screen:** Accessibility settings panel
 - **Symptom:** On a light-theme background the panel's text/labels stay a

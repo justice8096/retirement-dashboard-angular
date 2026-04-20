@@ -30,16 +30,16 @@ import { FinancialSettings } from '@models/api.model';
           </div>
           <div class="sum-card">
             <div class="sum-label">Expected Return</div>
-            <div class="sum-value">{{ fin()!.expectedReturn }}%</div>
+            <div class="sum-value">{{ fmtPct(fin()!.expectedReturn) }}%</div>
           </div>
           <div class="sum-card">
             <div class="sum-label">Expected Inflation</div>
-            <div class="sum-value">{{ fin()!.expectedInflation }}%</div>
+            <div class="sum-value">{{ fmtPct(fin()!.expectedInflation) }}%</div>
           </div>
           <div class="sum-card">
             <div class="sum-label">Allocation</div>
             <div class="sum-value alloc">
-              {{ fin()!.equityPct }}% Equity · {{ fin()!.bondPct }}% Bond · {{ fin()!.cashPct }}% Cash
+              {{ fmtPct(fin()!.equityPct) }}% Equity · {{ fmtPct(fin()!.bondPct) }}% Bond · {{ fmtPct(fin()!.cashPct) }}% Cash
             </div>
           </div>
         </div>
@@ -154,5 +154,16 @@ export class ProjectionsScreenComponent implements OnInit {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
       : '$' + amount.toLocaleString();
+  }
+
+  /** Rounds to 2 dp, trimming trailing zeros — so "60" stays "60" and
+   *  "60.256" renders as "60.26". Keeps the allocation / return /
+   *  inflation summary clean (FU-009). Shared with settings-screen's
+   *  fmtPct helper; factor out if a third caller appears. */
+  fmtPct(value: number | null | undefined): string {
+    const n = Number(value ?? 0);
+    if (!Number.isFinite(n)) return '0';
+    const rounded = Math.round(n * 100) / 100;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
   }
 }
