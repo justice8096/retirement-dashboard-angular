@@ -199,6 +199,22 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
   validation mismatch, not a dyscalculia issue — independent fix.
 
 ### FU-020 — Accessibility panel: font color unreadable on light background
+**Status update (2026-04-20):** Two root causes fixed —
+1. `styles.scss` light/cream theme blocks only overrode 8 of the 12
+   color tokens. `--dark-amber-light`, `--dark-purple`, `--dark-teal`,
+   `--dark-neutral` kept their dark-mode luminosity, so any text /
+   accent using those read as light-on-light in cream/light themes.
+   Added explicit dark-equivalents for all four to both theme blocks.
+2. The "enabled" master-toggle card in both `dyscalculia-settings`
+   and `dyslexia-settings` used a hardcoded `background: #1a2a1a`
+   (near-black green). On a light page this rendered a dark rectangle
+   behind text that flipped to `var(--dark-text)` = `#1F2430` — dark
+   text on dark bg, unreadable. Replaced with
+   `color-mix(in srgb, var(--dark-green) 14%, transparent)` which
+   flips cleanly across every theme.
+
+Swept the whole app for other unflipped tokens; these four + the one
+hardcoded hex were the only instances.
 - **Screen:** Accessibility settings panel
 - **Symptom:** On a light-theme background the panel's text/labels stay a
   light tone, yielding very low contrast against the light bg — barely
