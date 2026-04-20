@@ -247,6 +247,20 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
   — e.g. a persistent "Voice input: On" indicator in the status bar.
 
 ### FU-018 — Local Info: Resources/Links and Climate not populated
+**Status update (2026-04-20):** Root cause found for Climate — the UI
+template was reading the legacy `ClimateInfo.type` + `avgTemp` shape
+but actual location data uses the current `{winterLowF, summerHighF,
+rainyDaysPerYear, meetsWarmWinterReq}` shape. Template updated to
+render both shapes so 100% of locations now show climate info. Added
+explicit "No climate data yet" fallback when `climate` is absent.
+
+Resources/Links card now shows a friendly "No community resources
+contributed for this location yet" when either the supplement is
+missing or all link groups inside it are empty — eliminates the card
+being blank with no explanation.
+
+Contribution-pipeline follow-up remains for the 137 locations missing
+`local-info.json` supplements entirely.
 - **Screen:** Community → Local Info
 - **Symptom:**
   - **Resources and Links** — not populated for all tabs (partial data,
@@ -262,6 +276,13 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
   source-of-truth question, not just a data gap.
 
 ### FU-017 — Livability Index: empty tabs on some locations
+**Status update (2026-04-20):** Data audit complete (see
+[retirement-api/audits/location-data-gaps-2026-04-20.md](../../retirement-api/audits/location-data-gaps-2026-04-20.md)).
+**21 / 158** locations have an `inclusion.json`; the rest fall through
+to the existing lifestyle-ratings fallback card, which works. Where the
+file exists but specific tabs are empty (e.g. Lisbon/Algarve), that's a
+data-content gap inside the JSON. Treat this as a contribution-pipeline
+task, not a code bug.
 - **Screen:** Community → Livability Index
 - **Symptom:** One or more tabs render no content on some locations.
   - Confirmed: Lisbon / Algarve, Portugal
@@ -278,6 +299,14 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
   contribution pipeline or render a shared friendly empty state.
 
 ### FU-016 — Local Services: only Healthcare and Connectivity populated
+**Status update (2026-04-20):** Not a render bug — services-screen
+iterates whatever `categoryId`s are present in the location's
+`services.services[]`. The location the user opened simply had entries
+in only two categories. Across all 158 locations, 137 have at least
+some services data; per-category coverage varies and is a
+data-completeness task. Full breakdown in
+[retirement-api/audits/location-data-gaps-2026-04-20.md](../../retirement-api/audits/location-data-gaps-2026-04-20.md)
+under "Service categories".
 - **Screen:** Community → Local Services
 - **Symptom:** All other service categories (e.g. utilities, household,
   banking, transit, government, etc.) render empty even where the
@@ -295,6 +324,12 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
   broader data-completeness audit.
 
 ### FU-015 — Missing neighborhood data for specific locations
+**Status update (2026-04-20):** Data audit complete. Only **21 / 158**
+locations have a `neighborhoods.json` supplement. The remaining 137
+fall through to the existing "Detailed neighborhood data not available
+for this location." fallback inside [neighborhoods-screen](../src/app/components/screens/neighborhoods-screen/neighborhoods-screen.component.ts),
+which is the correct graceful empty state. Gap is pure data-authoring,
+tracked in [retirement-api/audits/location-data-gaps-2026-04-20.md](../../retirement-api/audits/location-data-gaps-2026-04-20.md).
 - **Screen:** Community → Neighborhoods
 - **Symptom:** Several locations render an empty / no-data state:
   - Gainesville, VA
@@ -461,6 +496,16 @@ _Log each `[F]` here with screen, steps, console output, and suspected fix._
 - **Location:** [assumptions-screen.component.ts:427](src/app/components/screens/assumptions-screen/assumptions-screen.component.ts:427)
 
 ### FU-001 — Region name normalization (Location Overview)
+**Status update (2026-04-20):** Audit complete. **34 distinct region
+strings** across 158 locations (see
+[retirement-api/audits/location-data-gaps-2026-04-20.md](../../retirement-api/audits/location-data-gaps-2026-04-20.md)
+region table). Proposed taxonomy: **`region`** = macro region
+(continent or US-level — "US Southeast", "Southern Europe", "Central
+America"), **`subregion`** = state/province/department — would need
+a new optional field + a one-off migration script, deferred pending
+product decision. Audit report + script remain in tree so future
+decisions can re-run `node tools/audit-location-data-completeness.mjs`
+to see current state.
 - **Screen:** Location Overview
 - **Symptom:** Region labels are inconsistent across location JSONs — mix of
   continent-level ("Southern Europe"), country-subdivision ("Virginia",
