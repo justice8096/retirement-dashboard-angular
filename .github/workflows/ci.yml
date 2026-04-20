@@ -55,6 +55,33 @@ jobs:
           path: sbom.json
           retention-days: 90
 
+  # SLSA L2 — build provenance attestation signed with Sigstore + OIDC.
+  # Runs only on main-branch pushes (not PRs) because attestations need
+  # id-token:write which is not granted to fork PRs. Produces a verifiable
+  # claim linking the dashboard's built bundle to this exact source +
+  # workflow run, queryable via `gh attestation verify dist/...`.
+  provenance:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write        # Sigstore OIDC signing
+      attestations: write    # GitHub attestation store
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build (production)
+        run: npx ng build --configuration production
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: dist/retirement-dashboard/**/*.{js,css,html,map}
+
   security-audit:
     runs-on: ubuntu-latest
     steps:
