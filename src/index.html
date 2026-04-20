@@ -5,7 +5,10 @@
   <title>Retirement Planning Dashboard</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.openstreetmap.org https://*.basemaps.cartocdn.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'">
+  <!-- connect-src must include the split-origin API (localhost:3000 in dev, your
+       deployed API host in prod). frame-ancestors is ignored when delivered via
+       <meta> — enforce it as an HTTP header on the hosting platform (Vercel/Nginx). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.openstreetmap.org https://*.basemaps.cartocdn.com; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000; base-uri 'self'; form-action 'self'; object-src 'none'">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
