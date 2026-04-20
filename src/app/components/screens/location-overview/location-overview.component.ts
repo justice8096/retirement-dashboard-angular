@@ -380,12 +380,18 @@ export class LocationOverviewComponent implements OnInit {
   readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
 
-  /** Regions filtered by selected country */
+  /** Region-filter options. Breaks US macros (US Southeast, US Midwest,
+   *  etc.) into their states via the locationService.displayRegion helper
+   *  so the dropdown is browseable at state granularity for US users while
+   *  non-US locations stay on their macro region. Applied after the
+   *  country filter so picking country=United States gives a state list,
+   *  country=Italy gives just "Southern Europe". */
   readonly filteredRegions = computed(() => {
     const country = this.loc.countryFilter();
-    if (!country) return this.loc.regions();
-    const locs = this.loc.locations().filter(l => l.country === country);
-    return [...new Set(locs.map(l => l.region))].sort();
+    const locs = country
+      ? this.loc.locations().filter(l => l.country === country)
+      : this.loc.locations();
+    return [...new Set(locs.map(l => this.loc.displayRegion(l)))].sort();
   });
 
   readonly allVisibleSelected = computed(() => {
