@@ -697,14 +697,29 @@ export class AssumptionsScreenComponent implements OnInit {
     this.saving.set(true);
     this.saveMsg.set(null);
     this.saveErr.set(false);
+    // API-side Zod expects numbers on all numeric fields, but Prisma Decimal
+    // columns round-trip as strings over JSON. Coerce every numeric field
+    // before PUT or the server rejects with "expects number, sent string".
+    const num = (v: unknown): number => Number(v) || 0;
     const payload: Partial<HouseholdProfile> = {
-      adultsCount: d.adultsCount,
-      targetAnnualIncome: d.targetAnnualIncome,
-      planningStartYear: d.planningStartYear,
-      planningYears: d.planningYears,
+      adultsCount: num(d.adultsCount),
+      targetAnnualIncome: num(d.targetAnnualIncome),
+      planningStartYear: num(d.planningStartYear),
+      planningYears: num(d.planningYears),
       requirements: d.requirements,
-      members: d.members,
-      pets: d.pets,
+      members: d.members.map(m => ({
+        ...m,
+        birthYear: num(m.birthYear),
+        ssPia: m.ssPia == null ? null : num(m.ssPia),
+        ssFra: m.ssFra == null ? null : num(m.ssFra),
+        ssClaimAge: m.ssClaimAge == null ? null : num(m.ssClaimAge),
+      })),
+      pets: d.pets.map(p => ({
+        ...p,
+        weight: num(p.weight),
+        birthYear: num(p.birthYear),
+        expectedLifespan: num(p.expectedLifespan),
+      })),
     };
     this.api.updateHousehold(payload).subscribe({
       next: (h) => {
