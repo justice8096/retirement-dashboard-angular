@@ -9,6 +9,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "check:readability": "node scripts/check-readability.mjs",
+    "check:numeric-inputs": "node scripts/check-raw-numeric-inputs.mjs",
     "verify:apportion": "node scripts/verify-apportionment.mjs"
   },
   "dependencies": {

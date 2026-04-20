@@ -1,7 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { coerceHousehold, coerceFinancial } from '@app/lib/coerce-encrypted-numerics';
 import {
   PaginatedResponse,
   LocationSummary,
@@ -72,21 +74,25 @@ export class ApiService {
   /* ─── Household ─────────────────────────────────────────────────── */
 
   getHousehold(): Observable<HouseholdProfile> {
-    return this.http.get<HouseholdProfile>(`${this.base}/me/household`);
+    return this.http.get<HouseholdProfile>(`${this.base}/me/household`)
+      .pipe(map(coerceHousehold));
   }
 
   updateHousehold(data: Partial<HouseholdProfile>): Observable<HouseholdProfile> {
-    return this.http.put<HouseholdProfile>(`${this.base}/me/household`, data);
+    return this.http.put<HouseholdProfile>(`${this.base}/me/household`, data)
+      .pipe(map(coerceHousehold));
   }
 
   /* ─── Financial ─────────────────────────────────────────────────── */
 
   getFinancial(): Observable<FinancialSettings> {
-    return this.http.get<FinancialSettings>(`${this.base}/me/financial`);
+    return this.http.get<FinancialSettings>(`${this.base}/me/financial`)
+      .pipe(map(coerceFinancial));
   }
 
   updateFinancial(data: Partial<FinancialSettings>): Observable<FinancialSettings> {
-    return this.http.put<FinancialSettings>(`${this.base}/me/financial`, data);
+    return this.http.put<FinancialSettings>(`${this.base}/me/financial`, data)
+      .pipe(map(coerceFinancial));
   }
 
   /* ─── Withdrawal ────────────────────────────────────────────────── */
