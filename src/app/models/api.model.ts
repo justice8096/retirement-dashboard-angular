@@ -317,7 +317,7 @@ export interface HouseholdPet {
   size: string | null;
   weight: number;
   weightTier: string;
-  feedingMode: FeedingMode;
+  feedingMode: FeedingMode | null;
   birthYear: number;
   expectedLifespan: number;
   sortOrder: number;

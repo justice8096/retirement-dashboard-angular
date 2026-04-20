@@ -435,8 +435,8 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                   <span class="hc-badge-level">{{ hc.decision.acaEstimate?.level ?? '—' }}-level</span>
                   Estimate for <strong>{{ hc.decision.acaEstimate?.rateArea ?? 'this location' }}</strong>.
                   {{ hc.decision.acaEstimate?.disclaimer }}
-                  <a href="https://www.healthcare.gov/see-plans/" target="_blank" rel="noopener noreferrer">
-                    Get a real quote →
+                  <a href="https://www.healthcare.gov/" target="_blank" rel="noopener noreferrer">
+                    Compare plans on healthcare.gov →
                   </a>
                 </div>
               }
@@ -719,6 +719,11 @@ export class AssumptionsScreenComponent implements OnInit {
         weight: num(p.weight),
         birthYear: num(p.birthYear),
         expectedLifespan: num(p.expectedLifespan),
+        // FU-021 — API rejects `feedingMode` on any non-dog/non-cat pet
+        // ("feedingMode is only supported for dogs and cats"). Strip it
+        // on the way out rather than letting the UI leak a stale value
+        // into the save payload.
+        feedingMode: (p.type === 'dog' || p.type === 'cat') ? p.feedingMode : null,
       })),
     };
     this.api.updateHousehold(payload).subscribe({
