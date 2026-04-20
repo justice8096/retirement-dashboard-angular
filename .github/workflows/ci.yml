@@ -36,6 +36,11 @@ jobs:
         # Warn-only for now; promote to --fail-on-exceed once baseline is clean.
         run: node scripts/check-readability.mjs
 
+      - name: Numeric-input coverage
+        # Fails if any <input type="number"> lacks the appNumeric directive —
+        # guardrail after the 2026-04-20 dyscalculia sweep (FU-002/004/007/011/013/019).
+        run: npm run check:numeric-inputs
+
       - name: Verify withdrawal apportionment math
         # Regression-tests the apportion() logic in src/app/lib/apportion.ts
         # against 14 canonical cases. Exits 1 on any divergence.

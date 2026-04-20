@@ -152,6 +152,15 @@ export class HealthcareService {
     return fplForHousehold(householdSize);
   }
 
+  /** 400% FPL — the ACA cliff ceiling under the 2026 cliff regime. The
+   *  magi-targeted apportion strategy keeps the trad+taxable draw below
+   *  this line so the household doesn't trip from partial subsidy to $0. */
+  magiCliffCeiling(): number {
+    const adults = (this.household()?.members ?? [])
+      .filter(m => m.role !== 'dependent').length;
+    return fplForHousehold(Math.max(1, adults)) * 4;
+  }
+
   /**
    * Income composition — editable on the Assumptions screen. On first load the
    * composition is seeded from FinancialSettings + household (SS), with
@@ -230,8 +239,13 @@ export class HealthcareService {
    * this service don't need to import the module directly. The math + test
    * coverage live in `src/app/lib/apportion.ts`.
    */
-  private apportion(residual: number, strategy: ApportionStrategy, balances: { traditional: number; roth: number; taxable: number }): { trad: number; roth: number; tax: number } {
-    return apportionPure(residual, strategy, balances);
+  private apportion(
+    residual: number,
+    strategy: ApportionStrategy,
+    balances: { traditional: number; roth: number; taxable: number },
+    opts?: { magiCeiling?: number; magiBuffer?: number; magiBaseline?: number },
+  ): { trad: number; roth: number; tax: number } {
+    return apportionPure(residual, strategy, balances, opts);
   }
 
   applyApportionment(): void {
@@ -244,7 +258,14 @@ export class HealthcareService {
       roth: Number(f?.rothBalance) || 0,
       taxable: Number(f?.taxableBalance) || 0,
     };
-    const { trad, roth, tax } = this.apportion(residual, this.apportionStrategy(), balances);
+    // For magi-targeted draws, feed the ACA cliff ceiling + current
+    // non-drawable baseline (SS + pension). The apportion lib keeps the
+    // trad+taxable draw under `ceiling - buffer - baseline` and pushes
+    // everything else to Roth.
+    const magiOpts = this.apportionStrategy() === 'magi-targeted'
+      ? { magiCeiling: this.magiCliffCeiling(), magiBaseline: cur.ssAnnual + cur.pensionAnnual }
+      : undefined;
+    const { trad, roth, tax } = this.apportion(residual, this.apportionStrategy(), balances, magiOpts);
 
     this.income.update(prev => ({
       ...prev,

@@ -235,6 +235,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
                     <option value="manual">Manual — I'll enter buckets below</option>
                     <option value="proportional">Proportional to balances</option>
                     <option value="tax-efficient">Tax-efficient (taxable → trad → Roth)</option>
+                    <option value="magi-targeted">MAGI-targeted (stay under ACA cliff)</option>
                   </select>
                 </label>
                 <div class="field compact hc-apply-wrap">

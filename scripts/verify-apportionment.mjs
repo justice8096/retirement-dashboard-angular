@@ -12,17 +12,35 @@
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-/** @param {number} residual @param {string} strategy @param {{traditional:number, roth:number, taxable:number}} balances */
-function apportion(residual, strategy, balances) {
+/** @param {number} residual @param {string} strategy @param {{traditional:number, roth:number, taxable:number}} balances @param {{magiCeiling?:number, magiBuffer?:number, magiBaseline?:number}=} opts */
+function apportion(residual, strategy, balances, opts = {}) {
   if (residual <= 0) return { trad: 0, roth: 0, tax: 0 };
   const { traditional, roth: rothBal, taxable } = balances;
   const total = traditional + rothBal + taxable;
-  if (strategy === 'tax-efficient') {
+  if (strategy === 'tax-efficient' || strategy === 'magi-targeted') {
     let left = residual;
-    const tax = Math.min(left, Math.max(0, taxable));
+    let tax = Math.min(left, Math.max(0, taxable));
     left -= tax;
-    const trad = Math.min(left, Math.max(0, traditional));
+    let trad = Math.min(left, Math.max(0, traditional));
     left -= trad;
+    if (strategy === 'magi-targeted' && opts.magiCeiling != null) {
+      const buffer = opts.magiBuffer ?? 5000;
+      const baseline = opts.magiBaseline ?? 0;
+      const magiBudget = Math.max(0, opts.magiCeiling - buffer - baseline);
+      const magiDraw = tax + trad;
+      if (magiDraw > magiBudget) {
+        const overshoot = magiDraw - magiBudget;
+        const tradPullback = Math.min(overshoot, trad);
+        trad -= tradPullback;
+        left += tradPullback;
+        const stillOver = overshoot - tradPullback;
+        if (stillOver > 0) {
+          const taxPullback = Math.min(stillOver, tax);
+          tax -= taxPullback;
+          left += taxPullback;
+        }
+      }
+    }
     const rothDraw = Math.min(left, Math.max(0, rothBal));
     left -= rothDraw;
     return { trad: trad + left, roth: rothDraw, tax };
@@ -111,6 +129,45 @@ const CASES = [
   },
 ];
 
+// MAGI-targeted cases are checked separately because they require opts.
+// Shape: { name, residual, balances, opts, expect }
+const MAGI_CASES = [
+  {
+    name: 'MAGI budget covers entire residual — draws same as tax-efficient',
+    residual: 40_000,
+    balances: { taxable: 500_000, traditional: 800_000, roth: 300_000 },
+    opts: { magiCeiling: 86_240, magiBuffer: 5000, magiBaseline: 0 }, // budget 81,240
+    expect: { tax: 40_000, trad: 0, roth: 0 },
+  },
+  {
+    name: 'Residual overshoots MAGI budget — excess flows to Roth via trad pullback',
+    residual: 100_000,
+    balances: { taxable: 500_000, traditional: 800_000, roth: 300_000 },
+    opts: { magiCeiling: 86_240, magiBuffer: 5000, magiBaseline: 0 }, // budget 81,240
+    // tax=100k, trad=0 (nothing to pull from yet — taxable filled first)
+    // Wait: tax-efficient fills tax first (100k from tax). That's already over
+    // the 81,240 MAGI budget. overshoot = 18,760. tradPullback = 0 (trad is 0).
+    // taxPullback = 18,760. Final: tax = 81,240, trad = 0, roth = 18,760.
+    expect: { tax: 81_240, trad: 0, roth: 18_760 },
+  },
+  {
+    name: 'Traditional pullback absorbs overshoot before touching taxable',
+    residual: 100_000,
+    balances: { taxable: 50_000, traditional: 800_000, roth: 300_000 },
+    opts: { magiCeiling: 86_240, magiBuffer: 5000, magiBaseline: 0 }, // budget 81,240
+    // tax=50k (exhausted), trad=50k, magi=100k, overshoot=18,760. trad pullback 18,760 → trad=31,240.
+    // left=18,760 → roth=18,760.
+    expect: { tax: 50_000, trad: 31_240, roth: 18_760 },
+  },
+  {
+    name: 'Baseline eats entire budget — everything drawable goes to Roth',
+    residual: 30_000,
+    balances: { taxable: 500_000, traditional: 800_000, roth: 300_000 },
+    opts: { magiCeiling: 86_240, magiBuffer: 5000, magiBaseline: 86_240 }, // budget 0
+    expect: { tax: 0, trad: 0, roth: 30_000 },
+  },
+];
+
 let failed = 0;
 const rows = [];
 
@@ -132,6 +189,23 @@ for (const c of CASES) {
       ok,
     });
   }
+}
+
+for (const c of MAGI_CASES) {
+  const actual = apportion(c.residual, 'magi-targeted', c.balances, c.opts);
+  const ok = near(actual.tax, c.expect.tax)
+    && near(actual.trad, c.expect.trad)
+    && near(actual.roth, c.expect.roth);
+  if (!ok) failed++;
+  rows.push({
+    name: c.name,
+    strategy: 'magi-targeted',
+    residual: c.residual,
+    balances: c.balances,
+    expected: c.expect,
+    actual,
+    ok,
+  });
 }
 
 // Console summary
