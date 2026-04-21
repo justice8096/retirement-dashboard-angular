@@ -275,12 +275,25 @@ export class DyscalculiaService {
 
   // ─── Persistence ────────────────────────────────────────────────────
 
+  /** Coalesce back-to-back update() calls into a single localStorage write.
+   *  Dyscalculia F-011 mirror of the dyslexia fix — see the block comment
+   *  there for rationale. */
+  private persistHandle: number | null = null;
+
   private persist(): void {
-    try {
-      localStorage.setItem('dyscalculia-settings', JSON.stringify(this.settings()));
-    } catch {
-      // localStorage unavailable — settings remain in memory
-    }
+    if (this.persistHandle !== null) return;
+    const write = () => {
+      this.persistHandle = null;
+      try {
+        localStorage.setItem('dyscalculia-settings', JSON.stringify(this.settings()));
+      } catch {
+        // localStorage unavailable — settings remain in memory
+      }
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    this.persistHandle = ric
+      ? ric(write, { timeout: 500 }) as unknown as number
+      : window.setTimeout(write, 200);
   }
 
   loadSaved(): void {

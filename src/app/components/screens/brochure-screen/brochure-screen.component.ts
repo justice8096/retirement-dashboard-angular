@@ -156,7 +156,7 @@ export class BrochureScreenComponent implements OnInit {
   .con { color: #a33; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   footer { margin-top: 24px; font-size: 10px; color: #999; text-align: center; }
-</style></head><body>
+</style></head><body onload="setTimeout(function(){window.print()},250)">
   <h1>${esc(loc.name)}</h1>
   <div class="sub">${esc(loc.country)} · ${esc(loc.region)}${loc.subregion ? ' · ' + esc(loc.subregion) : ''} · ${esc(loc.currency)}</div>
   <div class="cost-hero">
@@ -177,13 +177,13 @@ export class BrochureScreenComponent implements OnInit {
 </body></html>`;
 
     const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
-    const win = window.open(url, '_blank', 'width=800,height=1000');
+    // `noopener` severs window.opener in the new tab, blocking tab-nabbing.
+    // Under noopener we can't listen for the child's `load` event or call
+    // win.print() from the parent — the child's <body onload="window.print()">
+    // triggers the dialog, and we free the Blob URL on a long fallback timeout.
+    const win = window.open(url, '_blank', 'width=800,height=1000,noopener,noreferrer');
     if (!win) { URL.revokeObjectURL(url); return; }
-    win.addEventListener('load', () => {
-      win.focus();
-      win.print();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   fmt(amount: number): string {

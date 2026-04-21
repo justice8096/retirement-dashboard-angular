@@ -13,8 +13,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Inter:wght@400;500;600;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
-  <!-- OpenDyslexic (self-hosted at jsdelivr). Falls back to Atkinson/Inter when offline. -->
+  <!-- OpenDyslexic (self-hosted at jsdelivr). Falls back to Atkinson/Inter when offline.
+       DFA-2026-04-19-006: 400 + 700 so bold/headings render in-family instead of
+       faux-bolding the 400 weight (visually breaks OpenDyslexic's heavy baselines). -->
   <link href="https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.1.0/400.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fontsource/opendyslexic@5.1.0/700.css" rel="stylesheet">
 </head>
 <body>
   <app-root></app-root>

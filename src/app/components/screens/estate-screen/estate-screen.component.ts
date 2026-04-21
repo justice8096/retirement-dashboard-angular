@@ -58,6 +58,9 @@ interface EstateYear {
             <input appNumeric="currency" class="param-input"
               [class]="dyscalculia.numberSpacingClass()"
               [ngModel]="initialPortfolio()" (ngModelChange)="initialPortfolio.set($event)" />
+            @if (dyscalculia.isEnabled() && initialPortfolio() > 0) {
+              <span class="param-hint">{{ portfolioAnchor() }}</span>
+            }
           </label>
           <label class="param">
             <span class="param-label">Desired Legacy</span>
@@ -333,6 +336,11 @@ export class EstateScreenComponent implements OnInit {
     if (!primary) return 62;
     return this.startYear() - primary.birthYear;
   });
+
+  /** Plain-language magnitude anchor for the initial portfolio input. */
+  readonly portfolioAnchor = computed(() =>
+    this.dyscalculia.getAnchor(this.initialPortfolio(), 'portfolio', this.annualExpenses() || undefined)
+  );
 
   readonly projections = computed<EstateYear[]>(() => {
     const start = this.startAge();
