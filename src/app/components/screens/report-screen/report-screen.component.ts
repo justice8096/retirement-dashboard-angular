@@ -10,6 +10,7 @@ import {
   NeighborhoodsSupplement, InclusionSupplement, InclusionCategory,
   Scenario,
 } from '@models/api.model';
+import { escYaml as yamlStr } from '@app/lib/text-escape';
 
 type NeighborhoodsBag = Record<string, NeighborhoodsSupplement | null>;
 type InclusionBag = Record<string, InclusionSupplement | null>;
@@ -821,20 +822,5 @@ function prettyPath(path: string | null | undefined): string {
   return path.split('-').map(s => s[0]!.toUpperCase() + s.slice(1)).join(' ');
 }
 
-/** Minimal YAML string escaping — wraps in double quotes if the value
- *  contains a colon, quote, or leading special character. Good enough for
- *  the front-matter we emit; not a general YAML serializer. */
-function yamlStr(s: string): string {
-  if (/[:"'\[\]{},&*#?|>!%@`\n]/.test(s) || /^\s|\s$/.test(s)) {
-    // Escape in this order: backslashes first (so we don't double-escape our
-    // own additions), then quotes, then newlines/carriage returns so an
-    // embedded \n doesn't produce a literal newline inside double-quoted
-    // YAML (which is invalid front-matter). Addresses SAST INFO 2026-04-21.
-    return '"' + s
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r') + '"';
-  }
-  return s;
-}
+/* yamlStr moved to @app/lib/text-escape.escYaml — imported at top and
+ * aliased to keep the diff minimal. */

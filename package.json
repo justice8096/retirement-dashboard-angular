@@ -8,6 +8,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "test:pure": "tsx --test scripts/test-text-escape.mts",
     "check:readability": "node scripts/check-readability.mjs",
     "check:numeric-inputs": "node scripts/check-raw-numeric-inputs.mjs",
     "verify:apportion": "node scripts/verify-apportionment.mjs"
@@ -37,6 +38,7 @@
     "@emnapi/runtime": "^1.10.0",
     "@types/d3-sankey": "^0.12.5",
     "@types/leaflet": "^1.9.21",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.3"
   }
 }
