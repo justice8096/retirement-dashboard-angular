@@ -9,6 +9,11 @@ import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { LocationFull } from '@models/api.model';
 import { getCityCenter, listMissingCoords } from '@app/data/city-coordinates';
+import { escHtml, parseSpeedToMbps } from '@app/lib/text-escape';
+// Local alias — `escape` shadows window.escape and was the original name
+// used in the popup HTML template literals; keep it to minimize diff.
+const escape = escHtml;
+const parseSpeedMbps = parseSpeedToMbps;
 
 type MetricId = 'cost' | 'safety' | 'healthcare' | 'climate' | 'internet' | 'expat';
 
@@ -389,18 +394,5 @@ function scoreColor(score: number): string {
   return '#2E7D32';
 }
 
-function parseSpeedMbps(raw: string): number {
-  const match = String(raw).match(/(\d+(?:\.\d+)?)\s*(G|M)?/i);
-  if (!match) return 10;
-  const n = parseFloat(match[1]!);
-  const unit = (match[2] ?? 'M').toUpperCase();
-  return unit === 'G' ? n * 1000 : n;
-}
-
-/** HTML-escape popup content. Tile-popup content is fed into
- *  `bindPopup(htmlString)`, so we need to escape user/data strings. */
-function escape(s: string | undefined | null): string {
-  return String(s ?? '').replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!)
-  );
-}
+/* parseSpeedMbps + escape moved to @app/lib/text-escape — imported at the
+ * top of the file. `escape` is aliased to avoid shadowing window.escape. */

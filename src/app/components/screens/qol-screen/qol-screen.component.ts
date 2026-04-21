@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { LocationFull } from '@models/api.model';
+import { parseSpeedToMbps } from '@app/lib/text-escape';
 
 type Dim = 'costOfLiving' | 'safety' | 'healthcare' | 'climate' | 'internet' | 'expatCommunity';
 type PresetName = 'balanced' | 'budgetFocus' | 'safetyFirst' | 'digitalNomad';
@@ -300,15 +301,4 @@ function clamp01to10(n: number): number {
   return Math.max(0, Math.min(10, n));
 }
 
-/** Pull a Mbps number out of free-form strings like "1Gbps available",
- *  "100Mbps+", "500 Mbps fiber". Returns 10 as a conservative default when
- *  the string has no parseable number. */
-function parseSpeedToMbps(raw: string | undefined | null): number {
-  if (!raw) return 10;
-  const s = String(raw);
-  const match = s.match(/(\d+(?:\.\d+)?)\s*(G|M)?/i);
-  if (!match) return 10;
-  const n = parseFloat(match[1]!);
-  const unit = (match[2] ?? 'M').toUpperCase();
-  return unit === 'G' ? n * 1000 : n;
-}
+/* parseSpeedToMbps moved to @app/lib/text-escape for testability */
