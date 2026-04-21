@@ -8,6 +8,7 @@ import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NeighborhoodsSupplement, Neighborhood, LocationFull } from '@models/api.model';
 import * as L from 'leaflet';
+import { getCityCenter } from '@app/data/city-coordinates';
 
 /* Fix Leaflet default icon paths. Self-hosted in public/leaflet/ (copied from
  * node_modules/leaflet/dist/images/) — the previous unpkg.com URLs were blocked
@@ -17,28 +18,10 @@ const shadowUrl = 'leaflet/marker-shadow.png';
 const iconRetinaUrl = 'leaflet/marker-icon-2x.png';
 L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, iconSize: [25, 41], iconAnchor: [12, 41] });
 
-/** Hardcoded geocode fallback for common cities */
-const CITY_COORDS: Record<string, [number, number]> = {
-  'lisbon': [38.7223, -9.1393], 'porto': [41.1579, -8.6291], 'faro': [37.0194, -7.9322],
-  'lagos': [37.1028, -8.6731], 'medellin': [6.2442, -75.5812], 'bogota': [4.7110, -74.0721],
-  'cartagena': [10.3910, -75.5144], 'lyon': [45.7640, 4.8357], 'toulouse': [43.6047, 1.4442],
-  'montpellier': [43.6108, 3.8767], 'brittany': [48.2020, -2.9326], 'rennes': [48.1173, -1.6778],
-  'panama city': [8.9824, -79.5199], 'boquete': [8.7804, -82.4413], 'atlanta': [33.7490, -84.3880],
-  'alicante': [38.3452, -0.4810], 'waterford': [52.2593, -7.1101],
-  'barcelona': [41.3874, 2.1686], 'madrid': [40.4168, -3.7038], 'malaga': [36.7213, -4.4214],
-  'valencia': [39.4699, -0.3763], 'seville': [37.3891, -5.9845],
-  'san jose': [9.9281, -84.0907], 'cuenca': [2.9001, -79.0059], 'quito': [-0.1807, -78.4678],
-  'merida': [20.9674, -89.5926], 'mexico city': [19.4326, -99.1332],
-  'bangkok': [13.7563, 100.5018], 'chiang mai': [18.7061, 98.9817],
-  'kuala lumpur': [3.1390, 101.6869], 'penang': [5.4164, 100.3327],
-  'ho chi minh city': [10.8231, 106.6297], 'da nang': [16.0471, 108.2068],
-  'bali': [-8.3405, 115.0920], 'buenos aires': [-34.6037, -58.3816],
-};
-
-function geocodeCity(name: string): [number, number] | null {
-  const key = name.toLowerCase().trim();
-  return CITY_COORDS[key] ?? null;
-}
+/* Coordinate lookup now lives in `src/app/data/city-coordinates.ts` and is
+ * keyed by location ID (not city name), so it covers all 158 locations
+ * rather than the ~35 city-name hardcodes that used to live here. Shared
+ * with the Location Map screen. */
 
 @Component({
   selector: 'app-neighborhoods-screen',
@@ -375,10 +358,8 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
     this.activeCity.set(id);
     this.loadSupplement(id);
     // Pan map to location
-    const loc = this.loc.fullLocations().find(l => l.id === id);
-    if (loc && this.map) {
-      const city = loc.cities?.[0] ?? loc.name;
-      const coords = geocodeCity(city);
+    if (this.map) {
+      const coords = getCityCenter(id);
       if (coords) this.map.flyTo(coords, 8, { duration: 1 });
     }
   }
@@ -431,8 +412,7 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
     const bounds: L.LatLng[] = [];
 
     for (const l of cities) {
-      const city = l.cities?.[0] ?? l.name;
-      const coords = geocodeCity(city);
+      const coords = getCityCenter(l.id);
       if (!coords) continue;
 
       const marker = L.marker(coords)

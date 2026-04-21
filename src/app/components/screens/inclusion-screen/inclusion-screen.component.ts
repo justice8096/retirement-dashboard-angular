@@ -19,8 +19,8 @@ interface LocInclusion {
       <div class="screen-header">
         <span class="header-icon">🌍</span>
         <div>
-          <h2 class="header-title">Inclusion Index</h2>
-          <p class="header-sub">Diversity, safety, and inclusiveness scores by location</p>
+          <h2 class="header-title">Welcome and Safety</h2>
+          <p class="header-sub">How welcoming and safe each location is across racial, religious, country-of-origin, LGBTQ+, disability, and age dimensions.</p>
         </div>
       </div>
 

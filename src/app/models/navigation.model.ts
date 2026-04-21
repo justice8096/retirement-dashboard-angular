@@ -75,7 +75,7 @@ export const CATEGORIES: Category[] = [
     { id: 'neighborhoods', label: 'Neighborhoods' },
     { id: 'services', label: 'Local Services' },
     { id: 'livability', label: 'Livability Index' },
-    { id: 'inclusion', label: 'Inclusion & Safety' },
+    { id: 'inclusion', label: 'Welcome and Safety' },
     { id: 'localinfo', label: 'Local Info' },
   ]},
   { id: 'share', label: 'Share', icon: '📄', screens: [
