@@ -191,11 +191,30 @@ export class LocationService {
     return [...sup.neighborhoods].sort((a, b) => score(b) - score(a))[0];
   }
 
-  /** Preload neighborhoods supplement for every currently-selected location. */
+  /** Preload neighborhoods supplement for every currently-selected location.
+   *  Issues ONE batch request to `/locations/batch-supplements` instead of N
+   *  per-location GETs — previously a full selection fanned out 200 requests
+   *  and tripped the rate limiter. Locations missing a supplement are simply
+   *  absent from the response map (no 404 per miss). */
   preloadNeighborhoodsForSelected(): void {
-    for (const loc of this.selectedFullLocations()) {
-      this.loadSupplement(loc.id, 'neighborhoods');
-    }
+    const ids = [...this.selectedIds()];
+    if (!ids.length) return;
+    const missing = ids.filter(id => !this.supplementCache()[`${id}:neighborhoods`]);
+    if (!missing.length) return;
+    this.api.batchLoadSupplements(missing, 'neighborhoods').subscribe({
+      next: (map) => {
+        this.supplementCache.update(cache => {
+          const next = { ...cache };
+          for (const id of missing) {
+            const data = map[id];
+            // Cache hits AND misses so we don't re-request known-empty ids.
+            next[`${id}:neighborhoods`] = (data as Record<string, unknown>) ?? {};
+          }
+          return next;
+        });
+      },
+      error: (err) => console.warn('LocationService: batch neighborhoods fetch failed.', err),
+    });
   }
 
   /**
@@ -224,6 +243,7 @@ export class LocationService {
   /* ─── Actions ───────────────────────────────────────────────────── */
 
   loadAll(): void {
+    if (this.locations().length) return;
     this.loading.set(true);
     this.error.set(null);
     this.api.getAllLocations().subscribe({
@@ -247,6 +267,7 @@ export class LocationService {
   }
 
   loadCountries(): void {
+    if (this.countries().length) return;
     this.api.getCountries().subscribe({
       next: (data) => this.countries.set(data),
       error: (err) => console.warn('LocationService: countries fetch failed.', err),
@@ -254,6 +275,7 @@ export class LocationService {
   }
 
   loadRegions(): void {
+    if (this.regions().length) return;
     this.api.getRegions().subscribe({
       next: (data) => this.regions.set(data),
       error: (err) => console.warn('LocationService: regions fetch failed.', err),

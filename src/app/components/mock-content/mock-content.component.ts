@@ -25,6 +25,14 @@ import { TaxesScreenComponent } from '@components/screens/taxes-screen/taxes-scr
 import { WithdrawalScreenComponent } from '@components/screens/withdrawal-screen/withdrawal-screen.component';
 import { RothScreenComponent } from '@components/screens/roth-screen/roth-screen.component';
 import { FeesScreenComponent } from '@components/screens/fees-screen/fees-screen.component';
+import { GuardrailsScreenComponent } from '@components/screens/guardrails-screen/guardrails-screen.component';
+import { MedicareIrmaaScreenComponent } from '@components/screens/medicare-irmaa-screen/medicare-irmaa-screen.component';
+import { EstateScreenComponent } from '@components/screens/estate-screen/estate-screen.component';
+import { SankeyScreenComponent } from '@components/screens/sankey-screen/sankey-screen.component';
+import { QolScreenComponent } from '@components/screens/qol-screen/qol-screen.component';
+import { ClimateScreenComponent } from '@components/screens/climate-screen/climate-screen.component';
+import { VisaScreenComponent } from '@components/screens/visa-screen/visa-screen.component';
+import { HealthcareCompareScreenComponent } from '@components/screens/healthcare-compare-screen/healthcare-compare-screen.component';
 
 /* ─── Setup screens ─────────────────────────────────────────────── */
 import { AssumptionsScreenComponent } from '@components/screens/assumptions-screen/assumptions-screen.component';
@@ -41,6 +49,9 @@ import { FireCalcScreenComponent } from '@components/screens/fire-calc-screen/fi
 import { NeighborhoodsScreenComponent } from '@components/screens/neighborhoods-screen/neighborhoods-screen.component';
 import { ServicesScreenComponent } from '@components/screens/services-screen/services-screen.component';
 import { LivabilityScreenComponent } from '@components/screens/livability-screen/livability-screen.component';
+import { InclusionScreenComponent } from '@components/screens/inclusion-screen/inclusion-screen.component';
+import { MapScreenComponent } from '@components/screens/map-screen/map-screen.component';
+import { ReportScreenComponent } from '@components/screens/report-screen/report-screen.component';
 import { LocalinfoScreenComponent } from '@components/screens/localinfo-screen/localinfo-screen.component';
 
 import { LocationCompareComponent } from '@components/screens/location-compare/location-compare.component';
@@ -62,7 +73,12 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
     /* Income */
     SsScreenComponent, ProjectionsScreenComponent, TaxesScreenComponent,
     WithdrawalScreenComponent, RothScreenComponent,
-    FeesScreenComponent,
+    FeesScreenComponent, GuardrailsScreenComponent, MedicareIrmaaScreenComponent,
+    EstateScreenComponent, SankeyScreenComponent,
+    /* Locations (added) */
+    QolScreenComponent, ClimateScreenComponent, VisaScreenComponent, MapScreenComponent,
+    /* Costs (added) */
+    HealthcareCompareScreenComponent,
     /* Setup */
     AssumptionsScreenComponent, SettingsScreenComponent, ItemsScreenComponent, FireSetupScreenComponent,
     /* Simulate */
@@ -71,9 +87,9 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
     LocationCompareComponent,
     /* Community */
     NeighborhoodsScreenComponent, ServicesScreenComponent,
-    LivabilityScreenComponent, LocalinfoScreenComponent,
+    LivabilityScreenComponent, LocalinfoScreenComponent, InclusionScreenComponent,
     /* Share */
-    BrochureScreenComponent, VideoScreenComponent,
+    BrochureScreenComponent, VideoScreenComponent, ReportScreenComponent,
   ],
   template: `
     <div role="tabpanel" class="content-pane">
@@ -105,6 +121,10 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         @case ('locations/compare') {
           <app-location-compare />
         }
+        @case ('locations/map')      { <app-map-screen /> }
+        @case ('locations/climate')  { <app-climate-screen /> }
+        @case ('locations/visa')     { <app-visa-screen /> }
+        @case ('locations/qol')      { <app-qol-screen /> }
 
         <!-- Costs -->
         @case ('costs/housing')       { <app-housing-screen /> }
@@ -115,6 +135,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         @case ('costs/transport')     { <app-transport-screen /> }
         @case ('costs/cellphones')    { <app-cellphones-screen /> }
         @case ('costs/personalcare')  { <app-personalcare-screen /> }
+        @case ('costs/healthcare-compare') { <app-healthcare-compare-screen /> }
 
         <!-- Income -->
         @case ('income/ss')           { <app-ss-screen /> }
@@ -123,6 +144,10 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         @case ('income/withdrawal')   { <app-withdrawal-screen /> }
         @case ('income/roth')         { <app-roth-screen /> }
         @case ('income/fees')          { <app-fees-screen /> }
+        @case ('income/guardrails')    { <app-guardrails-screen /> }
+        @case ('income/medicare-irmaa') { <app-medicare-irmaa-screen /> }
+        @case ('income/estate')         { <app-estate-screen /> }
+        @case ('income/sankey')         { <app-sankey-screen /> }
 
         <!-- Setup -->
         @case ('setup/assumptions')   { <app-assumptions-screen /> }
@@ -140,10 +165,12 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         @case ('community/services')      { <app-services-screen /> }
         @case ('community/livability')     { <app-livability-screen /> }
         @case ('community/localinfo')     { <app-localinfo-screen /> }
+        @case ('community/inclusion')     { <app-inclusion-screen /> }
 
         <!-- Share -->
         @case ('share/brochure')      { <app-brochure-screen /> }
         @case ('share/video')         { <app-video-screen /> }
+        @case ('share/report')        { <app-report-screen /> }
 
         @default {
           <app-placeholder-screen />

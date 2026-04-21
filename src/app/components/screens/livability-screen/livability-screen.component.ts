@@ -40,10 +40,12 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
         @if (isLoading()) {
           <div class="status-msg">Loading livability data…</div>
         } @else if (activeData()) {
-          @if (activeData()!.overall) {
+          @if (overallScore(activeData()!); as overall) {
             <div class="overall-card">
-              <div class="overall-score">{{ activeData()!.overall!.score }}<span class="out-of">/10</span></div>
-              <div class="overall-summary">{{ activeData()!.overall!.summary }}</div>
+              <div class="overall-score">{{ overall.score }}<span class="out-of">/10</span></div>
+              <div class="overall-summary">
+                {{ overall.summary || 'Composite livability score across the categories below.' }}
+              </div>
             </div>
           }
 
@@ -222,17 +224,37 @@ export class LivabilityScreenComponent implements OnInit {
   livabilityCategories(data: InclusionSupplement): { key: string; label: string; cat: InclusionCategory }[] {
     const labels: Record<string, string> = {
       racial: 'Cultural Openness', religious: 'Religious Freedom',
-      countryOfOrigin: 'Expat Acceptance', lgbtq: 'LGBTQ+ Safety',
-      disability: 'Accessibility', age: 'Age-Friendliness',
+      countryOfOrigin: 'Expat Acceptance', language: 'Language',
+      lgbtq: 'LGBTQ+ Safety', disability: 'Accessibility', age: 'Age-Friendliness',
     };
+    // The seeded API shape nests categories under `.categories.*`; older
+    // shape had them hoisted to the top level. Accept either (same pattern
+    // as inclusion-screen post-fix).
+    const categoriesBag = (data as unknown as { categories?: Record<string, InclusionCategory> }).categories
+      ?? (data as unknown as Record<string, InclusionCategory>);
     return Object.entries(labels)
-      .filter(([k]) => data[k] && (data[k] as InclusionCategory).score !== undefined)
-      .map(([k, label]) => ({ key: k, label, cat: data[k] as InclusionCategory }));
+      .filter(([k]) => {
+        const c = categoriesBag[k];
+        return c && typeof c === 'object' && (c as InclusionCategory).score !== undefined;
+      })
+      .map(([k, label]) => ({ key: k, label, cat: categoriesBag[k] as InclusionCategory }));
   }
 
   scoreClass(score: number): string {
     if (score >= 7) return 'good';
     if (score >= 4) return 'ok';
     return 'bad';
+  }
+
+  /** Normalize overall-score access across the two shapes — seeded data uses
+   *  `overallInclusionScore` (flat number); older docs used `overall: { score, summary }`. */
+  overallScore(data: InclusionSupplement): { score: number; summary?: string } | null {
+    const d = data as unknown as {
+      overall?: { score?: number; summary?: string };
+      overallInclusionScore?: number;
+    };
+    if (d.overall?.score !== undefined) return { score: d.overall.score, summary: d.overall.summary };
+    if (typeof d.overallInclusionScore === 'number') return { score: d.overallInclusionScore };
+    return null;
   }
 }

@@ -53,6 +53,18 @@ export class ApiService {
     return this.http.get(`${this.base}/locations/${id}/${dataType}`);
   }
 
+  /** One POST instead of N GETs. Server returns `{ [locationId]: data }` —
+   *  locations with no supplement are omitted from the map (not an error). */
+  batchLoadSupplements(
+    locationIds: string[],
+    dataType: SupplementType,
+  ): Observable<Record<string, unknown>> {
+    return this.http.post<Record<string, unknown>>(
+      `${this.base}/locations/batch-supplements`,
+      { locationIds, dataType },
+    );
+  }
+
   getCountries(): Observable<string[]> {
     return this.http.get<string[]>(`${this.base}/locations/countries`);
   }
@@ -91,7 +103,15 @@ export class ApiService {
   }
 
   updateFinancial(data: Partial<FinancialSettings>): Observable<FinancialSettings> {
-    return this.http.put<FinancialSettings>(`${this.base}/me/financial`, data)
+    // Strip server-only fields so the API's strict Zod schema doesn't 400.
+    // GET returns userId / updatedAt / _units / _labels alongside settings;
+    // callers often forward the whole object back, so filter defensively.
+    const payload: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (k === 'userId' || k === 'updatedAt' || k.startsWith('_')) continue;
+      payload[k] = v;
+    }
+    return this.http.put<FinancialSettings>(`${this.base}/me/financial`, payload)
       .pipe(map(coerceFinancial));
   }
 

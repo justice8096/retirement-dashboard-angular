@@ -37,6 +37,10 @@ export const CATEGORIES: Category[] = [
   { id: 'locations', label: 'Locations', icon: '📍', screens: [
     { id: 'overview', label: 'Overview' },
     { id: 'compare', label: 'Compare' },
+    { id: 'map', label: 'Map', badge: 'NEW' },
+    { id: 'climate', label: 'Climate', badge: 'NEW' },
+    { id: 'visa', label: 'Visa & Residency', badge: 'NEW' },
+    { id: 'qol', label: 'Quality of Life', badge: 'NEW' },
     { id: 'manage', label: 'Manage', tier: 'premium' },
   ]},
   { id: 'costs', label: 'Costs', icon: '💰', screens: [
@@ -48,13 +52,18 @@ export const CATEGORIES: Category[] = [
     { id: 'transport', label: 'Transportation' },
     { id: 'cellphones', label: 'Cell Phones' },
     { id: 'personalcare', label: 'Personal Care' },
+    { id: 'healthcare-compare', label: 'Healthcare Comparison', badge: 'NEW' },
   ]},
   { id: 'income', label: 'Income', icon: '📊', screens: [
     { id: 'ss', label: 'Social Security' },
     { id: 'projections', label: 'Projections' },
+    { id: 'sankey', label: 'Cash Flow', badge: 'NEW' },
     { id: 'taxes', label: 'Taxes' },
     { id: 'withdrawal', label: 'Withdrawal Strategy', badge: 'NEW' },
+    { id: 'guardrails', label: 'Spending Guardrails', badge: 'NEW' },
     { id: 'roth', label: 'Roth Planner', badge: 'NEW' },
+    { id: 'medicare-irmaa', label: 'Medicare IRMAA', badge: 'NEW' },
+    { id: 'estate', label: 'Estate Planning', badge: 'NEW' },
     { id: 'fees', label: 'Fees & Currency', badge: 'NEW' },
   ]},
   { id: 'simulate', label: 'Simulate', icon: '🎲', screens: [
@@ -66,10 +75,12 @@ export const CATEGORIES: Category[] = [
     { id: 'neighborhoods', label: 'Neighborhoods' },
     { id: 'services', label: 'Local Services' },
     { id: 'livability', label: 'Livability Index' },
+    { id: 'inclusion', label: 'Welcome and Safety' },
     { id: 'localinfo', label: 'Local Info' },
   ]},
   { id: 'share', label: 'Share', icon: '📄', screens: [
     { id: 'brochure', label: 'Brochures' },
     { id: 'video', label: 'Video' },
+    { id: 'report', label: 'Narrative Report', badge: 'NEW' },
   ]},
 ];

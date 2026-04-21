@@ -357,9 +357,12 @@ export class FireSetupScreenComponent implements OnInit {
     });
   }
 
+  /** FIRE Number is a lifetime lump sum; annual-savings and annual-expenses
+   *  already carry time dimension in the surrounding text. Pass `''` so
+   *  dyscalculia.formatCurrency doesn't append a stray `/mo`. */
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount)
+      ? this.dyscalculia.formatCurrency(amount, '')
       : '$' + amount.toLocaleString();
   }
 }
