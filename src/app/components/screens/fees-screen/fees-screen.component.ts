@@ -39,8 +39,24 @@ import { debounceTime, Subject } from 'rxjs';
               <span class="rate-label">Exchange Rate</span>
               <span class="rate-value">1 USD = {{ exchangeRate().toFixed(4) }} {{ localCurrency() }}</span>
             </div>
-            @if (selectedCityName()) {
-              <div class="city-tag">Based on: {{ selectedCityName() }}</div>
+            @switch (rateSource()) {
+              @case ('manual')          { <div class="city-tag">Using manual override</div> }
+              @case ('selected')        { <div class="city-tag">Based on: {{ selectedCityName() }}</div> }
+              @case ('selection-match') { <div class="city-tag">Matched from your selected locations</div> }
+              @case ('selected-raw') {
+                <div class="rate-warn">
+                  ⚠ No location in your selection uses {{ localCurrency() }}.
+                  Showing the rate for <strong>{{ selectedCityName() }}</strong> —
+                  set a manual override or pick a {{ localCurrency() }} location for an accurate figure.
+                </div>
+              }
+              @case ('default') {
+                <div class="rate-warn">
+                  ⚠ No exchange-rate data available for <strong>{{ localCurrency() }}</strong>.
+                  Showing 1:1 as a placeholder. Set a manual override, or select a location
+                  that uses {{ localCurrency() }} on <em>Locations → Overview</em>.
+                </div>
+              }
             }
             @if (selectedCurrencies().length > 1 ||
                  (selectedCurrencies().length === 1 && selectedCurrencies()[0]?.code !== localCurrency())) {
@@ -252,6 +268,12 @@ import { debounceTime, Subject } from 'rxjs';
     .rate-label { font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; }
     .rate-value { font-size: 14px; font-weight: 600; color: var(--dark-text); }
     .city-tag { font-size: 10px; color: var(--dark-blue); padding: 3px 8px; background: rgba(92, 156, 230, 0.1); border-radius: 4px; margin-left: auto; }
+    .rate-warn {
+      width: 100%; padding: 10px 12px; border-radius: 6px;
+      background: rgba(212, 148, 58, 0.1); border-left: 3px solid var(--dark-amber);
+      font-size: 12px; color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5);
+    }
+    .rate-warn strong { color: var(--dark-text); }
     .currencies-row {
       display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
       width: 100%; padding-top: 10px; border-top: 1px solid var(--dark-border);
@@ -313,11 +335,45 @@ import { debounceTime, Subject } from 'rxjs';
     return loc?.currency ?? f?.localCurrency ?? 'USD';
   });
 
-  readonly exchangeRate = computed(() => {
+  readonly exchangeRate = computed(() => this.rateResolution().rate);
+
+  /** Source of the currently-displayed exchange rate. Used by the UI to
+   *  distinguish a genuine looked-up rate from the 1.0 fallback. */
+  readonly rateSource = computed(() => this.rateResolution().source);
+
+  /** Resolves `exchangeRate` + where it came from. Priority:
+   *   1. Manual override set on the user's fees record.
+   *   2. The actively-selected location's rate, if its currency matches
+   *      the local-currency code shown on this screen.
+   *   3. Any checked location carrying that currency (fall back across the
+   *      selection when the user typed a code without clicking a city).
+   *   4. The selected location's rate, as a last-ditch match on detail.
+   *   5. 1.0 — flagged as `'default'` so the UI can warn the user. */
+  private readonly rateResolution = computed<{ rate: number; source: 'manual' | 'selected' | 'selection-match' | 'selected-raw' | 'default' }>(() => {
     const f = this.fees();
-    if (f?.manualExchangeRate) return f.manualExchangeRate;
-    const loc = this.locService.selectedLocation();
-    return loc?.exchangeRate ?? 1;
+    if (f?.manualExchangeRate) return { rate: f.manualExchangeRate, source: 'manual' };
+
+    const cur = this.localCurrency();
+    const activeLoc = this.locService.selectedLocation();
+    if (activeLoc?.currency === cur && activeLoc.exchangeRate) {
+      return { rate: activeLoc.exchangeRate, source: 'selected' };
+    }
+
+    // Cross-reference the user's multi-selected full locations. If any of
+    // them has the currency the user typed, use that rate.
+    for (const l of this.locService.selectedFullLocations()) {
+      if (l.currency === cur && l.exchangeRate) {
+        return { rate: l.exchangeRate, source: 'selection-match' };
+      }
+    }
+
+    // Last resort: fall back to the active location's rate even if its
+    // currency doesn't match the typed code. Better than 1.0 for the "I
+    // just arrived at this screen" case.
+    if (activeLoc?.exchangeRate) {
+      return { rate: activeLoc.exchangeRate, source: 'selected-raw' };
+    }
+    return { rate: 1, source: 'default' };
   });
 
   /** Every distinct non-USD currency across the user's selected locations.
@@ -382,6 +438,12 @@ import { debounceTime, Subject } from 'rxjs';
   );
 
   ngOnInit(): void {
+    // Fees screen cross-references selectedFullLocations for its exchange-rate
+    // resolution (matches typed currency code against selected-location rates),
+    // so ensure the full locations are loaded even if the user hasn't visited
+    // a screen that loads them yet.
+    this.locService.loadFull();
+
     this.loading.set(true);
     this.api.getFees().subscribe({
       next: (f) => { this.fees.set(f); this.loading.set(false); },

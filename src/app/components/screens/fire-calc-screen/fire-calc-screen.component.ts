@@ -241,9 +241,13 @@ export class FireCalcScreenComponent {
     return target > 0 ? Math.min(100, Math.round((this.currentSavings() / target) * 100)) : 0;
   });
 
+  /** All values rendered via `fmt` on this screen are either lump sums
+   *  (FIRE Number, current savings) or annual figures whose "/yr" meaning
+   *  is already carried by surrounding text ("per year", "× multiplier ="
+   *  etc.). Pass `''` so dyscalculia.formatCurrency doesn't append `/mo`. */
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount)
+      ? this.dyscalculia.formatCurrency(amount, '')
       : '$' + amount.toLocaleString();
   }
 }

@@ -55,10 +55,12 @@ interface LocInclusion {
               }
             </div>
           } @else {
-            @if (entry.data.overall) {
+            @if (overallScore(entry.data); as overall) {
               <div class="overall-card">
-                <div class="overall-score">{{ entry.data.overall.score }}<span class="out-of">/10</span></div>
-                <div class="overall-summary">{{ entry.data.overall.summary }}</div>
+                <div class="overall-score">{{ overall.score }}<span class="out-of">/10</span></div>
+                <div class="overall-summary">
+                  {{ overall.summary || 'Overall inclusion score — weighted across the categories below.' }}
+                </div>
               </div>
             }
 
@@ -130,7 +132,7 @@ interface LocInclusion {
     .cat-score.bad { background: rgba(229, 115, 115, 0.12); color: var(--dark-red); }
     .cat-summary { font-size: 12px; color: var(--dark-text-sec); line-height: 1.4; margin: 0; }
     .factors { display: flex; flex-direction: column; gap: 3px; }
-    .factor { font-size: 10px; padding: 2px 0; }
+    .factor { font-size: 11px; padding: 2px 0; line-height: var(--prose-line-height, 1.5); }
     .factor.pos { color: var(--dark-green); }
     .factor.neg { color: var(--dark-red); }
 
@@ -195,16 +197,37 @@ export class InclusionScreenComponent implements OnInit {
   inclusionCategories(data: InclusionSupplement): { key: string; label: string; cat: InclusionCategory }[] {
     const labels: Record<string, string> = {
       racial: 'Racial', religious: 'Religious', countryOfOrigin: 'Country of Origin',
-      lgbtq: 'LGBTQ+', disability: 'Disability', age: 'Age',
+      language: 'Language', lgbtq: 'LGBTQ+', disability: 'Disability', age: 'Age',
     };
+    // The seeded shape nests categories under `categories.*`; older legacy
+    // shape had them hoisted to the top level. Try both so either works.
+    const categoriesBag = (data as unknown as { categories?: Record<string, InclusionCategory> }).categories
+      ?? (data as unknown as Record<string, InclusionCategory>);
     return Object.entries(labels)
-      .filter(([k]) => data[k] && (data[k] as InclusionCategory).score !== undefined)
-      .map(([k, label]) => ({ key: k, label, cat: data[k] as InclusionCategory }));
+      .filter(([k]) => {
+        const c = categoriesBag[k];
+        return c && typeof c === 'object' && (c as InclusionCategory).score !== undefined;
+      })
+      .map(([k, label]) => ({ key: k, label, cat: categoriesBag[k] as InclusionCategory }));
   }
 
   scoreClass(score: number): string {
     if (score >= 7) return 'good';
     if (score >= 4) return 'ok';
     return 'bad';
+  }
+
+  /** Normalize the "overall inclusion" block across the two shapes we've
+   *  seen: the seeded data uses `overallInclusionScore` (flat number), older
+   *  docs sometimes had `overall: { score, summary }`. Returns `null` so the
+   *  `@if (... as overall)` block only renders when there's a score. */
+  overallScore(data: InclusionSupplement): { score: number; summary?: string } | null {
+    const d = data as unknown as {
+      overall?: { score?: number; summary?: string };
+      overallInclusionScore?: number;
+    };
+    if (d.overall?.score !== undefined) return { score: d.overall.score, summary: d.overall.summary };
+    if (typeof d.overallInclusionScore === 'number') return { score: d.overallInclusionScore };
+    return null;
   }
 }

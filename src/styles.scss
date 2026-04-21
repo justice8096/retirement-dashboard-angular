@@ -322,3 +322,36 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
   --mat-button-text-label-text-size: 14px;
   font-family: var(--font-sans);
 }
+
+/* ─── Accessibility utilities (dyslexia audit 2026-04-21) ─────────── */
+
+/* Visually-hidden text for screen readers — used where color is the
+ * primary visual differentiator and we need a non-color equivalent for
+ * AT (e.g. hot/cold temp cells in Climate, quality cells in HC Compare).
+ * Pattern from the WAI-ARIA authoring practices `visually-hidden`. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Systemic focus-visible indicator (DFA-2026-04-21-004). Individual
+ * screens set `outline: none` on custom inputs and swap border-color on
+ * :focus — that swap alone doesn't always clear WCAG 2.4.11 perimeter
+ * contrast. This global outline catches keyboard focus on everything
+ * and is suppressed on mouse-click focus via `:focus-visible`. */
+:focus-visible {
+  outline: 2px solid var(--dark-amber);
+  outline-offset: 2px;
+}
+/* Silence the default browser outline on mouse-click focus where a
+ * component supplies its own :focus styling (border-color changes). */
+:focus:not(:focus-visible) {
+  outline: none;
+}
