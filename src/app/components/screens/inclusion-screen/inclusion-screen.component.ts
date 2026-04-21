@@ -65,7 +65,7 @@ interface LocInclusion {
             }
 
             <div class="cat-grid">
-              @for (cat of inclusionCategories(entry.data); track cat.key) {
+              @for (cat of allCategories(entry); track cat.key) {
                 <div class="cat-card">
                   <div class="cat-header">
                     <span class="cat-name">{{ cat.label }}</span>
@@ -209,6 +209,36 @@ export class InclusionScreenComponent implements OnInit {
         return c && typeof c === 'object' && (c as InclusionCategory).score !== undefined;
       })
       .map(([k, label]) => ({ key: k, label, cat: categoriesBag[k] as InclusionCategory }));
+  }
+
+  /** Full category list shown on a given location — inclusion supplement
+   *  categories first, then the synthetic Pet Friendliness card if the
+   *  location has lifestyle data. */
+  allCategories(entry: { id: string; data: InclusionSupplement | null }): { key: string; label: string; cat: InclusionCategory }[] {
+    const inclusion = entry.data ? this.inclusionCategories(entry.data) : [];
+    const pet = this.petFriendlinessCategory(entry.id);
+    return pet ? [...inclusion, pet] : inclusion;
+  }
+
+  /** Synthesize a "Pet Friendliness" category from the location's lifestyle
+   *  block. The only pet signal we have is `lifestyle.dogFriendly` (0-10),
+   *  so the category is labeled generically but the summary flags that
+   *  it's primarily dog-centric — a rental-or-public-spaces proxy that
+   *  usually correlates with overall pet-friendliness. Returns `null` when
+   *  lifestyle data is missing so the card simply doesn't render. */
+  petFriendlinessCategory(locId: string): { key: string; label: string; cat: InclusionCategory } | null {
+    const loc = this.loc.fullLocations().find(l => l.id === locId);
+    const dog = loc?.lifestyle?.dogFriendly;
+    if (dog === undefined || dog === null) return null;
+    const tier = dog >= 7 ? 'welcoming' : dog >= 4 ? 'moderate' : 'limited';
+    return {
+      key: 'petFriendliness',
+      label: 'Pet Friendliness',
+      cat: {
+        score: dog,
+        summary: `Based on the city's dog-friendliness rating (${tier}). Dog-centric as a proxy — public spaces, rental norms, and vet access usually correlate with overall pet-friendliness. Cat / small-pet specifics vary.`,
+      } as InclusionCategory,
+    };
   }
 
   scoreClass(score: number): string {
