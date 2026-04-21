@@ -62,6 +62,9 @@ interface ProjectionRow {
             <input appNumeric="currency" class="param-input"
               [class]="dyscalculia.numberSpacingClass()"
               [ngModel]="portfolio()" (ngModelChange)="portfolio.set($event)" />
+            @if (dyscalculia.isEnabled() && portfolio() > 0) {
+              <span class="param-hint">{{ portfolioAnchor() }}</span>
+            }
           </label>
           <label class="param">
             <span class="param-label">Annual Spending</span>
@@ -310,6 +313,13 @@ export class GuardrailsScreenComponent implements OnInit {
     if (!p || !h) return null;
     return h.planningStartYear - p.birthYear;
   });
+
+  /** Plain-language magnitude anchor for the portfolio input. Yearly-spending
+   *  context is passed so the anchor reads as "about N years of your planned
+   *  spending" rather than the generic bracket. */
+  readonly portfolioAnchor = computed(() =>
+    this.dyscalculia.getAnchor(this.portfolio(), 'portfolio', this.annualSpending() || undefined)
+  );
 
   /** Current-year bands. `baseRate` etc. are DOLLAR values (portfolio × rate). */
   readonly guardrails = computed(() => {

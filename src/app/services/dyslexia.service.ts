@@ -49,7 +49,26 @@ export class DyslexiaService {
   }
 
   toggle(): void {
-    this.update({ enabled: !this.settings().enabled });
+    const current = this.settings();
+    const nextEnabled = !current.enabled;
+    // DFA-2026-04-19-008: when the master toggle flips on for the first time,
+    // surface the reading progress bar by default — the audit evidence is
+    // that users who enable dyslexia mode benefit from it but rarely discover
+    // the individual sub-toggle. Only flip if the user hasn't already
+    // explicitly set it (we detect "explicit" as "any non-default value on
+    // another field" — a user who's made any customization is past
+    // onboarding and should keep their choices).
+    const hasCustomized =
+      current.fontFamily !== DYSLEXIA_DEFAULTS.fontFamily ||
+      current.lineHeight !== DYSLEXIA_DEFAULTS.lineHeight ||
+      current.letterSpacing !== DYSLEXIA_DEFAULTS.letterSpacing ||
+      current.wordSpacing !== DYSLEXIA_DEFAULTS.wordSpacing ||
+      current.readingAid !== DYSLEXIA_DEFAULTS.readingAid;
+    if (nextEnabled && !hasCustomized && !current.showReadingProgress) {
+      this.update({ enabled: nextEnabled, showReadingProgress: true });
+    } else {
+      this.update({ enabled: nextEnabled });
+    }
   }
 
   update(partial: Partial<DyslexiaSettings>): void {
@@ -119,12 +138,28 @@ export class DyslexiaService {
 
   // ─── Internals ──────────────────────────────────────────────────
 
+  /** Coalesce back-to-back `update()` calls into a single localStorage write.
+   *  L-02 / F-011: every individual signal change went straight to
+   *  `localStorage.setItem` synchronously, which for a user dragging a slider
+   *  or typing in a field hit ~60 writes/sec. Now scheduled via
+   *  `requestIdleCallback` (or a setTimeout fallback) and collapsed if
+   *  another change arrives before the callback fires. */
+  private persistHandle: number | null = null;
+
   private persist(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings()));
-    } catch {
-      /* ignore */
-    }
+    if (this.persistHandle !== null) return; // already scheduled; coalesce
+    const write = () => {
+      this.persistHandle = null;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings()));
+      } catch {
+        /* ignore */
+      }
+    };
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+    this.persistHandle = ric
+      ? ric(write, { timeout: 500 }) as unknown as number
+      : window.setTimeout(write, 200);
   }
 
   /** Sync settings to CSS custom properties on :root and toggle body classes. */

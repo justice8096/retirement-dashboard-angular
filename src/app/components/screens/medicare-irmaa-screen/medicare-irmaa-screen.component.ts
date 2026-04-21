@@ -86,6 +86,9 @@ interface ProjectionRow {
             <span class="param-hint">
               MAGI lookback is 2 years — your 2026 premium is set by 2024 income.
             </span>
+            @if (dyscalculia.isEnabled() && projectedMAGI() > 0) {
+              <span class="param-hint">— {{ magiAnchor() }}</span>
+            }
           </label>
         </div>
       </div>
@@ -284,6 +287,13 @@ export class MedicareIrmaaScreenComponent implements OnInit {
   readonly household = signal<HouseholdProfile | null>(null);
 
   readonly brackets = computed(() => IRMAA_BRACKETS[this.filingStatus()]);
+
+  /** Plain-language magnitude anchor for MAGI. Uses `withdrawal-year` since
+   *  MAGI is an annual-income quantity; the service already has ranges
+   *  calibrated for that context. */
+  readonly magiAnchor = computed(() =>
+    this.dyscalculia.getAnchor(this.projectedMAGI(), 'withdrawal-year')
+  );
 
   readonly currentTierIndex = computed(() => {
     const magi = this.projectedMAGI();
