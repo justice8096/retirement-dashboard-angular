@@ -174,13 +174,12 @@ reusable; the parent repository you are reading now is not.
 
 - [`retirement-ui-concrete-tiles`](https://github.com/justice8096/retirement-ui-concrete-tiles)
   — magnitude-tile visualization component (Dyscalculia F-004).
-
-**Planned extracts (not yet extracted):**
-
-- `src/app/directives/numeric-input.directive.ts` (voice-entry directive)
-- `src/app/services/dyscalculia.service.ts` + `dyslexia.service.ts`
-- `src/app/components/read-aloud-button/`
-- `src/app/components/shortcut-cheatsheet/`
+- [`retirement-ui-shortcut-cheatsheet`](https://github.com/justice8096/retirement-ui-shortcut-cheatsheet)
+  — keyboard-shortcut reference modal (opens on `?`).
+- [`retirement-ui-dyscalculia-kit`](https://github.com/justice8096/retirement-ui-dyscalculia-kit)
+  — reactive settings service + `[appNumeric]` directive with Web Speech voice entry.
+- [`retirement-ui-dyslexia-kit`](https://github.com/justice8096/retirement-ui-dyslexia-kit)
+  — reactive settings service (font / spacing / contrast / TTS) + floating read-aloud button.
 
 For licensing enquiries: `justice8096@gmail.com`.
 
