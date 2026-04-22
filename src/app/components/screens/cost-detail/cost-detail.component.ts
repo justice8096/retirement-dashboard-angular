@@ -3,16 +3,22 @@ import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ItemsService } from '@services/items.service';
 import { COST_CATEGORIES } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 @Component({
   selector: 'app-cost-detail',
   standalone: true,
+  imports: [SourceTooltipComponent],
   template: `
     <div class="cost-screen">
       <div class="screen-header">
         <span class="header-icon">{{ meta().icon }}</span>
         <div>
-          <h2 class="header-title">{{ meta().label }}</h2>
+          <h2 class="header-title">
+            {{ meta().label }}
+            <app-source-tooltip [sources]="categorySources()"
+                                 [label]="meta().label + ' data sources'" />
+          </h2>
           <p class="header-sub">
             Compare {{ meta().label.toLowerCase() }} costs across
             {{ ranked().length }} locations
@@ -183,6 +189,17 @@ export class CostDetailComponent implements OnInit {
   readonly barMax = computed(() => {
     const items = this.ranked();
     return items.length ? items[items.length - 1].typical : 1;
+  });
+
+  /** Category-level sources — same across locations since they come from
+   *  the shared backend map. Pick from the first location that has them. */
+  readonly categorySources = computed(() => {
+    const key = this.costKey();
+    for (const l of this.loc.selectedFullLocations()) {
+      const s = l.monthlyCosts?.[key]?.sources;
+      if (s?.length) return s;
+    }
+    return undefined;
   });
 
   ngOnInit(): void {
