@@ -153,7 +153,7 @@ export class ProjectionsScreenComponent implements OnInit {
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
-      : '$' + amount.toLocaleString();
+      : '$' + Math.round(amount).toLocaleString();
   }
 
   /** Rounds to 2 dp, trimming trailing zeros — so "60" stays "60" and

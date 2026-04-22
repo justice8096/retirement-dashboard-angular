@@ -237,6 +237,6 @@ export class LocationDetailComponent {
     if (this.dyscalculia.isEnabled()) {
       return this.dyscalculia.formatCurrency(amount);
     }
-    return '$' + amount.toLocaleString();
+    return '$' + Math.round(amount).toLocaleString();
   }
 }

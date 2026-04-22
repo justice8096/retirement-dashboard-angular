@@ -241,7 +241,7 @@ export class MedicineScreenComponent implements OnInit {
   fmt(amount: number): string {
     return this.dys.isEnabled()
       ? this.dys.formatCurrency(amount)
-      : '$' + amount.toLocaleString();
+      : '$' + Math.round(amount).toLocaleString();
   }
 
   constructor() {
