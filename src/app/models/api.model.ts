@@ -13,6 +13,21 @@ export interface Source {
   accessed?: string;
 }
 
+/**
+ * A pros/cons bullet — either a plain string (legacy) or an object carrying
+ * citation sources alongside the text. Consumers should read via the
+ * `bulletText` / `bulletSources` helpers below to stay agnostic of shape.
+ */
+export type ProConBullet = string | { text: string; sources?: Source[] };
+
+export function bulletText(b: ProConBullet): string {
+  return typeof b === 'string' ? b : b.text;
+}
+
+export function bulletSources(b: ProConBullet): Source[] | undefined {
+  return typeof b === 'string' ? undefined : b.sources;
+}
+
 /* ─── Pagination ─────────────────────────────────────────────────────── */
 export interface PaginatedResponse<T> {
   data: T[];
@@ -185,8 +200,8 @@ export interface LocationFull {
   monthlyCosts: MonthlyCosts;
   healthcare?: HealthcareInfo;
   lifestyle?: LifestyleInfo;
-  pros?: string[];
-  cons?: string[];
+  pros?: ProConBullet[];
+  cons?: ProConBullet[];
   taxes?: TaxInfo;
   monthlyCostTotal?: number;
   _version?: number;

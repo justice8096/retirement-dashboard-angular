@@ -6,7 +6,7 @@ import { NavigationService } from '@services/navigation.service';
 import { fpl2026 } from '@app/lib/aca-constants';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HealthcareService } from '@services/healthcare.service';
-import { LocationFull, COST_CATEGORIES } from '@models/api.model';
+import { LocationFull, COST_CATEGORIES, bulletText } from '@models/api.model';
 
 @Component({
   selector: 'app-location-compare',
@@ -512,8 +512,8 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                       <span class="metric-name">Pros</span>
                       <div class="tags-wrap">
                         @if (city.pros?.length) {
-                          @for (p of (city.pros ?? []).slice(0, 4); track p) {
-                            <span class="pro-tag">{{ p }}</span>
+                          @for (p of (city.pros ?? []).slice(0, 4); track $index) {
+                            <span class="pro-tag">{{ bulletText(p) }}</span>
                           }
                         } @else {
                           <span class="metric-text-val">–</span>
@@ -533,8 +533,8 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
                       <span class="metric-name">Cons</span>
                       <div class="tags-wrap">
                         @if (city.cons?.length) {
-                          @for (c of (city.cons ?? []).slice(0, 4); track c) {
-                            <span class="con-tag">{{ c }}</span>
+                          @for (c of (city.cons ?? []).slice(0, 4); track $index) {
+                            <span class="con-tag">{{ bulletText(c) }}</span>
                           }
                         } @else {
                           <span class="metric-text-val">–</span>
@@ -848,6 +848,7 @@ import { LocationFull, COST_CATEGORIES } from '@models/api.model';
   `],
 })
 export class LocationCompareComponent implements OnInit {
+  readonly bulletText = bulletText;
   readonly loc = inject(LocationService);
   readonly tax = inject(TaxService);
   readonly healthcare = inject(HealthcareService);

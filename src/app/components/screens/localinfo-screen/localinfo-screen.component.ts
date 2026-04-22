@@ -3,11 +3,13 @@ import { LocationService } from '@services/location.service';
 import { NavigationService } from '@services/navigation.service';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
-import { LocalInfoSupplement, LocationFull } from '@models/api.model';
+import { LocalInfoSupplement, LocationFull, bulletText, bulletSources } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 @Component({
   selector: 'app-localinfo-screen',
   standalone: true,
+  imports: [SourceTooltipComponent],
   template: `
     <div class="info-screen">
       <div class="screen-header">
@@ -86,15 +88,21 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
                 <h3 class="card-title">Pros & Cons</h3>
                 @if (sl.pros?.length) {
                   <div class="pc-section">
-                    @for (p of sl.pros; track p) {
-                      <div class="pc-item pro">✓ {{ p }}</div>
+                    @for (p of sl.pros; track $index) {
+                      <div class="pc-item pro">
+                        ✓ {{ bulletText(p) }}
+                        <app-source-tooltip [sources]="bulletSources(p)" />
+                      </div>
                     }
                   </div>
                 }
                 @if (sl.cons?.length) {
                   <div class="pc-section">
-                    @for (c of sl.cons; track c) {
-                      <div class="pc-item con">✗ {{ c }}</div>
+                    @for (c of sl.cons; track $index) {
+                      <div class="pc-item con">
+                        ✗ {{ bulletText(c) }}
+                        <app-source-tooltip [sources]="bulletSources(c)" />
+                      </div>
                     }
                   </div>
                 }
@@ -224,6 +232,8 @@ import { LocalInfoSupplement, LocationFull } from '@models/api.model';
   `],
 })
 export class LocalinfoScreenComponent implements OnInit {
+  readonly bulletText = bulletText;
+  readonly bulletSources = bulletSources;
   readonly loc = inject(LocationService);
   private readonly nav = inject(NavigationService);
   private readonly api = inject(ApiService);

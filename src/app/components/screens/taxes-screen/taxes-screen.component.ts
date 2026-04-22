@@ -6,11 +6,13 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ApiService } from '@services/api.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { HouseholdProfile } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
+import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '../../../lib/tax-sources';
 
 @Component({
   selector: 'app-taxes-screen',
   standalone: true,
-  imports: [FormsModule, NumericInputDirective],
+  imports: [FormsModule, NumericInputDirective, SourceTooltipComponent],
   template: `
     <div class="taxes-screen">
       <div class="screen-header">
@@ -76,7 +78,10 @@ import { HouseholdProfile } from '@models/api.model';
                 @if (item.source === 'brackets') {
                   @if (item.federalAnnual > 0) {
                     <div class="tax-row tax-sub">
-                      <span class="tax-label">↳ Federal (annual)</span>
+                      <span class="tax-label">
+                        ↳ Federal (annual)
+                        <app-source-tooltip [sources]="fedBracketSources" label="2026 federal brackets" />
+                      </span>
                       <span class="tax-value">{{ fmt(item.federalAnnual) }}</span>
                     </div>
                   }
@@ -184,6 +189,9 @@ export class TaxesScreenComponent implements OnInit {
   readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
   private readonly api = inject(ApiService);
+
+  readonly fedBracketSources = FED_BRACKETS_2026_SOURCES;
+  readonly fedStdDeductionSources = FED_STD_DEDUCTION_2026_SOURCES;
 
   /** Proxy onto the shared LocationService signal so edits fan out to Compare, Overview, etc. */
   readonly annualIncome = this.loc.annualIncome;

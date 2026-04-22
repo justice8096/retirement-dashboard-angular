@@ -21,6 +21,8 @@ import {
 import {
   HISTORICAL_PRESETS, HISTORICAL_RETURNS, statsForRange,
 } from '@app/data/historical-returns';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
+import { SS_CUT_SOURCES, RMD_AGE_SOURCES } from '@app/lib/tax-sources';
 
 // Dyscalculia F-002: Removed red `#E57373` for the lowest percentile — now
 // uses the same neutral amber gradient as the rest. Anxiety-inducing red is
@@ -82,7 +84,7 @@ const HIST_BINS = 40;
 @Component({
   selector: 'app-montecarlo-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, NumericInputDirective],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective, SourceTooltipComponent],
   template: `
     <div class="mc-screen">
       <div class="screen-header">
@@ -492,7 +494,10 @@ const HIST_BINS = 40;
               </div>
             </div>
             @if (fin()?.ssCutEnabled) {
-              <div class="ss-note">⚠ SS cut enabled in settings — benefit reduces after {{ fin()?.ssCutYear }}.</div>
+              <div class="ss-note">
+                ⚠ SS cut enabled in settings — benefit reduces after {{ fin()?.ssCutYear }}.
+                <app-source-tooltip [sources]="ssCutSources" label="SS trust fund projection" />
+              </div>
             }
           </div>
         </div>
@@ -968,6 +973,9 @@ export class MontecarloScreenComponent implements OnInit {
   readonly ssMonthly = signal(0);
   readonly monthlyIncome = signal(0);
   readonly runs = signal(5000);
+  readonly ssCutSources = SS_CUT_SOURCES;
+  readonly rmdSources = RMD_AGE_SOURCES;
+
   readonly years = signal(25);
   readonly meanReturn = signal(7);
   readonly volatility = signal(15);
