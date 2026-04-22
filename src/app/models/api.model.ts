@@ -61,6 +61,13 @@ export interface CostRange {
   min: number;
   max: number;
   annualInflation?: number;
+  /**
+   * Structured citations for this category's cost values. Injected by
+   * retirement-api from its shared category-cost-sources map at read
+   * time — seed data doesn't carry these per-location. Consumers render
+   * via <app-source-tooltip>. See Todos #11.
+   */
+  sources?: Source[];
 }
 
 export interface MonthlyCosts {
@@ -269,8 +276,9 @@ export interface DetailedCosts {
   cellPhone?: {
     monthlyBudget: number;
     plans: { provider: string; data: string; cost: number }[];
-    /** TODO #11: migrate to Source[] (requires backend seed transform). */
-    sources: string[];
+    /** Carrier plan citations. Seed data (as of 2026-04-22) ships the
+     *  Source shape across all 138 detailed-costs.json files. */
+    sources: Source[];
   };
   groceries?: {
     categories: { name: string; items: { item: string; price: number }[] }[];
