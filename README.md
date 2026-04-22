@@ -168,11 +168,16 @@ Individual UI components may, from time to time, be extracted into
 separate repositories under **[Creative Commons Zero (CC0 1.0
 Universal)](https://creativecommons.org/publicdomain/zero/1.0/)**. Those
 extracts are governed by their own LICENSE files and are freely
-reusable; the parent repository you are reading now is not. Candidate
-components include:
+reusable; the parent repository you are reading now is not.
+
+**Available CC0 extracts:**
+
+- [`retirement-ui-concrete-tiles`](https://github.com/justice8096/retirement-ui-concrete-tiles)
+  — magnitude-tile visualization component (Dyscalculia F-004).
+
+**Planned extracts (not yet extracted):**
 
 - `src/app/directives/numeric-input.directive.ts` (voice-entry directive)
-- `src/app/components/concrete-tiles/` (magnitude-tile visualization)
 - `src/app/services/dyscalculia.service.ts` + `dyslexia.service.ts`
 - `src/app/components/read-aloud-button/`
 - `src/app/components/shortcut-cheatsheet/`
