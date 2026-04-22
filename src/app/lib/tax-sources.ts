@@ -1,4 +1,38 @@
-import type { Source } from '@models/api.model';
+import type { Source, TaxBracket } from '@models/api.model';
+
+/**
+ * 2026 US federal bracket tables — mirrors `FED_BRACKETS_2026_MFJ` /
+ * `_SINGLE` in retirement-api/shared/taxes.js. Used by TaxService as a
+ * fallback when a US location's seed data doesn't carry federal
+ * brackets (most US locations don't — they ship a single monthly
+ * stored value). Keep both sides in sync.
+ */
+export const FED_BRACKETS_2026_MFJ: TaxBracket[] = [
+  { min: 0,       max: 24800,  rate: 0.10 },
+  { min: 24800,   max: 100800, rate: 0.12 },
+  { min: 100800,  max: 211400, rate: 0.22 },
+  { min: 211400,  max: 403550, rate: 0.24 },
+  { min: 403550,  max: 512450, rate: 0.32 },
+  { min: 512450,  max: 768700, rate: 0.35 },
+  { min: 768700,  max: null,   rate: 0.37 },
+];
+
+export const FED_BRACKETS_2026_SINGLE: TaxBracket[] = [
+  { min: 0,       max: 12400,  rate: 0.10 },
+  { min: 12400,   max: 50400,  rate: 0.12 },
+  { min: 50400,   max: 105700, rate: 0.22 },
+  { min: 105700,  max: 201775, rate: 0.24 },
+  { min: 201775,  max: 256225, rate: 0.32 },
+  { min: 256225,  max: 640600, rate: 0.35 },
+  { min: 640600,  max: null,   rate: 0.37 },
+];
+
+/** 2026 standard deduction by filing status (Rev. Proc. 2025-32 § 3.17). */
+export const FED_STD_DEDUCTION_2026 = {
+  mfj:    32200,
+  single: 16100,
+  hoh:    24150,
+} as const;
 
 /**
  * Structured citations for the 2026 US federal tax constants used on
