@@ -56,9 +56,12 @@ export class DyscalculiaService {
   formatCurrency(amount: number, unit: '/mo' | '/yr' | '' = '/mo'): string {
     const s = this.settings();
     const perPhrase = unit === '/mo' ? ' per month' : unit === '/yr' ? ' per year' : '';
-    if (!s.enabled) return `$${amount.toLocaleString()}${unit}`;
+    // Always display whole dollars — cents add noise at dashboard-scale amounts.
+    // Callers that genuinely need precision (e.g. tax to-the-penny) use
+    // `formatCurrencyPrecise` below.
+    let value = Math.round(amount);
+    if (!s.enabled) return `$${value.toLocaleString()}${unit}`;
 
-    let value = amount;
     if (s.roundNumbers) {
       value = Math.round(value / 100) * 100;
     }
@@ -127,21 +130,25 @@ export class DyscalculiaService {
 
   formatPercentage(pct: number): string {
     const s = this.settings();
-    if (!s.enabled) return `${pct}%`;
+    // Always display whole percent for values ≥ 1%. Sub-1% values (0.25%
+    // fees, 0.8% APRs) keep one decimal — rounding them to 0% would be
+    // misleading. Callers that need more precision format inline.
+    const display = Math.abs(pct) >= 1 ? Math.round(pct) : +pct.toFixed(1);
+    if (!s.enabled) return `${display}%`;
 
     switch (s.percentageDisplay) {
       case 'natural': {
         const ratio = Math.round(100 / pct);
-        return `${pct}% (about 1 in ${ratio})`;
+        return `${display}% (about 1 in ${ratio})`;
       }
       case 'proportion':
         if (pct === 100) return 'all';
-        if (pct >= 90) return `nearly all (${pct}%)`;
-        if (pct >= 75) return `about three-quarters (${pct}%)`;
-        if (pct >= 50) return `about half (${pct}%)`;
-        if (pct >= 25) return `about a quarter (${pct}%)`;
-        if (pct >= 10) return `a small share (${pct}%)`;
-        return `very few (${pct}%)`;
+        if (pct >= 90) return `nearly all (${display}%)`;
+        if (pct >= 75) return `about three-quarters (${display}%)`;
+        if (pct >= 50) return `about half (${display}%)`;
+        if (pct >= 25) return `about a quarter (${display}%)`;
+        if (pct >= 10) return `a small share (${display}%)`;
+        return `very few (${display}%)`;
       case 'none':
         if (pct >= 90) return 'nearly all';
         if (pct >= 75) return 'most';
@@ -150,7 +157,7 @@ export class DyscalculiaService {
         if (pct >= 10) return 'a few';
         return 'very few';
       default:
-        return `${pct}%`;
+        return `${display}%`;
     }
   }
 

@@ -258,9 +258,11 @@ export class TaxesScreenComponent implements OnInit {
   }
 
   fmt(amount: number): string {
+    // Whole dollars — cents add noise on a cost-of-living dashboard. Use
+    // `fmtCents` explicitly when to-the-penny precision is needed.
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
-      : this.fmtCents(amount);
+      : '$' + Math.round(amount).toLocaleString();
   }
 
   /** Currency with cents precision — taxes display to-the-penny.
@@ -270,10 +272,12 @@ export class TaxesScreenComponent implements OnInit {
     return this.dyscalculia.formatCurrencyPrecise(amount, { fractionDigits: 2 });
   }
 
-  /** Normalize rate (decimal 0.22 or whole 22 → "22"). */
+  /** Normalize rate (decimal 0.22 or whole 22 → "22"). Whole-percent
+   *  display for ≥1% values; sub-1% keeps one decimal (a 0.25% fee
+   *  shouldn't collapse to 0%). */
   pct(rate: number): string {
     const n = Number(rate) || 0;
     const whole = n > 1 ? n : n * 100;
-    return whole.toFixed(whole >= 10 ? 0 : 1);
+    return whole.toFixed(whole >= 1 ? 0 : 1);
   }
 }

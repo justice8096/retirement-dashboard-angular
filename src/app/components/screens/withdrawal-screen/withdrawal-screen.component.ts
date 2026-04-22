@@ -166,7 +166,7 @@ export class WithdrawalScreenComponent implements OnInit {
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
-      : '$' + amount.toLocaleString();
+      : '$' + Math.round(amount).toLocaleString();
   }
 
   /** Withdrawal rates come from the API as decimal fractions (0.04 = 4%). */

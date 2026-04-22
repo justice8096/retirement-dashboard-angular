@@ -1020,7 +1020,7 @@ export class LocationCompareComponent implements OnInit {
     if (this.dyscalculia.isEnabled()) {
       return this.dyscalculia.formatCurrency(val);
     }
-    return '$' + val.toLocaleString();
+    return '$' + Math.round(val).toLocaleString();
   }
 
   /** Currency with cents — for the Total Monthly + Income Tax rows.

@@ -191,6 +191,6 @@ export class BrochureScreenComponent implements OnInit {
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount)
-      : '$' + amount.toLocaleString();
+      : '$' + Math.round(amount).toLocaleString();
   }
 }

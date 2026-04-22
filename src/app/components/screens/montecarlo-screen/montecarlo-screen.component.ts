@@ -122,7 +122,7 @@ const HIST_BINS = 40;
               <span class="param-label">Portfolio ($)</span>
               <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="portfolio()" (ngModelChange)="portfolio.set($event)" />
-              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ fmt(portfolio()) }} · {{ dyscalculia.getAnchor(portfolio(), 'portfolio') }}</span>
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ fmt(portfolio(), '') }} · {{ dyscalculia.getAnchor(portfolio(), 'portfolio') }}</span>
             </label>
 
             <label class="param">

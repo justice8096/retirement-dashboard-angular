@@ -385,7 +385,7 @@ export class MedicareIrmaaScreenComponent implements OnInit {
   fmt(amount: number): string {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount, '/yr')
-      : '$' + amount.toLocaleString() + '/yr';
+      : '$' + Math.round(amount).toLocaleString() + '/yr';
   }
 
   /** Lump-sum dollar figure with no time-unit suffix — for income ranges and
@@ -394,7 +394,7 @@ export class MedicareIrmaaScreenComponent implements OnInit {
     if (amount === Infinity) return '∞';
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(amount, '')
-      : '$' + amount.toLocaleString();
+      : '$' + Math.round(amount).toLocaleString();
   }
 
   /** Small monthly surcharge amount for the bracket table — routes through
