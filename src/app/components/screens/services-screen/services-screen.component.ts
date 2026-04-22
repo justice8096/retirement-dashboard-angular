@@ -218,7 +218,16 @@ export class ServicesScreenComponent implements OnInit {
     this.services.set([]);
     this.api.getLocationSupplement(id, 'services').subscribe({
       next: (data) => {
-        this.services.set(data as LocalService[]);
+        // API returns the full supplement envelope:
+        // `{ distanceUnit, currency, services, attractions }`.
+        // Older code assigned the whole envelope to `services()`, which
+        // made `services().length` undefined and always triggered the
+        // fallback branch. Unwrap `.services` explicitly.
+        const payload = data as { services?: LocalService[] } | LocalService[] | null;
+        const arr = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.services) ? payload!.services : [];
+        this.services.set(arr);
         this.isLoading.set(false);
       },
       error: () => {
