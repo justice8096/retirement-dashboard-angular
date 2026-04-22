@@ -1,3 +1,18 @@
+/* ─── Source citations ────────────────────────────────────────────────
+ * Every user-facing number / narrative claim in the app should carry a
+ * clickable source. See Todos #11. Surfaced via <app-source-tooltip> info
+ * icon. A missing/empty sources array renders a muted "no-citation-yet"
+ * badge — makes gaps visible rather than invisible.
+ */
+export interface Source {
+  /** Human-readable title — e.g. "Rev. Proc. 2025-32", "HHS FPL 2026", "Numbeo Lisbon Oct 2025". */
+  title: string;
+  /** Canonical URL for verification. */
+  url: string;
+  /** ISO date (YYYY-MM-DD) when the source was last verified. Supports link-rot audits. */
+  accessed?: string;
+}
+
 /* ─── Pagination ─────────────────────────────────────────────────────── */
 export interface PaginatedResponse<T> {
   data: T[];
@@ -232,6 +247,7 @@ export interface DetailedCosts {
   cellPhone?: {
     monthlyBudget: number;
     plans: { provider: string; data: string; cost: number }[];
+    /** TODO #11: migrate to Source[] (requires backend seed transform). */
     sources: string[];
   };
   groceries?: {
@@ -483,7 +499,7 @@ export interface Neighborhood {
   safetyRating: string;
   expats: { communitySize: string; englishPrevalence: string };
   character_notes?: string;
-  sources?: { title: string; url: string }[];
+  sources?: Source[];
 }
 
 export interface NeighborhoodsSupplement {
@@ -498,7 +514,7 @@ export interface LocalService {
   address?: string;
   distanceKm?: number;
   notes?: string;
-  sources?: { title: string; url: string }[];
+  sources?: Source[];
 }
 
 /* ─── Supplement: Inclusion ─────────────────────────────────────── */
@@ -508,7 +524,7 @@ export interface InclusionCategory {
   legalProtections?: string[];
   positiveFactors?: string[];
   riskFactors?: string[];
-  sources?: { title: string; url: string }[];
+  sources?: Source[];
 }
 
 export interface InclusionSupplement {

@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { LocationFull } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
+import { ACA_PCT_SOURCES_2026, FPL_SOURCES_2026 } from '../../../lib/aca-constants';
 
 interface Metric {
   loc: LocationFull;
@@ -20,7 +22,7 @@ const ACA_MONTHLY_ESTIMATE = 1200;
 @Component({
   selector: 'app-healthcare-compare-screen',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, SourceTooltipComponent],
   template: `
     <div class="hc-screen">
       <div class="screen-header">
@@ -176,6 +178,7 @@ const ACA_MONTHLY_ESTIMATE = 1200;
           <div class="aca-note">
             <strong>Pre-Medicare (Ages 60-64):</strong>
             ACA premium estimate ~{{ acaLabel }}/mo.
+            <app-source-tooltip [sources]="acaSources" label="ACA 2026 sources" />
             Typical bronze/silver plans run \$800 – \$1,500/mo depending on age, state, and subsidy eligibility.
           </div>
 
@@ -347,6 +350,7 @@ export class HealthcareCompareScreenComponent implements OnInit {
 
   readonly ACA_MONTHLY_ESTIMATE = ACA_MONTHLY_ESTIMATE;
   readonly acaLabel = '$' + ACA_MONTHLY_ESTIMATE.toLocaleString();
+  readonly acaSources = [...ACA_PCT_SOURCES_2026, ...FPL_SOURCES_2026];
 
   readonly selectedId = signal<string | null>(null);
 
