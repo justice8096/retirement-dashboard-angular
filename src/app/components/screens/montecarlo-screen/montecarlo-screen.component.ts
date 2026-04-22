@@ -499,6 +499,15 @@ const HIST_BINS = 40;
                 <app-source-tooltip [sources]="ssCutSources" label="SS trust fund projection" />
               </div>
             }
+
+            <div class="rmd-note">
+              <strong>RMDs kick in at age {{ rmdStartAge() }}.</strong>
+              Traditional 401(k) / IRA balances must begin drawing down at
+              SECURE 2.0's raised RMD age ({{ rmdStartAge() }} for birth year
+              1960+, 73 for 1951–1959). The Monte Carlo projection applies this
+              automatically when your plan horizon crosses the threshold.
+              <app-source-tooltip [sources]="rmdSources" label="SECURE 2.0 RMD age" />
+            </div>
           </div>
         </div>
 
@@ -975,6 +984,17 @@ export class MontecarloScreenComponent implements OnInit {
   readonly runs = signal(5000);
   readonly ssCutSources = SS_CUT_SOURCES;
   readonly rmdSources = RMD_AGE_SOURCES;
+
+  /** SECURE 2.0 RMD start age — 73 for birth years 1951–1959, 75 for 1960+.
+   *  Derived from the household's earliest-born adult when available,
+   *  defaults to 75 otherwise. */
+  readonly rmdStartAge = computed(() => {
+    const members = this.household()?.members ?? [];
+    const years = members.map(m => m.birthYear).filter((y): y is number => typeof y === 'number');
+    if (!years.length) return 75;
+    const earliest = Math.min(...years);
+    return earliest < 1960 ? 73 : 75;
+  });
 
   readonly years = signal(25);
   readonly meanReturn = signal(7);
