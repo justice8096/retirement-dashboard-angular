@@ -161,6 +161,13 @@ export interface TaxInfo {
   ssExempt?: boolean;
   ssTaxedInCountry?: boolean;
   socialCharges?: unknown;
+  /**
+   * Structured citations for the tax rates on this location. Injected by
+   * retirement-api from its `shared/country-tax-sources.js` map based on
+   * `loc.country` at read time — the seed data doesn't carry these
+   * per-location. See Todos #11.
+   */
+  sources?: Source[];
 }
 
 export interface VisaInfo {
