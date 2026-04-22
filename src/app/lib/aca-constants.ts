@@ -7,14 +7,35 @@
  *
  * Keeping two copies led to drift — the 2026-04-20 law-conformance
  * review found both tables were still pre-ARPA 2021 values. Extracted
- * here so future updates happen in one place.
- *
- * Sources for 2026:
- *   - HHS 2026 Poverty Guidelines (effective 2026-01-13) —
- *     https://aspe.hhs.gov/sites/default/files/documents/b1bfa16b20ae9b89d525bc35de7c1643/detailed-guidelines-2026.pdf
- *   - IRS Rev Proc 2025-25 — 2026 applicable-percentage + affordability —
- *     https://www.irs.gov/pub/irs-drop/rp-25-25.pdf
+ * here so future updates happen in one place. See also the structured
+ * `*_SOURCES_2026` exports below which UI components surface through
+ * <app-source-tooltip>.
  */
+
+import type { Source } from '@models/api.model';
+
+/** Structured citations for the 2026 ACA applicable-percentage table. */
+export const ACA_PCT_SOURCES_2026: Source[] = [
+  {
+    title: 'IRS Rev. Proc. 2025-25 (2026 applicable-percentage table)',
+    url: 'https://www.irs.gov/pub/irs-drop/rp-25-25.pdf',
+    accessed: '2026-04-20',
+  },
+  {
+    title: 'IRC § 36B — Premium tax credit',
+    url: 'https://www.law.cornell.edu/uscode/text/26/36B',
+    accessed: '2026-04-20',
+  },
+];
+
+/** Structured citations for the 2026 HHS Federal Poverty Level table. */
+export const FPL_SOURCES_2026: Source[] = [
+  {
+    title: 'HHS 2026 Poverty Guidelines (effective 2026-01-13)',
+    url: 'https://aspe.hhs.gov/sites/default/files/documents/b1bfa16b20ae9b89d525bc35de7c1643/detailed-guidelines-2026.pdf',
+    accessed: '2026-04-20',
+  },
+];
 
 // ─── Federal Poverty Level (HHS 2026, continental US) ───────────────
 // Alaska + Hawaii carry higher FPLs and are not modeled separately.

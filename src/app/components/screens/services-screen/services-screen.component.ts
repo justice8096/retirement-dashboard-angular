@@ -3,10 +3,12 @@ import { LocationService } from '@services/location.service';
 import { NavigationService } from '@services/navigation.service';
 import { ApiService } from '@services/api.service';
 import { LocalService, LocationFull } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 @Component({
   selector: 'app-services-screen',
   standalone: true,
+  imports: [SourceTooltipComponent],
   template: `
     <div class="svc-screen">
       <div class="screen-header">
@@ -54,13 +56,13 @@ import { LocalService, LocationFull } from '@models/api.model';
                       <div class="svc-dist">{{ svc.distanceKm }} km away</div>
                     }
                     @if (svc.notes) {
-                      <div class="svc-notes">{{ svc.notes }}</div>
-                    }
-                    @if (svc.sources?.length) {
-                      <div class="svc-sources">
-                        @for (src of svc.sources; track src.url) {
-                          <a [href]="src.url" target="_blank" rel="noopener noreferrer" class="src-link">{{ src.title }}</a>
-                        }
+                      <div class="svc-notes">
+                        {{ svc.notes }}
+                        <app-source-tooltip [sources]="svc.sources" />
+                      </div>
+                    } @else {
+                      <div class="svc-notes">
+                        <app-source-tooltip [sources]="svc.sources" />
                       </div>
                     }
                   </div>
