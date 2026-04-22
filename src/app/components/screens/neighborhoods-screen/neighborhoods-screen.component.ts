@@ -9,6 +9,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NeighborhoodsSupplement, Neighborhood, LocationFull } from '@models/api.model';
 import * as L from 'leaflet';
 import { getCityCenter } from '@app/data/city-coordinates';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 /* Fix Leaflet default icon paths. Self-hosted in public/leaflet/ (copied from
  * node_modules/leaflet/dist/images/) — the previous unpkg.com URLs were blocked
@@ -26,6 +27,7 @@ L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, ic
 @Component({
   selector: 'app-neighborhoods-screen',
   standalone: true,
+  imports: [SourceTooltipComponent],
   template: `
     <div class="nbh-screen">
       <div class="screen-header">
@@ -126,7 +128,14 @@ L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, ic
                 }
 
                 @if (nbh.character_notes) {
-                  <div class="nbh-notes">💡 {{ nbh.character_notes }}</div>
+                  <div class="nbh-notes">
+                    💡 {{ nbh.character_notes }}
+                    <app-source-tooltip [sources]="nbh.sources" />
+                  </div>
+                } @else {
+                  <div class="nbh-notes">
+                    <app-source-tooltip [sources]="nbh.sources" />
+                  </div>
                 }
               </div>
             }

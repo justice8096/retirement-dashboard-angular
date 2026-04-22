@@ -6,11 +6,13 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ApiService } from '@services/api.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { HouseholdProfile } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
+import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '../../../lib/tax-sources';
 
 @Component({
   selector: 'app-taxes-screen',
   standalone: true,
-  imports: [FormsModule, NumericInputDirective],
+  imports: [FormsModule, NumericInputDirective, SourceTooltipComponent],
   template: `
     <div class="taxes-screen">
       <div class="screen-header">
@@ -58,7 +60,11 @@ import { HouseholdProfile } from '@models/api.model';
             <div class="tax-card" (click)="loc.selectLocation(item.id)">
               <div class="tax-header">
                 <span class="tax-name">{{ item.name }}</span>
-                <span class="tax-country">{{ item.country }}</span>
+                <span class="tax-country">
+                  {{ item.country }}
+                  <app-source-tooltip [sources]="item.taxSources"
+                                       [label]="item.country + ' tax sources'" />
+                </span>
               </div>
               <div class="tax-body">
                 <div class="tax-row">
@@ -76,7 +82,10 @@ import { HouseholdProfile } from '@models/api.model';
                 @if (item.source === 'brackets') {
                   @if (item.federalAnnual > 0) {
                     <div class="tax-row tax-sub">
-                      <span class="tax-label">↳ Federal (annual)</span>
+                      <span class="tax-label">
+                        ↳ Federal (annual)
+                        <app-source-tooltip [sources]="fedBracketSources" label="2026 federal brackets" />
+                      </span>
                       <span class="tax-value">{{ fmt(item.federalAnnual) }}</span>
                     </div>
                   }
@@ -185,6 +194,9 @@ export class TaxesScreenComponent implements OnInit {
   readonly dyscalculia = inject(DyscalculiaService);
   private readonly api = inject(ApiService);
 
+  readonly fedBracketSources = FED_BRACKETS_2026_SOURCES;
+  readonly fedStdDeductionSources = FED_STD_DEDUCTION_2026_SOURCES;
+
   /** Proxy onto the shared LocationService signal so edits fan out to Compare, Overview, etc. */
   readonly annualIncome = this.loc.annualIncome;
 
@@ -205,6 +217,9 @@ export class TaxesScreenComponent implements OnInit {
           socialRate: l.taxes?.socialChargesRate ?? null,
           salesRate: l.taxes?.salesTax?.rate ?? null,
           notes: l.taxes?.notes ?? '',
+          // Country-level citations injected by retirement-api from its
+          // shared/country-tax-sources map (Todos #11).
+          taxSources: l.taxes?.sources,
         };
       })
       .sort((a, b) => a.monthlyTax - b.monthlyTax);

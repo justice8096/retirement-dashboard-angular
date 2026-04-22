@@ -2,6 +2,7 @@ import { Component, inject, computed, OnInit } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { bulletText } from '@models/api.model';
 
 @Component({
   selector: 'app-brochure-screen',
@@ -46,8 +47,8 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
               </div>
               @if (item.pros.length) {
                 <div class="b-pros">
-                  @for (p of item.pros.slice(0, 3); track p) {
-                    <span class="b-pro">✓ {{ p }}</span>
+                  @for (p of item.pros.slice(0, 3); track $index) {
+                    <span class="b-pro">✓ {{ bulletText(p) }}</span>
                   }
                 </div>
               }
@@ -96,6 +97,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
   `],
 })
 export class BrochureScreenComponent implements OnInit {
+  readonly bulletText = bulletText;
   readonly loc = inject(LocationService);
   readonly dyscalculia = inject(DyscalculiaService);
 
@@ -130,8 +132,8 @@ export class BrochureScreenComponent implements OnInit {
       `<tr><td>${b.icon} ${esc(b.label)}</td><td class="num">${this.fmt(b.value)}</td></tr>`
     ).join('');
 
-    const bullets = (arr: string[] | undefined, cls: string, mark: string) =>
-      (arr ?? []).map(x => `<li class="${cls}">${mark} ${esc(x)}</li>`).join('');
+    const bullets = (arr: Array<string | { text: string }> | undefined, cls: string, mark: string) =>
+      (arr ?? []).map(x => `<li class="${cls}">${mark} ${esc(bulletText(x))}</li>`).join('');
 
     const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>${esc(loc.name)} — Brochure</title>

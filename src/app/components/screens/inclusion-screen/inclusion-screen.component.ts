@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { ApiService } from '@services/api.service';
 import { InclusionSupplement, InclusionCategory } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 interface LocInclusion {
   id: string;
@@ -14,6 +15,7 @@ interface LocInclusion {
 @Component({
   selector: 'app-inclusion-screen',
   standalone: true,
+  imports: [SourceTooltipComponent],
   template: `
     <div class="incl-screen">
       <div class="screen-header">
@@ -71,7 +73,10 @@ interface LocInclusion {
                     <span class="cat-name">{{ cat.label }}</span>
                     <span class="cat-score" [class]="scoreClass(cat.cat.score)">{{ cat.cat.score }}/10</span>
                   </div>
-                  <p class="cat-summary">{{ cat.cat.summary }}</p>
+                  <p class="cat-summary">
+                    {{ cat.cat.summary }}
+                    <app-source-tooltip [sources]="cat.cat.sources" />
+                  </p>
                   @if (cat.cat.positiveFactors?.length) {
                     <div class="factors">
                       @for (f of cat.cat.positiveFactors; track f) {

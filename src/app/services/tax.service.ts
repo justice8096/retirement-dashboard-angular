@@ -1,6 +1,14 @@
 import { Injectable, inject, computed } from '@angular/core';
 import { LocationService } from './location.service';
 import { LocationFull, IncomeTaxTable, COST_CATEGORIES } from '@models/api.model';
+import { FED_BRACKETS_2026_MFJ, FED_STD_DEDUCTION_2026 } from '../lib/tax-sources';
+
+/** US-state location heuristic — drives the shared 2026-MFJ federal fallback
+ *  when the seed doesn't ship location-level federal brackets (most don't). */
+function isUsLocation(loc: LocationFull): boolean {
+  const c = (loc.country ?? '').toLowerCase();
+  return c === 'us' || c === 'usa' || c === 'united states' || loc.id?.startsWith('us-');
+}
 
 /**
  * Tax computation helpers extracted from LocationService. All methods are pure
@@ -83,9 +91,22 @@ export class TaxService {
     source: 'brackets' | 'stored' | 'vat-converged' | 'none';
   } {
     const t = loc.taxes;
-    if (t?.federalIncomeTax?.brackets?.length || t?.stateIncomeTax?.brackets?.length) {
-      const fed = this.applyBrackets(t.federalIncomeTax, annualIncome);
-      const state = this.applyBrackets(t.stateIncomeTax, annualIncome);
+    // US locations: apply the shared 2026 MFJ federal table when the seed
+    // doesn't ship federal brackets. Matches what retirement-api/shared/
+    // taxes.js does in calcTaxesForLocation — the dashboard was out of sync.
+    const hasSeedFed   = !!t?.federalIncomeTax?.brackets?.length;
+    const hasSeedState = !!t?.stateIncomeTax?.brackets?.length;
+    const fallbackFed  = !hasSeedFed && isUsLocation(loc);
+
+    if (hasSeedFed || hasSeedState || fallbackFed) {
+      const fedTable: IncomeTaxTable | undefined = hasSeedFed
+        ? t!.federalIncomeTax
+        : (fallbackFed ? {
+            brackets: FED_BRACKETS_2026_MFJ,
+            standardDeduction: FED_STD_DEDUCTION_2026.mfj,
+          } : undefined);
+      const fed = this.applyBrackets(fedTable, annualIncome);
+      const state = this.applyBrackets(t?.stateIncomeTax, annualIncome);
       return {
         monthlyTax: (fed + state) / 12,
         federalAnnual: fed,
