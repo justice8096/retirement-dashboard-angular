@@ -8,12 +8,27 @@ import { TaxService } from '@services/tax.service';
 import {
   FinancialSettings, HouseholdProfile, HouseholdMember, LocationFull,
   NeighborhoodsSupplement, InclusionSupplement, InclusionCategory,
-  Scenario,
+  LocalInfoSupplement, Scenario, bulletText,
 } from '@models/api.model';
 import { escYaml as yamlStr } from '@app/lib/text-escape';
 
 type NeighborhoodsBag = Record<string, NeighborhoodsSupplement | null>;
 type InclusionBag = Record<string, InclusionSupplement | null>;
+type LocalInfoBag = Record<string, LocalInfoSupplement | null>;
+
+/** Shape of the services supplement JSON — kept local since no shared model
+ *  covers the category-level fields the report surfaces. */
+interface ServicesBagEntry {
+  distanceUnit?: 'mi' | 'km';
+  services?: Array<{
+    categoryId?: string;
+    name?: string;
+    distanceMi?: number;
+    distanceKm?: number;
+    notes?: string;
+  }>;
+}
+type ServicesBag = Record<string, ServicesBagEntry | null>;
 
 /** Simple FIRE-number & year math replicated here so the report is a single,
  *  self-contained module. Matches the formulas used by the FIRE calc and
@@ -48,7 +63,7 @@ const GUARDRAIL_CEILING = 0.055;
           <li><strong>FIRE math:</strong> FIRE number, progress, years remaining at current pace.</li>
           <li><strong>Cash flow:</strong> Social Security projection, portfolio withdrawal, expected taxes.</li>
           <li><strong>Guardrails bands:</strong> floor / base / ceiling withdrawal ranges.</li>
-          <li><strong>Per-location chapters</strong> (one per selected location) — costs, climate, healthcare, visa, inclusion, neighborhoods.</li>
+          <li><strong>Per-location chapters</strong> (one per selected location) — costs, climate, healthcare, visa, inclusion, neighborhoods, community &amp; services, local info &amp; resources.</li>
           <li><strong>Front-matter</strong> with machine-readable numbers so the narrative can be verified against structured data.</li>
         </ul>
       </div>
@@ -171,12 +186,14 @@ export class ReportScreenComponent {
       financial: this.api.getFinancial().pipe(catchError(() => of(null))),
       neighborhoods: this.api.batchLoadSupplements(ids, 'neighborhoods').pipe(catchError(() => of({} as Record<string, unknown>))),
       inclusion: this.api.batchLoadSupplements(ids, 'inclusion').pipe(catchError(() => of({} as Record<string, unknown>))),
+      services: this.api.batchLoadSupplements(ids, 'services').pipe(catchError(() => of({} as Record<string, unknown>))),
+      localInfo: this.api.batchLoadSupplements(ids, 'local-info').pipe(catchError(() => of({} as Record<string, unknown>))),
       // Saved MC scenarios — empty list on fetch failure so the report still
       // generates. Users who've never saved a scenario will just get the
       // "no scenarios saved yet" note in that section.
       scenarios: this.api.getScenarios().pipe(catchError(() => of([] as Scenario[]))),
     }).subscribe({
-      next: ({ household, financial, neighborhoods, inclusion, scenarios }) => {
+      next: ({ household, financial, neighborhoods, inclusion, services, localInfo, scenarios }) => {
         try {
           const full = this.loc.fullLocations();
           const selected = full.filter(l => this.loc.selectedIds().has(l.id));
@@ -189,6 +206,8 @@ export class ReportScreenComponent {
             selected,
             neighborhoodsBag: neighborhoods as unknown as NeighborhoodsBag,
             inclusionBag: inclusion as unknown as InclusionBag,
+            servicesBag: services as unknown as ServicesBag,
+            localInfoBag: localInfo as unknown as LocalInfoBag,
             scenarios,
             tax: this.tax,
           });
@@ -236,10 +255,12 @@ function buildReportMarkdown(args: {
   selected: LocationFull[];
   neighborhoodsBag: NeighborhoodsBag;
   inclusionBag: InclusionBag;
+  servicesBag: ServicesBag;
+  localInfoBag: LocalInfoBag;
   scenarios: Scenario[];
   tax: TaxService;
 }): string {
-  const { household, financial, selected, neighborhoodsBag, inclusionBag, scenarios, tax } = args;
+  const { household, financial, selected, neighborhoodsBag, inclusionBag, servicesBag, localInfoBag, scenarios, tax } = args;
   const gen = new Date();
   const genIso = gen.toISOString();
   const genHuman = gen.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -424,7 +445,7 @@ function buildReportMarkdown(args: {
   lines.push('');
 
   for (const l of selected) {
-    lines.push(...buildLocationChapter(l, neighborhoodsBag, inclusionBag, tax, targetIncome));
+    lines.push(...buildLocationChapter(l, neighborhoodsBag, inclusionBag, servicesBag, localInfoBag, tax, targetIncome));
   }
 
   // ─── Saved Scenarios ──────────────────────────────────────────
@@ -452,6 +473,8 @@ function buildLocationChapter(
   l: LocationFull,
   nb: NeighborhoodsBag,
   inc: InclusionBag,
+  svc: ServicesBag,
+  li: LocalInfoBag,
   tax: TaxService,
   targetIncome: number,
 ): string[] {
@@ -464,11 +487,14 @@ function buildLocationChapter(
   out.push(opener);
   out.push('');
 
-  // Pros / cons, if the location has them
+  // Pros / cons, if the location has them. Pros remain legacy strings;
+  // cons are now {text, sources?} objects — use bulletText so both render.
   if (l.pros?.length || l.cons?.length) {
-    out.push(`**What works here:** ${(l.pros ?? []).join('; ') || '—'}.`);
+    const prosJoined = (l.pros ?? []).map(bulletText).join('; ') || '—';
+    const consJoined = (l.cons ?? []).map(bulletText).join('; ') || '—';
+    out.push(`**What works here:** ${prosJoined}.`);
     out.push('');
-    out.push(`**What to think twice about:** ${(l.cons ?? []).join('; ') || '—'}.`);
+    out.push(`**What to think twice about:** ${consJoined}.`);
     out.push('');
   }
 
@@ -518,6 +544,30 @@ function buildLocationChapter(
     out.push('');
     out.push(neighborhoodsParagraph(nbData));
     out.push('');
+  }
+
+  // Community & services (category coverage, not individual listings)
+  const svcData = svc[l.id];
+  if (svcData?.services?.length) {
+    const p = servicesParagraph(svcData);
+    if (p) {
+      out.push(`#### Community & services`);
+      out.push('');
+      out.push(p);
+      out.push('');
+    }
+  }
+
+  // Local info / resources (webcams, blogs, YouTube, official sites)
+  const liData = li[l.id];
+  if (liData) {
+    const p = localInfoParagraph(liData);
+    if (p) {
+      out.push(`#### Local info & resources`);
+      out.push('');
+      out.push(p);
+      out.push('');
+    }
   }
 
   return out;
@@ -648,6 +698,69 @@ function inclusionParagraph(data: InclusionSupplement): string {
   if (racial?.summary) extras.push(`On racial inclusion: ${racial.summary}`);
   if (xeno?.summary) extras.push(`On country-of-origin inclusion: ${xeno.summary}`);
   return [header + breakdown, ...extras].join(' ');
+}
+
+/** Summarise the services supplement — focuses on category coverage, not
+ *  individual listings, so the narrative stays scannable. Highlights the
+ *  community/cultural categories added in the 2026-04 sweep. */
+function servicesParagraph(data: ServicesBagEntry): string {
+  const services = data.services ?? [];
+  if (!services.length) return '';
+  const catSet = new Set<string>();
+  for (const s of services) if (s.categoryId) catSet.add(s.categoryId);
+
+  // Flag community / cultural categories the user has specifically asked about.
+  const communityMap: Record<string, string> = {
+    religious_mosque: 'mosque',
+    religious_synagogue: 'synagogue',
+    grocery_halal: 'halal grocer',
+    grocery_kosher: 'kosher grocer',
+    hair_care_african: 'Black/African hair care',
+    restaurant_local: 'local cuisine',
+    clothing_womens: "women's clothing",
+    clothing_mens: "men's clothing",
+    clothing_childrens: "children's clothing",
+    clothing_bigtall: 'big & tall clothing',
+  };
+  const present: string[] = [];
+  for (const [key, label] of Object.entries(communityMap)) {
+    if (catSet.has(key)) present.push(label);
+  }
+  const essentialCats = ['hospital', 'pharmacy', 'grocery', 'bank', 'public_transit', 'airport'];
+  const missingEssential = essentialCats.filter(c => !catSet.has(c));
+
+  const parts: string[] = [];
+  parts.push(`Covers ${catSet.size} service categor${catSet.size === 1 ? 'y' : 'ies'} across ${services.length} listing${services.length === 1 ? '' : 's'}.`);
+  if (present.length) {
+    parts.push(`Community coverage includes ${present.join(', ')}.`);
+  }
+  if (missingEssential.length) {
+    parts.push(`Missing essential categories: ${missingEssential.join(', ')}.`);
+  }
+  return parts.join(' ');
+}
+
+/** Summarise the local-info supplement — counts per resource group and
+ *  whether an official city/government site exists. */
+function localInfoParagraph(data: LocalInfoSupplement): string {
+  const w = data.webcams?.length ?? 0;
+  const y = data.youtubeChannels?.length ?? 0;
+  const b = data.bloggers?.length ?? 0;
+  const o = data.officialSites?.length ?? 0;
+  if (w + y + b + o === 0) return '';
+  const parts: string[] = [];
+  const counts: string[] = [];
+  if (o) counts.push(`${o} official site${o === 1 ? '' : 's'}`);
+  if (w) counts.push(`${w} webcam${w === 1 ? '' : 's'}`);
+  if (y) counts.push(`${y} YouTube channel${y === 1 ? '' : 's'}`);
+  if (b) counts.push(`${b} blog${b === 1 ? '' : 's'}`);
+  parts.push(`Resources linked: ${counts.join(', ')}.`);
+  // Name the top official site if any — that's what most users will click first.
+  const topOfficial = data.officialSites?.[0];
+  if (topOfficial?.name && topOfficial.url) {
+    parts.push(`Primary government reference: [${topOfficial.name}](${topOfficial.url}).`);
+  }
+  return parts.join(' ');
 }
 
 function neighborhoodsParagraph(data: NeighborhoodsSupplement): string {
