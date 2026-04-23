@@ -42,32 +42,38 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
         @if (isLoading()) {
           <div class="status-msg">Loading services…</div>
         } @else if (services().length) {
-          @for (group of grouped(); track group.category) {
-            <div class="group-section">
+          @for (group of grouped(); track group.categoryId) {
+            <div class="group-section" [class.group-empty]="group.empty">
               <h3 class="group-title">{{ group.category }}</h3>
-              <div class="svc-grid">
-                @for (svc of group.items; track svc.name) {
-                  <div class="svc-card">
-                    <div class="svc-name">{{ svc.name }}</div>
-                    @if (svc.address) {
-                      <div class="svc-address">📍 {{ svc.address }}</div>
-                    }
-                    @if (svc.distanceKm) {
-                      <div class="svc-dist">{{ svc.distanceKm }} km away</div>
-                    }
-                    @if (svc.notes) {
-                      <div class="svc-notes">
-                        {{ svc.notes }}
-                        <app-source-tooltip [sources]="svc.sources" />
-                      </div>
-                    } @else {
-                      <div class="svc-notes">
-                        <app-source-tooltip [sources]="svc.sources" />
-                      </div>
-                    }
-                  </div>
-                }
-              </div>
+              @if (group.empty) {
+                <div class="svc-empty">
+                  No {{ group.category.toLowerCase() }} listed yet for this city.
+                </div>
+              } @else {
+                <div class="svc-grid">
+                  @for (svc of group.items; track svc.name) {
+                    <div class="svc-card">
+                      <div class="svc-name">{{ svc.name }}</div>
+                      @if (svc.address) {
+                        <div class="svc-address">📍 {{ svc.address }}</div>
+                      }
+                      @if (svc.distanceKm) {
+                        <div class="svc-dist">{{ svc.distanceKm }} km away</div>
+                      }
+                      @if (svc.notes) {
+                        <div class="svc-notes">
+                          {{ svc.notes }}
+                          <app-source-tooltip [sources]="svc.sources" />
+                        </div>
+                      } @else {
+                        <div class="svc-notes">
+                          <app-source-tooltip [sources]="svc.sources" />
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              }
             </div>
           }
         } @else if (activeCity()) {
@@ -140,10 +146,17 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
     }
 
     .group-section { margin-top: 4px; }
+    .group-section.group-empty .group-title { color: var(--dark-text-muted); }
     .group-title {
       font-size: 13px; font-weight: 700; color: var(--dark-text-sec);
       text-transform: capitalize; margin: 0 0 8px;
       padding-bottom: 6px; border-bottom: 1px solid var(--dark-bg-secondary);
+    }
+    .svc-empty {
+      font-size: 11px; color: var(--dark-text-muted); font-style: italic;
+      padding: 8px 12px; margin-bottom: 12px;
+      border: 1px dashed var(--dark-border); border-radius: 6px;
+      background: var(--dark-bg-secondary);
     }
     .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-bottom: 12px; }
     .svc-card {
@@ -193,14 +206,69 @@ export class ServicesScreenComponent implements OnInit {
     this.loc.fullLocations().find(l => l.id === this.activeCity()) ?? null
   );
 
+  /**
+   * Canonical category list — displayed in this order. `essential: true`
+   * categories render even when the current city has no entries; users
+   * see a "no listings yet" card instead of the category silently
+   * disappearing (makes data gaps visible).
+   *
+   * Any categoryId arriving in `services()` that isn't in this list is
+   * rendered at the end using the raw id as the label (fallback path
+   * for future additions before this map is updated).
+   */
+  private readonly CATEGORY_META: { id: string; label: string; essential: boolean }[] = [
+    { id: 'hospital',             label: 'Hospitals',                essential: true },
+    { id: 'doctor_gp',            label: 'General Practitioners',    essential: true },
+    { id: 'dentist',              label: 'Dentists',                 essential: true },
+    { id: 'pharmacy',             label: 'Pharmacies',               essential: true },
+    { id: 'grocery',              label: 'Grocery & Supermarkets',   essential: true },
+    { id: 'electronics',          label: 'Electronics',              essential: true },
+    { id: 'hardware',             label: 'Hardware / Home Improvement', essential: true },
+    { id: 'bank',                 label: 'Banks',                    essential: true },
+    { id: 'public_transit',       label: 'Public Transit',           essential: true },
+    { id: 'airport',              label: 'Airports',                 essential: true },
+    { id: 'gym',                  label: 'Gyms & Fitness',           essential: true },
+    { id: 'coworking',            label: 'Coworking Spaces',         essential: false },
+    { id: 'english_church',       label: 'English-Speaking Churches', essential: false },
+    { id: 'international_school', label: 'International Schools',    essential: false },
+    { id: 'vet',                  label: 'Veterinarians',            essential: false },
+    { id: 'pet_groomer',          label: 'Pet Groomers',             essential: false },
+    { id: 'pet_daycare',          label: 'Pet Daycare',              essential: false },
+    { id: 'dog_park',             label: 'Dog Parks',                essential: false },
+    { id: 'legal',                label: 'Legal Services',           essential: false },
+    { id: 'postal',               label: 'Postal Services',          essential: false },
+    { id: 'library',              label: 'Libraries',                essential: false },
+    { id: 'home_repair',          label: 'Home Repair',              essential: false },
+    { id: 'attraction',           label: 'Attractions',              essential: false },
+    { id: 'cultural',             label: 'Cultural',                 essential: false },
+  ];
+
   readonly grouped = computed(() => {
-    const map = new Map<string, LocalService[]>();
+    // Bucket services by categoryId.
+    const byCat = new Map<string, LocalService[]>();
     for (const svc of this.services()) {
       const cat = svc.categoryId || 'other';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(svc);
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat)!.push(svc);
     }
-    return Array.from(map.entries()).map(([category, items]) => ({ category, items }));
+
+    // Emit canonical categories in order — include empty ones where
+    // `essential: true`, skip empty non-essentials, then append any
+    // unknown categoryIds at the end.
+    const out: { category: string; items: LocalService[]; empty: boolean; categoryId: string }[] = [];
+    const seen = new Set<string>();
+    for (const meta of this.CATEGORY_META) {
+      const items = byCat.get(meta.id) ?? [];
+      seen.add(meta.id);
+      if (items.length === 0 && !meta.essential) continue;
+      out.push({ category: meta.label, items, empty: items.length === 0, categoryId: meta.id });
+    }
+    // Fallback: any categoryId in data that wasn't in CATEGORY_META.
+    for (const [cat, items] of byCat) {
+      if (seen.has(cat) || items.length === 0) continue;
+      out.push({ category: cat, items, empty: false, categoryId: cat });
+    }
+    return out;
   });
 
   ngOnInit(): void {
