@@ -570,10 +570,10 @@ export interface InclusionSupplement {
 
 /* ─── Supplement: Local Info ────────────────────────────────────── */
 export interface LocalInfoSupplement {
-  webcams?: { title: string; url: string }[];
-  bloggers?: { title: string; url: string }[];
-  officialSites?: { title: string; url: string }[];
-  youtubeChannels?: { title: string; url: string }[];
+  webcams?: { name: string; url: string; description?: string }[];
+  bloggers?: { name: string; url: string; description?: string }[];
+  officialSites?: { name: string; url: string; description?: string }[];
+  youtubeChannels?: { name: string; url: string; description?: string }[];
 }
 
 /* --- Brokerage & Transfer Fees --- */
