@@ -136,7 +136,21 @@ const HIST_BINS = 40;
               <span class="param-label">Other Income ($/mo)</span>
               <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
                 [ngModel]="monthlyIncome()" (ngModelChange)="monthlyIncome.set($event)" />
-              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Pension, part-time, annuity · {{ fmt(monthlyIncome() * 12, '/yr') }}</span>
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Permanent pension / annuity · {{ fmt(monthlyIncome() * 12, '/yr') }}</span>
+            </label>
+
+            <label class="param">
+              <span class="param-label">Part-Time Income ($/mo)</span>
+              <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+                [ngModel]="partTimeMonthlyIncome()" (ngModelChange)="partTimeMonthlyIncome.set($event)" />
+              <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Barista-FIRE / bridge income · {{ fmt(partTimeMonthlyIncome() * 12, '/yr') }} · cliffs to $0 at year {{ partTimeEndYear() }}</span>
+            </label>
+
+            <label class="param">
+              <span class="param-label">Part-Time Ends (year)</span>
+              <input appNumeric="age" class="param-input" min="0" [max]="years()"
+                [ngModel]="partTimeEndYear()" (ngModelChange)="partTimeEndYear.set($event)" />
+              <span class="param-hint">0 = no part-time. Common: 5 years bridging to full SS at FRA.</span>
             </label>
 
             <label class="param">
@@ -972,6 +986,8 @@ export class MontecarloScreenComponent implements OnInit {
   readonly portfolio = signal(0);
   readonly ssMonthly = signal(0);
   readonly monthlyIncome = signal(0);
+  readonly partTimeMonthlyIncome = signal(0);
+  readonly partTimeEndYear = signal(0);
   readonly runs = signal(5000);
   readonly ssCutSources = SS_CUT_SOURCES;
   readonly rmdSources = RMD_AGE_SOURCES;
@@ -1206,6 +1222,7 @@ export class MontecarloScreenComponent implements OnInit {
       // Dependency-read each input. Order doesn't matter; Angular tracks
       // any signal read inside this effect body.
       this.portfolio(); this.ssMonthly(); this.monthlyIncome();
+      this.partTimeMonthlyIncome(); this.partTimeEndYear();
       this.runs(); this.years();
       this.meanReturn(); this.volatility();
       this.meanInflation(); this.inflVol(); this.currVol(); this.fxDrift();
@@ -1453,6 +1470,8 @@ export class MontecarloScreenComponent implements OnInit {
         portfolio: this.portfolio(),
         ssMonthly: this.ssMonthly(),
         monthlyIncome: this.monthlyIncome(),
+        partTimeMonthlyIncome: this.partTimeMonthlyIncome(),
+        partTimeEndYear: this.partTimeEndYear(),
         meanReturn: this.meanReturn(),
         volatility: this.volatility(),
         meanInflation: this.meanInflation(),
@@ -1531,6 +1550,8 @@ export class MontecarloScreenComponent implements OnInit {
           spouseDeathYear: this.spouseDeathEnabled() ? this.spouseDeathYear() : undefined,
           survivorMonthlyIncome: this.spouseDeathEnabled() ? this.survivorMonthlyIncome() : undefined,
           survivorCostRatio: this.spouseDeathEnabled() ? this.survivorCostRatio() / 100 : undefined,
+          partTimeMonthlyIncome: this.partTimeMonthlyIncome(),
+          partTimeEndYear: this.partTimeEndYear(),
           regime: {
             bullMean: this.regimeBullMean() / 100,
             bullVol: this.regimeBullVol() / 100,
