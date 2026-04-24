@@ -842,8 +842,8 @@ import { LocationFull, COST_CATEGORIES, bulletText } from '@models/api.model';
       color: var(--dark-green);
     }
     .con-tag {
-      background: rgba(229, 115, 115, 0.12);
-      color: var(--dark-red);
+      background: rgba(139, 157, 195, 0.15);
+      color: var(--dark-neutral);
     }
   `],
 })

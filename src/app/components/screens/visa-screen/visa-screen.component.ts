@@ -222,7 +222,7 @@ type SortBy = 'income' | 'country' | 'type';
 
     .green { color: var(--dark-green); }
     .amber { color: var(--dark-amber); }
-    .red   { color: var(--dark-red); }
+    .red   { color: var(--dark-neutral); }
     .muted { color: var(--dark-text-muted); font-weight: 400; }
 
     .detail-card {

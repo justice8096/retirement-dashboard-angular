@@ -1,56 +1,70 @@
-POST-COMMIT AUDIT SUMMARY
-==========================
-Date:          2026-04-21
-Commit:        7828023 (base — working tree has 27 staged/unstaged changes)
-Branch:        main
-Cycle scope:   2026-04-20 → 2026-04-21 feature-port sweep + in-cycle audit
+POST-COMMIT AUDIT SUMMARY — retirement-dashboard-angular
+=========================================================
+Date:           2026-04-24
+Commit:         4f6f307
+Branch:         main
+Project:        Angular 21 retirement dashboard (standalone components, signals)
+Previous Audit: 2026-04-21 (PASS, 1 LOW resolved in-audit)
 
-1. SAST/DAST Scan:          PASS — 0 CRITICAL / 0 HIGH / 0 MEDIUM
-                            1 LOW raised & RESOLVED in-audit (MC noopener)
-                            3 INFO: 2 resolved, 1 structural deferred
+Recent merges in this batch:
+  #51 Narrative Report new chapters + cons rendering fix
+  #52 Monte Carlo: survivor tax + IRMAA + stepped-up basis (adds src/app/lib/irmaa.ts)
+  #53 Monte Carlo: Part-time income (Barista FIRE) cliff end-year
 
-2. Supply Chain Audit:      PASS — SLSA Level 2 (maintained)
-                            1 HIGH raised & RESOLVED in-audit (@types/* misplacement)
-                            1 MEDIUM accepted (d3-sankey maintenance status)
-                            npm audit --omit=dev: 0 vulnerabilities
+Phase 1 (Security Scanning):
+  1. SAST/DAST Scan:        PASS — 0 critical / 0 high / 0 medium / 2 low / 4 info
+                            Both LOW findings are the same pattern (CWE-502 — localStorage
+                            JSON parsed with unchecked TypeScript cast):
+                              src/app/services/dyslexia.service.ts:86–89
+                              src/app/services/dyscalculia.service.ts:308–311
+                            Blast radius is confined to the user's own browser; both sites
+                            are already wrapped in try/catch with safe fallback defaults.
 
-3. CWE Mapping:             PASS — 6 relevant CWEs mapped across 8 frameworks
-                            0 net new OPEN findings (MC noopener fixed in-cycle)
-                            4 LOW items remain in cumulative register
+                            Sanity-passed checks across all of src/:
+                              No [innerHTML], no bypassSecurity*, no DomSanitizer escapes
+                              No eval-family code-injection sinks
+                              All raw HTML/SVG emitters (brochure print, MC print HTML +
+                                SVG export, report markdown download) pass interpolated
+                                fields through a 5-entity escape; src/app/lib/text-escape.ts
+                                is shared and unit-tested (commit f4a86cb)
+                              All window.open() use noopener,noreferrer
+                              Math.random() is statistical-only (Box-Muller, regime Markov,
+                                bootstrap sampling); UUIDs use crypto.randomUUID()
+                              No secrets in src/environments/*
 
-4. LLM Compliance:          70/100 — DEVELOPING (upper band)
-                            Up from 65/100 on 2026-04-20
-                            +5 Supply Chain, +5 Bias, +5 Incident Response
-                            Gap to MATURE (70+): no README, no SBOM publish, no tests
+  2. Supply Chain Audit:    PASS — SLSA Level 2 (maintained from 2026-04-21)
+                            Every uses: pinned by 40-char SHA in .github/workflows.
+                            CycloneDX SBOM generated in CI.
+                            No new deps in PR #51 / #52 / #53 batch.
+                            No typosquat candidates in dependency tree.
+                            Zero network calls in scripts/ folder.
+                            npm audit --omit=dev: 0 vulnerabilities (clean).
 
-5. Contribution Analysis:   Keystroke-weighted:    ~15% Human / 85% AI
-                            Decision-weighted:     ~55% Human / 45% AI
-                            Grade: A-
+  3. CWE Mapping:           1 active CWE (CWE-502) at 2 call sites.
+                            Mapped to OWASP Top 10 2021 (A08), OWASP LLM Top 10 (LLM03),
+                            NIST SP 800-53, EU AI Act Art. 25, ISO 27001, SOC 2,
+                            MITRE ATT&CK, MITRE ATLAS.
 
------------------------------------------------------------------
-Overall: PASS
-Action Required: no — 0 HIGH/CRITICAL, 4 LOW deferred with effort estimates
-Recommended next session: README.md + SECURITY.md + unit tests for
-                          4 security-invariant pure functions (yamlStr, esc,
-                          escape, parseSpeedMbps). Total effort ~3 hours.
-                          Would lift LLM compliance from 70 → ~80 (MATURE band).
------------------------------------------------------------------
+Severity profile:
+  CRITICAL: 0   (was 0)
+  HIGH:     0   (was 0, 1 raised+resolved in 2026-04-21 cycle)
+  MEDIUM:   0   (was 0, 1 raised+accepted in 2026-04-21 cycle)
+  LOW:      2   (was 1, 1 resolved in 2026-04-21; 2 new today both same pattern)
+  INFO:     4   (positive controls)
 
-In-cycle remediations applied during this audit:
-  • @types/d3-sankey + @types/leaflet moved to devDependencies
-  • MC printCharts() now uses 'noopener,noreferrer' + 2.5s blob revoke timeout
-  • yamlStr() now escapes \n and \r for valid YAML front-matter on edge data
-
-Cumulative open items register (unchanged + accepted):
-  L-01  CWE-353   LOW  No SRI on jsDelivr font CSS                   10 min
-  L-02  CWE-400   LOW  Unthrottled localStorage.setItem              30 min
-  L-03  CWE-1021  LOW  Brochure window.open without noopener         10 min
-                       (same fix pattern as resolved MC instance)
-  L-04  CWE-20    LOW  No Zod schema on API response shapes          ~4 hr
+Top 3 recommendations:
+  1. Add a tiny runtime schema validator (hand-rolled or Zod) to both loadSaved() methods
+     in dyslexia.service.ts and dyscalculia.service.ts — closes both LOW findings via one
+     shared helper. CWE-502 mitigation.
+  2. Migrate the two remaining in-component esc() copies (brochure-screen, montecarlo-screen)
+     to import from the unit-tested src/app/lib/text-escape.ts to prevent drift.
+  3. Consider a Trusted Types CSP header at the hosting layer to convert the "no unsafe sinks
+     today" property into an enforced runtime invariant.
 
 Reports:
-  audits/sast-dast-scan.md          (replaced 2026-04-19 baseline)
-  audits/supply-chain-audit.md      (replaced 2026-04-20 baseline)
-  audits/cwe-mapping.md             (replaced 2026-04-20 baseline)
-  audits/llm-compliance-report.md   (replaced 2026-04-20 baseline)
-  audits/contribution-analysis.md   (replaced 2026-04-20 baseline)
+  audits/sast-dast-scan-2026-04-24.md
+  audits/supply-chain-audit-2026-04-24.md
+  audits/cwe-mapping-2026-04-24.md
+
+Overall:         PASS
+Action Required: NO — recommendations are optional hardening; LOW findings are constrained-radius and already defensively wrapped.

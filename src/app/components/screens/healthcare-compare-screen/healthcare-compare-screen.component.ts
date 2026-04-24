@@ -268,9 +268,9 @@ const ACA_MONTHLY_ESTIMATE = 1200;
 
     .q-good { color: var(--dark-green); font-weight: 700; }
     .q-mid  { color: var(--dark-amber); font-weight: 700; }
-    .q-low  { color: var(--dark-red); font-weight: 700; }
+    .q-low  { color: var(--dark-neutral); font-weight: 700; }
     .green { color: var(--dark-green); }
-    .red   { color: var(--dark-red); }
+    .red   { color: var(--dark-neutral); }
 
     .scatter { display: flex; flex-direction: column; }
     .scatter-axes { display: grid; grid-template-columns: 36px 1fr; gap: 4px; height: 320px; }
@@ -319,7 +319,7 @@ const ACA_MONTHLY_ESTIMATE = 1200;
     .qm-fill { height: 100%; transition: width 0.3s; }
     .qm-fill.q-good { background: var(--dark-green); }
     .qm-fill.q-mid  { background: var(--dark-amber); }
-    .qm-fill.q-low  { background: var(--dark-red); }
+    .qm-fill.q-low  { background: var(--dark-neutral); }
     .qm-val { font-size: 14px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
 
     .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
@@ -327,7 +327,7 @@ const ACA_MONTHLY_ESTIMATE = 1200;
     .detail-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 4px; }
     .detail-val { font-size: 16px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
     .detail-val.green { color: var(--dark-green); }
-    .detail-val.red { color: var(--dark-red); }
+    .detail-val.red { color: var(--dark-neutral); }
 
     .aca-note, .warning-block {
       padding: 12px 14px; border-radius: 8px; font-size: 13px;

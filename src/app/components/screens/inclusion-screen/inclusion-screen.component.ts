@@ -134,12 +134,12 @@ interface LocInclusion {
     .cat-score { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
     .cat-score.good { background: rgba(76, 175, 80, 0.12); color: var(--dark-green); }
     .cat-score.ok { background: rgba(212, 148, 58, 0.12); color: var(--dark-amber); }
-    .cat-score.bad { background: rgba(229, 115, 115, 0.12); color: var(--dark-red); }
+    .cat-score.bad { background: rgba(139, 157, 195, 0.15); color: var(--dark-neutral); }
     .cat-summary { font-size: 12px; color: var(--dark-text-sec); line-height: 1.4; margin: 0; }
     .factors { display: flex; flex-direction: column; gap: 3px; }
     .factor { font-size: 11px; padding: 2px 0; line-height: var(--prose-line-height, 1.5); }
     .factor.pos { color: var(--dark-green); }
-    .factor.neg { color: var(--dark-red); }
+    .factor.neg { color: var(--dark-neutral); }
 
     .fallback-card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
