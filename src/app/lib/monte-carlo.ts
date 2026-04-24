@@ -291,6 +291,24 @@ export interface MonteCarloParams {
    */
   ltcInsuranceMonthly?: number;
   ltcInsuranceStartAge?: number; // default 60
+
+  /**
+   * FX stress test — a one-time abrupt currency move at `fxShockYear`.
+   * Distinct from `fxDrift` (ongoing per-year drift) and `currVol` (annual
+   * random shock per year). This shock is deterministic: if you set
+   * +0.10, the USD weakens 10% in a single year against the local
+   * currency, raising all foreign-cost-of-living deductions by 10×
+   * thereafter. Negative values represent USD strengthening.
+   *
+   * Only applied to foreign segments — no-op for US-segment years.
+   * Permanent: the shock multiplier persists in `fxMult` so the rest
+   * of the sim runs at the new exchange-rate level. Useful for asking
+   * "what if EUR/USD goes from 0.93 to 1.05 in a recession?"
+   *
+   * Default: no shock applied.
+   */
+  fxShockYear?: number;
+  fxShockPct?: number; // decimal, e.g. 0.10 for +10% USD-weakens / cost-rises
 }
 
 export interface MonteCarloResult {
@@ -607,6 +625,10 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       const { ret, inf } = sampleYear(mode, y, p, regimeState);
       const currShock = curIsForeign ? 1 + currVol * normalRandom() : 1;
       if (curIsForeign && curDrift) fxMult *= (1 + curDrift);
+      // FX stress test: deterministic one-time shock at fxShockYear, foreign-only.
+      if (curIsForeign && p.fxShockYear != null && y === p.fxShockYear && p.fxShockPct) {
+        fxMult *= (1 + p.fxShockPct);
+      }
 
       // Part-time income stops at `partTimeEndYear` (exclusive — year == end is zero).
       const activePartTime = (partTimeEndYear > 0 && y < partTimeEndYear) ? partTime : 0;

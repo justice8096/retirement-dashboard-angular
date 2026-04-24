@@ -546,6 +546,42 @@ const HIST_BINS = 40;
           }
         </div>
 
+        <!-- FX stress test (#26) — only meaningful for foreign-segment plans -->
+        <div class="card death-card">
+          <h3 class="card-title">FX Stress Test</h3>
+          <p class="card-sub">
+            One-time abrupt currency shock at year Y, applied to foreign segments only.
+            Distinct from the ongoing FX drift parameter above. Use to ask "what if EUR
+            jumps 10% against USD in a single year?" — the multiplier persists, raising
+            all subsequent foreign-cost-of-living deductions. Positive % = USD weakens
+            (foreign cost rises); negative = USD strengthens.
+          </p>
+
+          <label class="param death-toggle">
+            <input type="checkbox"
+              [checked]="fxShockEnabled()"
+              (change)="fxShockEnabled.set(!fxShockEnabled())" />
+            <span>Apply FX stress shock to next simulation run</span>
+          </label>
+
+          @if (fxShockEnabled()) {
+            <div class="death-grid">
+              <label class="param">
+                <span class="param-label">Shock year</span>
+                <input type="range" class="param-range" min="0" [max]="years() - 1" step="1"
+                  [ngModel]="fxShockYear()" (ngModelChange)="fxShockYear.set(+$event)" />
+                <span class="param-hint">Year {{ fxShockYear() }} of {{ years() }}.</span>
+              </label>
+              <label class="param">
+                <span class="param-label">Shock magnitude (%)</span>
+                <input type="number" class="param-input" min="-50" max="50" step="1"
+                  [ngModel]="fxShockPct()" (ngModelChange)="fxShockPct.set(+$event)" />
+                <span class="param-hint">+10 = USD weakens 10% (foreign cost +10%). Try ±10 / ±20 to bracket.</span>
+              </label>
+            </div>
+          }
+        </div>
+
         <!-- Spouse-death scenario (deterministic) -->
         @if (adults().length >= 1) {
           <div class="card death-card">
@@ -1231,6 +1267,11 @@ export class MontecarloScreenComponent implements OnInit {
   readonly ltcInsuranceMonthly = signal(350);  // $4.2K/yr is mid-range LTC premium for 60yo
   readonly ltcInsuranceStartAge = signal(60);
 
+  /** FX stress test (#26). One-time shock at year Y, applied to foreign segments only. */
+  readonly fxShockEnabled = signal(false);
+  readonly fxShockYear = signal(5);
+  readonly fxShockPct = signal(10);  // % — positive = USD weakens (cost rises)
+
   /* ─── Spouse-death scenario (deterministic) ────────────────────── */
   readonly spouseDeathEnabled = signal(false);
   readonly spouseDeathYear = signal(10);
@@ -1530,6 +1571,7 @@ export class MontecarloScreenComponent implements OnInit {
       this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
       this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
       this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();
+      this.fxShockEnabled(); this.fxShockYear(); this.fxShockPct();
       this.spouseDeathEnabled(); this.spouseDeathYear();
       this.survivorCostRatio(); this.deceasedMemberIndex();
       this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
@@ -1816,6 +1858,9 @@ export class MontecarloScreenComponent implements OnInit {
         ltcStartAgeMax: this.ltcStartAgeMax(),
         ltcInsuranceMonthly: this.ltcInsuranceMonthly(),
         ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
+        fxShockEnabled: this.fxShockEnabled(),
+        fxShockYear: this.fxShockYear(),
+        fxShockPct: this.fxShockPct(),
         spouseDeathEnabled: this.spouseDeathEnabled(),
         spouseDeathYear: this.spouseDeathYear(),
         survivorCostRatio: this.survivorCostRatio(),
@@ -1889,6 +1934,8 @@ export class MontecarloScreenComponent implements OnInit {
           ltcInsuranceMonthly: (this.ltcMode() === 'insurance' || this.ltcMode() === 'both')
             ? this.ltcInsuranceMonthly() : 0,
           ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
+          fxShockYear: this.fxShockEnabled() ? this.fxShockYear() : undefined,
+          fxShockPct: this.fxShockEnabled() ? this.fxShockPct() / 100 : undefined,
           adultBirthYears: this.adults().map(m => m.birthYear),
           simStartYear: this.household()?.planningStartYear ?? new Date().getFullYear(),
           magiAnnual: this.healthcare.magi().magiForAca,
