@@ -4,7 +4,7 @@ import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
-import { FinancialSettings, HouseholdProfile } from '@models/api.model';
+import { FinancialSettings, HouseholdProfile, COST_CATEGORIES, LocationFull } from '@models/api.model';
 
 /* Guyton-Klinger guardrails.
  *   Base rate   : 4.0% of initial portfolio (inflation-adjusted annually).
@@ -127,6 +127,35 @@ interface ProjectionRow {
               <span class="marker-rate">({{ currentRatePct() }}% of portfolio)</span>
             </span>
           </div>
+
+          @if (essentialFloorPct() != null) {
+            <div class="ess-row">
+              <div class="ess-cell">
+                <div class="corr-label">Essential floor (dynamic)</div>
+                <div class="corr-val">{{ fmt(essentialMonthly() * 12) }}</div>
+                <div class="result-explain">
+                  {{ essentialFloorPct()!.toFixed(2) }}% of portfolio — the dollar amount you genuinely
+                  can't cut (rent, food, healthcare, insurance, utilities, transportation, taxes).
+                </div>
+              </div>
+              <div class="ess-cell">
+                <div class="corr-label">Discretionary (flex room)</div>
+                <div class="corr-val">{{ fmt(discretionaryMonthly() * 12) }}</div>
+                <div class="result-explain">
+                  Entertainment, clothing, personal care, pet care, subscriptions, miscellaneous,
+                  buffer. Cut here first in bad years before touching essentials.
+                </div>
+              </div>
+            </div>
+            @if (essentialFloorPct()! > 3) {
+              <p class="ess-warn">
+                ⚠ Your essential-spending floor ({{ essentialFloorPct()!.toFixed(2) }}%) is
+                <strong>tighter than</strong> the static Guyton-Klinger 3% floor. Bad-sequence
+                years bind harder than the rule-of-thumb implies — consider building a larger
+                cash buffer or planning a lower-cost-of-living move as a backup.
+              </p>
+            }
+          }
         </div>
       </div>
 
@@ -250,6 +279,17 @@ interface ProjectionRow {
       font-variant-numeric: tabular-nums;
     }
     .corridor-marker { display: flex; justify-content: center; }
+    .ess-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    .ess-cell {
+      padding: 14px 16px; background: var(--dark-bg-secondary); border-radius: 8px;
+      border-left: 3px solid var(--dark-amber);
+    }
+    .ess-cell:first-child { border-left-color: var(--dark-neutral); }
+    .ess-warn {
+      margin-top: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.4;
+      background: rgba(212, 148, 58, 0.08); border-left: 3px solid var(--dark-amber);
+      border-radius: 6px; color: var(--dark-text-sec);
+    }
     .marker-pill {
       padding: 8px 14px; border-radius: 999px;
       background: rgba(212, 148, 58, 0.12); color: var(--dark-amber);
@@ -341,6 +381,42 @@ export class GuardrailsScreenComponent implements OnInit {
   readonly monthlyHeadroom = computed(() =>
     Math.max(0, (this.guardrails().ceiling - this.annualSpending()) / 12)
   );
+
+  /**
+   * Sum of essential monthly cost categories in the user's selected location
+   * — the spending floor the household genuinely cannot cut in a bad-sequence
+   * year. Discretionary (entertainment, clothing, subscriptions, pet care,
+   * personal care, miscellaneous, buffer) flexes; essential stays.
+   */
+  readonly essentialMonthly = computed(() => this.sumByEssential(true));
+  readonly discretionaryMonthly = computed(() => this.sumByEssential(false));
+
+  /** Essential spending as a % of portfolio — the dynamic spending floor.
+   *  When > 3% (the static Guyton-Klinger floor), the household has a
+   *  tighter floor than the rule-of-thumb assumes — bad-sequence years
+   *  bind harder. When < 3%, more headroom than the static floor implies. */
+  readonly essentialFloorPct = computed<number | null>(() => {
+    const p = this.portfolio();
+    const annual = this.essentialMonthly() * 12;
+    if (p <= 0 || annual <= 0) return null;
+    return (annual / p) * 100;
+  });
+
+  private sumByEssential(wantEssential: boolean): number {
+    const ids = this.loc.selectedIds();
+    const locs = this.loc.fullLocations().filter(l => ids.has(l.id));
+    const target: LocationFull | undefined = locs[0] ?? this.loc.fullLocations()[0];
+    if (!target) return 0;
+    const mc = target.monthlyCosts ?? {};
+    let total = 0;
+    for (const cat of COST_CATEGORIES) {
+      if (cat.alternate) continue;
+      if (!!cat.essential !== wantEssential) continue;
+      const v = mc[cat.key]?.typical;
+      if (typeof v === 'number') total += v;
+    }
+    return total;
+  }
 
   readonly currentRatePct = computed(() => {
     const p = this.portfolio();

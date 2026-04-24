@@ -242,27 +242,37 @@ export interface CostCategoryMeta {
    * HealthcareService picks whichever applies based on household ages + income.
    */
   alternate?: boolean;
+  /**
+   * Whether this category counts as essential / non-discretionary spending.
+   * The Guardrails screen uses the sum of essential monthly × 12 as a
+   * floor-spending estimate — the dollar amount the household genuinely
+   * cannot cut in a bad-sequence year. Categories like entertainment,
+   * subscriptions, and clothing are discretionary; rent, food, healthcare,
+   * insurance, utilities, and taxes are essential. Default true (most
+   * categories tilt essential when in doubt).
+   */
+  essential?: boolean;
 }
 
 export const COST_CATEGORIES: CostCategoryMeta[] = [
-  { key: 'rent', label: 'Housing', icon: '🏠', color: '#D4943A', screenId: 'housing', taxable: false },
-  { key: 'groceries', label: 'Groceries', icon: '🛒', color: '#5C9CE6', screenId: 'groceries', taxable: false },
-  { key: 'medicine', label: 'Medicine', icon: '💊', color: '#E57373', screenId: 'medicine', taxable: false },
-  { key: 'healthcare', label: 'Healthcare', icon: '🏥', color: '#4CAF50', taxable: false },
-  { key: 'healthcarePreMedicare', label: 'Healthcare (Pre-Medicare / ACA)', icon: '🏥', color: '#4CAF50', taxable: false, alternate: true },
-  { key: 'medicalOOP', label: 'Medical OOP', icon: '🩺', color: '#2A7B7B', taxable: false },
-  { key: 'insurance', label: 'Insurance', icon: '🛡️', color: '#8B9DC3', taxable: false },
-  { key: 'transportation', label: 'Transportation', icon: '🚗', color: '#9C6FDE', screenId: 'transport', taxable: true },
-  { key: 'entertainment', label: 'Entertainment', icon: '🎭', color: '#E8B86D', screenId: 'entertainment', taxable: true },
-  { key: 'phoneCell', label: 'Cell Phones', icon: '📱', color: '#5A6F94', screenId: 'cellphones', taxable: true },
-  { key: 'personalCare', label: 'Personal Care', icon: '💇', color: '#D4943A', screenId: 'personalcare', taxable: true },
-  { key: 'clothing', label: 'Clothing', icon: '👔', color: '#5C9CE6', taxable: true },
-  { key: 'subscriptions', label: 'Subscriptions', icon: '📺', color: '#9C6FDE', taxable: true },
-  { key: 'utilities', label: 'Utilities', icon: '💡', color: '#4CAF50', taxable: false },
-  { key: 'petCare', label: 'Pet Care', icon: '🐾', color: '#E8B86D', taxable: true },
-  { key: 'miscellaneous', label: 'Miscellaneous', icon: '📦', color: '#8B9DC3', taxable: true },
-  { key: 'buffer', label: 'Buffer', icon: '🔒', color: '#5A6F94', taxable: false },
-  { key: 'taxes', label: 'Taxes', icon: '🏛️', color: '#E57373', taxable: false },
+  { key: 'rent', label: 'Housing', icon: '🏠', color: '#D4943A', screenId: 'housing', taxable: false, essential: true },
+  { key: 'groceries', label: 'Groceries', icon: '🛒', color: '#5C9CE6', screenId: 'groceries', taxable: false, essential: true },
+  { key: 'medicine', label: 'Medicine', icon: '💊', color: '#E57373', screenId: 'medicine', taxable: false, essential: true },
+  { key: 'healthcare', label: 'Healthcare', icon: '🏥', color: '#4CAF50', taxable: false, essential: true },
+  { key: 'healthcarePreMedicare', label: 'Healthcare (Pre-Medicare / ACA)', icon: '🏥', color: '#4CAF50', taxable: false, alternate: true, essential: true },
+  { key: 'medicalOOP', label: 'Medical OOP', icon: '🩺', color: '#2A7B7B', taxable: false, essential: true },
+  { key: 'insurance', label: 'Insurance', icon: '🛡️', color: '#8B9DC3', taxable: false, essential: true },
+  { key: 'transportation', label: 'Transportation', icon: '🚗', color: '#9C6FDE', screenId: 'transport', taxable: true, essential: true },
+  { key: 'entertainment', label: 'Entertainment', icon: '🎭', color: '#E8B86D', screenId: 'entertainment', taxable: true, essential: false },
+  { key: 'phoneCell', label: 'Cell Phones', icon: '📱', color: '#5A6F94', screenId: 'cellphones', taxable: true, essential: true },
+  { key: 'personalCare', label: 'Personal Care', icon: '💇', color: '#D4943A', screenId: 'personalcare', taxable: true, essential: false },
+  { key: 'clothing', label: 'Clothing', icon: '👔', color: '#5C9CE6', taxable: true, essential: false },
+  { key: 'subscriptions', label: 'Subscriptions', icon: '📺', color: '#9C6FDE', taxable: true, essential: false },
+  { key: 'utilities', label: 'Utilities', icon: '💡', color: '#4CAF50', taxable: false, essential: true },
+  { key: 'petCare', label: 'Pet Care', icon: '🐾', color: '#E8B86D', taxable: true, essential: false },
+  { key: 'miscellaneous', label: 'Miscellaneous', icon: '📦', color: '#8B9DC3', taxable: true, essential: false },
+  { key: 'buffer', label: 'Buffer', icon: '🔒', color: '#5A6F94', taxable: false, essential: false },
+  { key: 'taxes', label: 'Taxes', icon: '🏛️', color: '#E57373', taxable: false, essential: true },
 ];
 
 /* ─── Detailed Costs (supplement) ────────────────────────────────── */
