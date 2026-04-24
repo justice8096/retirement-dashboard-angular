@@ -206,6 +206,24 @@ export interface MonteCarloParams {
    * basis credit).
    */
   survivorStepUpBenefitUSD?: number;
+
+  /**
+   * Part-time / Barista-FIRE income that runs for a bounded number of years
+   * then cliffs to zero. Models the common Coast / Barista pattern where a
+   * retiree works a low-stress job for 3–10 years to bridge to full SS claim
+   * age. Inflates at the same `incGrowth` rate as the base `monthlyIncome`.
+   *
+   * Default 0: no part-time income.
+   */
+  partTimeMonthlyIncome?: number;
+
+  /**
+   * Sim year at which part-time income stops (exclusive — year
+   * `partTimeEndYear` is the first year at $0). Common case: user plans
+   * to work part-time for 5 years, sets `partTimeEndYear = 5`. When
+   * unset or ≤ 0, part-time income is ignored entirely.
+   */
+  partTimeEndYear?: number;
 }
 
 export interface MonteCarloResult {
@@ -424,9 +442,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     return active;
   };
 
+  const partTimeBase = Math.max(0, p.partTimeMonthlyIncome ?? 0);
+  const partTimeEndYear = Math.max(0, p.partTimeEndYear ?? 0);
+
   for (let r = 0; r < effectiveRuns; r++) {
     let bal = portfolio;
     let income = monthlyIncome;
+    // Part-time income tracked separately so it can cliff to zero at
+    // `partTimeEndYear` without disturbing the base income (SS + pension)
+    // stream. Inflates at the same `incGrowth` rate as income.
+    let partTime = partTimeBase;
     // Initial cost uses the segment-aware calc if the breakdown is present,
     // otherwise the legacy flat `baseCost`.
     let cost = segmentCostAtYear(initial, 0, p, false);
@@ -479,11 +504,15 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       const currShock = curIsForeign ? 1 + currVol * normalRandom() : 1;
       if (curIsForeign && curDrift) fxMult *= (1 + curDrift);
 
+      // Part-time income stops at `partTimeEndYear` (exclusive — year == end is zero).
+      const activePartTime = (partTimeEndYear > 0 && y < partTimeEndYear) ? partTime : 0;
+
       bal *= (1 + ret);
-      bal += income * 12 - cost * 12 * currShock * fxMult;
+      bal += (income + activePartTime) * 12 - cost * 12 * currShock * fxMult;
       cost *= (1 + inf);
       cumInfl *= (1 + inf);
       income *= (1 + incGrowth);
+      partTime *= (1 + incGrowth);
 
       path.push(bal);
     }
