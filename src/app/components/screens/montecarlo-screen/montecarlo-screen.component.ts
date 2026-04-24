@@ -415,6 +415,61 @@ const HIST_BINS = 40;
           }
         </div>
 
+        <!-- One-time future expenses -->
+        <div class="card moves-card">
+          <h3 class="card-title">One-Time Future Expenses</h3>
+          <p class="card-sub">
+            Lumpy expenses a recurring monthly cost line can't represent — car replacement,
+            new roof, grandchild tuition, big trip, late-life nursing-home stay. Each row
+            deducts at year Y, scaled by accumulated inflation by default. Multiple rows
+            in the same year stack.
+          </p>
+
+          @for (e of oneTimeExpenses(); track $index; let i = $index) {
+            <div class="timeline-row">
+              <label class="tl-field">
+                <span class="tl-small-label">Year</span>
+                <input appNumeric="age" class="tl-input" min="0" [max]="years() - 1"
+                  [ngModel]="e.year"
+                  (ngModelChange)="patchOneTimeExpense(i, { year: +$event })" />
+              </label>
+              <label class="tl-field tl-field-loc">
+                <span class="tl-small-label">Label</span>
+                <input class="tl-input" type="text"
+                  [ngModel]="e.label"
+                  (ngModelChange)="patchOneTimeExpense(i, { label: $event })" />
+              </label>
+              <label class="tl-field">
+                <span class="tl-small-label">Amount ($)</span>
+                <input appNumeric="currency" class="tl-input" step="500"
+                  [class]="dyscalculia.numberSpacingClass()"
+                  [ngModel]="e.amountUSD"
+                  (ngModelChange)="patchOneTimeExpense(i, { amountUSD: +$event })" />
+              </label>
+              <label class="tl-field tl-inflate">
+                <input type="checkbox"
+                  [checked]="e.inflate"
+                  (change)="patchOneTimeExpense(i, { inflate: !e.inflate })" />
+                <span class="tl-small-label">Inflate</span>
+              </label>
+              <button class="tl-remove" (click)="removeOneTimeExpense(i)" aria-label="Remove expense">✕</button>
+            </div>
+          }
+
+          <button mat-stroked-button class="add-move-btn" (click)="addOneTimeExpense()">
+            + Add One-Time Expense
+          </button>
+
+          @if (oneTimeExpenses().length > 0) {
+            <label class="moves-toggle">
+              <input type="checkbox"
+                [checked]="oneTimeExpensesEnabled()"
+                (change)="oneTimeExpensesEnabled.set(!oneTimeExpensesEnabled())" />
+              <span>Apply expenses to next simulation run</span>
+            </label>
+          }
+        </div>
+
         <!-- Spouse-death scenario (deterministic) -->
         @if (adults().length >= 1) {
           <div class="card death-card">
@@ -892,6 +947,8 @@ const HIST_BINS = 40;
       font-size: 12px; color: var(--dark-text);
     }
     .moves-toggle input { accent-color: var(--dark-amber); }
+    .tl-inflate { display: flex; flex-direction: row; align-items: center; gap: 4px; }
+    .tl-inflate input { accent-color: var(--dark-amber); }
 
     .death-card { display: flex; flex-direction: column; gap: 12px; }
     .death-card .card-sub {
@@ -1081,6 +1138,11 @@ export class MontecarloScreenComponent implements OnInit {
    */
   readonly moves = signal<{ fromYear: number; locationId: string; moveCostUSD: number }[]>([]);
   readonly movesEnabled = signal(false);
+
+  /** One-time future expenses (cars, roof, tuition, big trips). Each row:
+   *  year (0-based sim year), amountUSD (today's $), label, inflate (default true). */
+  readonly oneTimeExpenses = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
+  readonly oneTimeExpensesEnabled = signal(false);
 
   /* ─── Spouse-death scenario (deterministic) ────────────────────── */
   readonly spouseDeathEnabled = signal(false);
@@ -1377,6 +1439,7 @@ export class MontecarloScreenComponent implements OnInit {
       this.regimeBearMean(); this.regimeBearVol();
       this.regimeBullToBear(); this.regimeBearToBull();
       this.moves(); this.movesEnabled();
+      this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
       this.spouseDeathEnabled(); this.spouseDeathYear();
       this.survivorCostRatio(); this.deceasedMemberIndex();
       this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
@@ -1481,6 +1544,26 @@ export class MontecarloScreenComponent implements OnInit {
 
   patchMove(idx: number, partial: Partial<{ fromYear: number; locationId: string; moveCostUSD: number }>): void {
     this.moves.update(list => list.map((m, i) => i === idx ? { ...m, ...partial } : m));
+  }
+
+  /** Add a one-time expense row — defaults to year 5, $20K, "Car replacement". */
+  addOneTimeExpense(): void {
+    const current = this.oneTimeExpenses();
+    const lastYear = current.length ? current[current.length - 1].year : 0;
+    const newYear = Math.min(this.years() - 1, Math.max(lastYear + 3, 5));
+    this.oneTimeExpenses.set([
+      ...current,
+      { year: newYear, amountUSD: 20000, label: 'Car replacement', inflate: true },
+    ]);
+    this.oneTimeExpensesEnabled.set(true);
+  }
+
+  removeOneTimeExpense(idx: number): void {
+    this.oneTimeExpenses.update(list => list.filter((_, i) => i !== idx));
+  }
+
+  patchOneTimeExpense(idx: number, partial: Partial<{ year: number; amountUSD: number; label: string; inflate: boolean }>): void {
+    this.oneTimeExpenses.update(list => list.map((e, i) => i === idx ? { ...e, ...partial } : e));
   }
 
   /**
@@ -1633,6 +1716,8 @@ export class MontecarloScreenComponent implements OnInit {
         transitionExtraIncome: this.healthcare.transitionYearExtraIncome(),
         movesEnabled: this.movesEnabled(),
         moves: this.moves(),
+        oneTimeExpensesEnabled: this.oneTimeExpensesEnabled(),
+        oneTimeExpenses: this.oneTimeExpenses(),
         spouseDeathEnabled: this.spouseDeathEnabled(),
         spouseDeathYear: this.spouseDeathYear(),
         survivorCostRatio: this.survivorCostRatio(),
@@ -1689,6 +1774,14 @@ export class MontecarloScreenComponent implements OnInit {
           returnMode: this.returnMode(),
           historicalStartYear: this.historicalStartYear(),
           moveSchedule: this.buildSchedule(),
+          oneTimeExpenses: this.oneTimeExpensesEnabled()
+            ? this.oneTimeExpenses().map(e => ({
+                year: e.year,
+                amountUSD: e.amountUSD,
+                label: e.label || undefined,
+                inflate: e.inflate,
+              }))
+            : undefined,
           adultBirthYears: this.adults().map(m => m.birthYear),
           simStartYear: this.household()?.planningStartYear ?? new Date().getFullYear(),
           magiAnnual: this.healthcare.magi().magiForAca,
