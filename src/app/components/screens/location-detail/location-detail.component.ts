@@ -201,7 +201,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
     }
     .range-min { color: var(--dark-green); }
     .range-typical { color: var(--dark-amber); font-weight: 700; }
-    .range-max { color: var(--dark-red); }
+    .range-max { color: var(--dark-neutral); }
     .range-arrow { color: var(--dark-text-muted); font-size: 10px; }
   `],
 })

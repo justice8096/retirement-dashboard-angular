@@ -134,7 +134,7 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
     .range-line { display: flex; gap: 4px; font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
     .range-min { color: var(--dark-green); }
-    .range-max { color: var(--dark-red); }
+    .range-max { color: var(--dark-neutral); }
     .area-line { display: flex; gap: 6px; font-size: 10px; color: var(--dark-purple); margin-top: 2px; font-style: italic; }
     .area-value { font-weight: 600; }
 

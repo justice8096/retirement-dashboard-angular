@@ -251,7 +251,7 @@ const BREAKOUT_EXPENSE_KEYS: Record<string, string> = {
     .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
     .result-value { font-size: 22px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
     .result-value.green { color: var(--dark-green); }
-    .result-value.red   { color: var(--dark-red); }
+    .result-value.red   { color: var(--dark-neutral); }
     .result-explain { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; }
 
     .chart-card { padding: 20px 24px; }

@@ -285,7 +285,7 @@ L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, ic
     }
     .nbh-safety.high { background: rgba(76, 175, 80, 0.12); color: var(--dark-green); }
     .nbh-safety.moderate-high { background: rgba(212, 148, 58, 0.12); color: var(--dark-amber); }
-    .nbh-safety.moderate { background: rgba(229, 115, 115, 0.12); color: var(--dark-red); }
+    .nbh-safety.moderate { background: rgba(139, 157, 195, 0.15); color: var(--dark-neutral); }
     .nbh-desc { font-size: 12px; color: var(--dark-text-sec); line-height: 1.4; margin: 0; }
     .nbh-character { font-size: 10px; color: var(--dark-text-muted); font-style: italic; }
 

@@ -231,7 +231,7 @@ interface EstateYear {
       font-size: 12px; color: var(--dark-text-muted);
       line-height: var(--prose-line-height, 1.5); margin-top: 4px;
     }
-    .param-hint.warn { color: var(--dark-red); }
+    .param-hint.warn { color: var(--dark-neutral); }
 
     .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
     .result-card {
@@ -271,13 +271,13 @@ interface EstateYear {
     .sw-portfolio { background: var(--dark-blue); }
     .sw-net       { background: var(--dark-green); }
     .sw-charity   { background: var(--dark-green); }
-    .sw-tax       { background: var(--dark-red); }
+    .sw-tax       { background: var(--dark-neutral); }
     .sw-heirs     { background: var(--dark-amber); }
 
     .composition { display: flex; flex-direction: column; gap: 14px; }
     .comp-bar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; }
     .comp-seg.charity { background: var(--dark-green); }
-    .comp-seg.tax     { background: var(--dark-red); }
+    .comp-seg.tax     { background: var(--dark-neutral); }
     .comp-seg.heirs   { background: var(--dark-amber); }
     .comp-legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--dark-text-sec); }
     .comp-legend strong { color: var(--dark-text); font-variant-numeric: tabular-nums; }
@@ -295,7 +295,7 @@ interface EstateYear {
     .data-table .right { text-align: right; font-variant-numeric: tabular-nums; }
     .data-table .strong { font-weight: 700; color: var(--dark-amber); }
     .green { color: var(--dark-green); }
-    .red   { color: var(--dark-red); }
+    .red   { color: var(--dark-neutral); }
     .muted { color: var(--dark-text-muted); }
 
     .insights {

@@ -260,7 +260,7 @@ interface ProjectionRow {
       background: rgba(76, 175, 80, 0.15); color: var(--dark-green);
     }
     .tier-pill.tier-surcharged {
-      background: rgba(229, 115, 115, 0.15); color: var(--dark-red);
+      background: rgba(139, 157, 195, 0.18); color: var(--dark-neutral);
     }
 
     .insights {

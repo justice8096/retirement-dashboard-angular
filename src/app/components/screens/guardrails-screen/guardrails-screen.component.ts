@@ -229,7 +229,7 @@ interface ProjectionRow {
     .result-value.status { font-size: 18px; }
     .result-value.status.s-green { color: var(--dark-green); }
     .result-value.status.s-yellow { color: var(--dark-amber); }
-    .result-value.status.s-red { color: var(--dark-red); }
+    .result-value.status.s-red { color: var(--dark-neutral); }
     .result-explain { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; }
 
     .corridor { display: flex; flex-direction: column; gap: 14px; }
@@ -241,7 +241,7 @@ interface ProjectionRow {
       padding: 14px 12px; display: flex; flex-direction: column; gap: 4px;
       background: var(--dark-bg-secondary);
     }
-    .corr-seg.s-floor    { border-left: 3px solid var(--dark-red); }
+    .corr-seg.s-floor    { border-left: 3px solid var(--dark-neutral); }
     .corr-seg.s-base     { border-left: 3px solid var(--dark-green); }
     .corr-seg.s-ceiling  { border-left: 3px solid var(--dark-blue); }
     .corr-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
@@ -276,7 +276,7 @@ interface ProjectionRow {
     }
     .status-pill.s-green  { background: rgba(76, 175, 80, 0.15); color: var(--dark-green); }
     .status-pill.s-yellow { background: rgba(212, 148, 58, 0.15); color: var(--dark-amber); }
-    .status-pill.s-red    { background: rgba(229, 115, 115, 0.15); color: var(--dark-red); }
+    .status-pill.s-red    { background: rgba(139, 157, 195, 0.18); color: var(--dark-neutral); }
 
     .insights {
       background: rgba(92, 156, 230, 0.08); border-left: 4px solid var(--dark-blue);

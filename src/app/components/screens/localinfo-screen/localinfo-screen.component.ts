@@ -220,7 +220,7 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
     .pc-section:last-child { margin-bottom: 0; }
     .pc-item { font-size: 12px; padding: 4px 0; line-height: 1.3; }
     .pc-item.pro { color: var(--dark-green); }
-    .pc-item.con { color: var(--dark-red); }
+    .pc-item.con { color: var(--dark-neutral); }
 
     .link-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
     .link-group:last-child { margin-bottom: 0; }
