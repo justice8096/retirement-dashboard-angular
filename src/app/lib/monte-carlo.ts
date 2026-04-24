@@ -258,6 +258,39 @@ export interface MonteCarloParams {
    * unset or ≤ 0, part-time income is ignored entirely.
    */
   partTimeEndYear?: number;
+
+  /**
+   * Long-Term Care (LTC) self-insure mode. Each trial rolls an independent
+   * Bernoulli check on `ltcProbability`; if it triggers, the simulation
+   * deducts `ltcCostPerYearUSD` (today's $, inflated by cumInfl) for
+   * `ltcDurationYears` consecutive years starting at a uniformly-sampled
+   * age in `[ltcStartAgeMin, ltcStartAgeMax]`. Defaults reflect the US
+   * Genworth Cost-of-Care 2024 medians: 70% lifetime probability of needing
+   * any LTC at 65+, 2.4-year median duration, $108K/yr median nursing-home
+   * private-room cost.
+   *
+   * Anchored on the OLDEST adult's birth year (the more likely first to need
+   * LTC). Caller supplies birth year via `adultBirthYears`.
+   *
+   * When `ltcSelfInsureEnabled` is false, no per-trial roll happens.
+   * Insurance mode (recurring premium) is captured via `ltcInsuranceMonthly`
+   * below — the two modes are independent and can stack if the user wants
+   * to test "insurance covers part, self-insure the rest".
+   */
+  ltcSelfInsureEnabled?: boolean;
+  ltcProbability?: number;       // 0..1, default 0.70
+  ltcCostPerYearUSD?: number;    // today's $/yr, default 108000 (US median)
+  ltcDurationYears?: number;     // default 2.4 (so a Math.round() lands at 2 or 3)
+  ltcStartAgeMin?: number;       // default 78
+  ltcStartAgeMax?: number;       // default 88
+
+  /**
+   * Long-Term Care insurance premium — flat monthly $ deducted from balance
+   * once the oldest adult reaches `ltcInsuranceStartAge`. Independent of the
+   * self-insure roll; can stack. Default 0 (no insurance modelled).
+   */
+  ltcInsuranceMonthly?: number;
+  ltcInsuranceStartAge?: number; // default 60
 }
 
 export interface MonteCarloResult {
@@ -489,6 +522,23 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   const partTimeBase = Math.max(0, p.partTimeMonthlyIncome ?? 0);
   const partTimeEndYear = Math.max(0, p.partTimeEndYear ?? 0);
 
+  // LTC self-insure setup. Anchor on the OLDEST adult — most likely first
+  // to need LTC. simStartYear + sim-year y === calendar year; LTC start
+  // year (in sim-year terms) = max(0, ltcStartAge - oldestAdultAge0).
+  const ltcSelfInsure = !!p.ltcSelfInsureEnabled;
+  const ltcProbability = Math.min(1, Math.max(0, p.ltcProbability ?? 0.70));
+  const ltcCostUSD = Math.max(0, p.ltcCostPerYearUSD ?? 108000);
+  const ltcDurationY = Math.max(0.1, p.ltcDurationYears ?? 2.4);
+  const ltcStartAgeMin = Math.max(50, p.ltcStartAgeMin ?? 78);
+  const ltcStartAgeMax = Math.max(ltcStartAgeMin, p.ltcStartAgeMax ?? 88);
+  const ltcInsMonthly = Math.max(0, p.ltcInsuranceMonthly ?? 0);
+  const ltcInsStartAge = Math.max(0, p.ltcInsuranceStartAge ?? 60);
+  const calStart = p.simStartYear ?? new Date().getFullYear();
+  const oldestBirthYear = (p.adultBirthYears && p.adultBirthYears.length)
+    ? Math.min(...p.adultBirthYears)
+    : null;
+  const oldestAge0 = oldestBirthYear != null ? (calStart - oldestBirthYear) : null;
+
   for (let r = 0; r < effectiveRuns; r++) {
     let bal = portfolio;
     let income = monthlyIncome;
@@ -506,6 +556,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     let survivorPhase = false;
     const regimeState = { inBear: false };
     const path: number[] = [bal];
+
+    // Per-trial LTC roll. Resolves once at trial start; deterministic across
+    // years within the trial. willNeedLtc: 70% of 65+ Americans by Genworth.
+    let ltcStartSimYear = -1;
+    let ltcEndSimYear = -1;
+    if (ltcSelfInsure && oldestAge0 != null && Math.random() < ltcProbability) {
+      const ltcStartAge = ltcStartAgeMin + Math.random() * (ltcStartAgeMax - ltcStartAgeMin);
+      ltcStartSimYear = Math.max(0, Math.floor(ltcStartAge - oldestAge0));
+      ltcEndSimYear = ltcStartSimYear + Math.max(1, Math.round(ltcDurationY));
+    }
 
     for (let y = 0; y < years; y++) {
       const moveThisYear = y > 0 && movesByYear.has(y);
@@ -562,6 +622,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           const inflated = (e.inflate ?? true) ? e.amountUSD * cumInfl : e.amountUSD;
           bal -= inflated;
         }
+      }
+
+      // Long-Term Care deductions (independent of one-time expenses; see #21).
+      // Self-insure: per-trial probabilistic LTC stay. Insurance: flat
+      // monthly premium once the oldest adult crosses ltcInsuranceStartAge.
+      if (ltcSelfInsure && y >= ltcStartSimYear && y < ltcEndSimYear && ltcStartSimYear >= 0) {
+        bal -= ltcCostUSD * cumInfl;
+      }
+      if (ltcInsMonthly > 0 && oldestAge0 != null && (oldestAge0 + y) >= ltcInsStartAge) {
+        bal -= ltcInsMonthly * 12 * cumInfl;
       }
 
       cost *= (1 + inf);
