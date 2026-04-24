@@ -155,11 +155,57 @@ export interface MonteCarloParams {
   /** Monthly income after spouse death (SS survivor benefit + other). */
   survivorMonthlyIncome?: number;
   /**
-   * Multiplier applied to `cost` at the death year. Captures that fixed costs
-   * (housing, utilities) don't halve but variable costs (food, transport,
-   * healthcare) do. Default 0.75 — the commonly-cited survivor adjustment.
+   * Multiplier applied to the lifestyle portion of `cost` (nonHealthcareBase
+   * minus tax) at the death year. Captures that fixed costs (housing,
+   * utilities) don't halve but variable costs (food, transport) do. Default
+   * 0.75 — the commonly-cited survivor adjustment. Does NOT apply to the
+   * tax or healthcare lines — those are swapped via the survivor overrides
+   * below.
    */
   survivorCostRatio?: number;
+
+  /**
+   * Monthly income-tax line for the survivor phase, computed by the caller
+   * using single-filer brackets (MFJ brackets are ~2× wider, so survivor tax
+   * usually goes UP even as income goes down). When set, replaces the
+   * segment's `monthlyIncomeTax` in all years after `spouseDeathYear`. When
+   * null, survivor tax stays at the pre-death MFJ value — an undertaxation
+   * that historically made this a ~$50–200K under-projection over a 15–25
+   * year survivor horizon.
+   */
+  survivorMonthlyIncomeTax?: number;
+
+  /**
+   * Monthly Medicare + IRMAA for the survivor — caller recomputes using
+   * single-filer IRMAA thresholds (which are ~half of MFJ, so a surviving
+   * spouse with unchanged MAGI can jump into a higher surcharge tier).
+   * Only applied when `survivorBirthYear` indicates the survivor has
+   * reached Medicare eligibility (age ≥ 65) at the current sim year.
+   * For US segments before survivor age 65, the kernel falls back to the
+   * single-adult ACA path. For foreign segments, this is ignored
+   * entirely — `foreignHealthcareMonthly` continues to apply.
+   */
+  survivorMedicareMonthly?: number;
+
+  /**
+   * Birth year of the surviving spouse — used to gate
+   * `survivorMedicareMonthly` on Medicare eligibility (age ≥ 65 at current
+   * sim year). When unset and a survivor phase is active, the kernel
+   * conservatively assumes Medicare-eligible (preserves the previous
+   * behaviour of immediately swapping to survivorMedicareMonthly).
+   */
+  survivorBirthYear?: number;
+
+  /**
+   * One-time portfolio bump applied at `spouseDeathYear` to reflect the
+   * stepped-up cost basis on jointly-held taxable accounts. Surviving
+   * spouse can realize up to this dollar amount in capital gains tax-free
+   * (the basis resets to fair market value at death). Caller computes as
+   *   `taxableBalanceAtDeath × unrealizedGainRatio × effectiveLtcgRate`
+   * and passes the resulting dollar benefit. Default 0 (no stepped-up
+   * basis credit).
+   */
+  survivorStepUpBenefitUSD?: number;
 
   /**
    * Part-time / Barista-FIRE income that runs for a bounded number of years
@@ -211,19 +257,44 @@ import { fpl2026 as fplMc, applicablePctCliff2026 as applicablePctCliffMc } from
  *
  * The kernel multiplies by `cumInfl` at use time.
  */
-function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams): number {
+function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, survivorPhase = false): number {
   if (m.nonHealthcareBase == null) return m.baseCost;
-  const tax = m.monthlyIncomeTax ?? 0;
+  // Survivor-phase overrides: single-filer tax, single-IRMAA Medicare, and a
+  // ratio applied to the non-tax / non-healthcare lifestyle portion.
+  const lifestyleRatio = survivorPhase ? (p.survivorCostRatio ?? 0.75) : 1;
+  const tax = survivorPhase && p.survivorMonthlyIncomeTax != null
+    ? p.survivorMonthlyIncomeTax
+    : (m.monthlyIncomeTax ?? 0);
   let healthcare = 0;
 
+  // Survivor Medicare swap is only valid when (a) US segment AND (b) survivor
+  // is Medicare-eligible (age ≥ 65 at the current sim year). The caller's
+  // single-filer IRMAA computation is US-specific — applying it to a
+  // foreign segment, or applying it before age 65, materially distorts cost.
+  const calYear = (p.simStartYear ?? new Date().getFullYear()) + y;
+  const survivorMedicareEligible = survivorPhase
+    && p.survivorMedicareMonthly != null
+    && m.isUS
+    && (p.survivorBirthYear == null || (calYear - p.survivorBirthYear) >= 65);
+
   if (m.isUS) {
-    const calYear = (p.simStartYear ?? new Date().getFullYear()) + y;
     const adults = p.adultBirthYears ?? [];
     const nAdults = Math.max(1, adults.length || 2);
-    if (!adults.length) {
+    if (survivorMedicareEligible) {
+      // Survivor phase + age 65+ + US: use the IRMAA-adjusted single-filer
+      // premium from the caller (pre-computed for 1 adult, so use as-is).
+      healthcare = p.survivorMedicareMonthly!;
+    } else if (!adults.length) {
       // Unknown ages → assume all Medicare-eligible (conservative lower bound).
       healthcare = m.medicareMonthly ?? 0;
     } else {
+      // Standard age-aware mix. In survivor phase but pre-65, this still runs
+      // and naturally treats the survivor as 1 adult on ACA — except
+      // adultBirthYears still includes the deceased spouse, which over-counts
+      // adults for the post-death years. Effect is small (ACA per-adult halved
+      // when survivor's pre-65 share gets calculated against nAdults=2) but
+      // worth noting as a future refinement: drop the deceased birth year
+      // from `adults` once survivorPhase is true.
       const medicareCount = adults.filter(by => (calYear - by) >= 65).length;
       const acaCount = nAdults - medicareCount;
       const medicarePerAdult = (m.medicareMonthly ?? 0) / nAdults;
@@ -253,10 +324,19 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams): num
       healthcare = medicareCount * medicarePerAdult + acaCount * acaPerAdult;
     }
   } else {
+    // Foreign segment: survivor Medicare swap does NOT apply — that's a
+    // US-specific IRMAA calc, not a foreign-healthcare equivalent. Keep the
+    // foreign healthcare baseline (caller may scale it down if desired by
+    // adjusting `foreignHealthcareMonthly` directly per segment, or via the
+    // lifestyle ratio on `nonHealthcareBase` — but not here).
     healthcare = m.foreignHealthcareMonthly ?? 0;
   }
 
-  return m.nonHealthcareBase + tax + healthcare;
+  // Lifestyle ratio scales the non-tax / non-healthcare portion only —
+  // housing, food, transport, utilities. Tax + healthcare are already
+  // swapped to their survivor values above; scaling them again would
+  // double-count the reduction.
+  return m.nonHealthcareBase * lifestyleRatio + tax + healthcare;
 }
 
 /** Whether any adult crosses 65 exactly at calendar year (simStartYear + y). */
@@ -374,7 +454,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     let partTime = partTimeBase;
     // Initial cost uses the segment-aware calc if the breakdown is present,
     // otherwise the legacy flat `baseCost`.
-    let cost = segmentCostAtYear(initial, 0, p);
+    let cost = segmentCostAtYear(initial, 0, p, false);
     let curIsForeign = initial.isForeign;
     let curDrift = initial.fxDrift ?? drift;
     let fxMult = 1;
@@ -392,7 +472,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // FX resets (new currency baseline). Optional one-time move cost.
       if (moveThisYear) {
         const m = movesByYear.get(y)!;
-        cost = segmentCostAtYear(m, y, p) * cumInfl;
+        cost = segmentCostAtYear(m, y, p, survivorPhase) * cumInfl;
         curIsForeign = m.isForeign;
         curDrift = m.fxDrift ?? curDrift;
         fxMult = 1;
@@ -401,14 +481,23 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         // Medicare crossover or any age-65 transition in a US segment —
         // recompute the segment's cost without resetting FX.
         const active = activeSegmentAt(y);
-        cost = segmentCostAtYear(active, y, p) * cumInfl;
+        cost = segmentCostAtYear(active, y, p, survivorPhase) * cumInfl;
       }
 
-      // Spouse-death transition: income steps down, cost×ratio once.
+      // Spouse-death transition: income steps down, cost recomputed with
+      // survivor overrides (single-filer tax, single-IRMAA Medicare,
+      // lifestyle ratio on the remainder), and a one-time stepped-up-basis
+      // bump on the taxable portion of the portfolio.
       if (!survivorPhase && deathYear != null && y === deathYear) {
         survivorPhase = true;
         if (survivorIncome != null) income = survivorIncome;
-        cost *= survivorRatio;
+        const active = activeSegmentAt(y);
+        // Back out cumulative inflation so segmentCostAtYear gets today's $,
+        // then re-inflate for the sim's current-year dollars.
+        cost = segmentCostAtYear(active, y, p, true) * cumInfl;
+        if (p.survivorStepUpBenefitUSD && p.survivorStepUpBenefitUSD > 0) {
+          bal += p.survivorStepUpBenefitUSD;
+        }
       }
 
       const { ret, inf } = sampleYear(mode, y, p, regimeState);

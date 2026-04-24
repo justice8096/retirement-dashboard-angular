@@ -22,7 +22,11 @@ import {
   HISTORICAL_PRESETS, HISTORICAL_RETURNS, statsForRange,
 } from '@app/data/historical-returns';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
-import { SS_CUT_SOURCES, RMD_AGE_SOURCES } from '@app/lib/tax-sources';
+import {
+  SS_CUT_SOURCES, RMD_AGE_SOURCES,
+  FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026,
+} from '@app/lib/tax-sources';
+import { monthlyMedicareFor } from '@app/lib/irmaa';
 
 // Dyscalculia F-002: Removed red `#E57373` for the lowest percentile — now
 // uses the same neutral amber gradient as the rest. Anxiety-inducing red is
@@ -417,8 +421,12 @@ const HIST_BINS = 40;
             <h3 class="card-title">Spouse-Death Scenario</h3>
             <p class="card-sub">
               One deterministic toggle: pick a year in the sim horizon at which one adult dies.
-              Income steps down to the survivor benefit; expenses multiply by the survivor ratio
-              (fixed costs don't halve). Probabilistic mortality is a future extension.
+              Income steps down to the survivor's higher SS benefit; the lifestyle portion of
+              expenses multiplies by the survivor ratio (fixed costs don't halve). Federal tax
+              is recalculated with single-filer brackets (wider MFJ → tighter single bumps
+              survivor tax); Medicare is recalculated with single-filer IRMAA thresholds
+              (half of MFJ, so unchanged MAGI can jump a tier). Optional: one-time stepped-up-
+              basis bump in the death year. Probabilistic mortality is a future extension.
             </p>
 
             <label class="param death-toggle">
@@ -478,9 +486,56 @@ const HIST_BINS = 40;
                   </span>
                 </div>
                 <div>
-                  <span class="dp-label">Post-Death Monthly</span>
+                  <span class="dp-label">Survivor Federal Tax (single brackets)</span>
                   <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
-                    {{ fmt(baseCost() * survivorCostRatio() / 100, '/mo') }}
+                    {{ fmt(survivorMonthlyIncomeTax(), '/mo') }}
+                  </span>
+                </div>
+                <div>
+                  <span class="dp-label">Survivor Medicare + IRMAA (single)</span>
+                  <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmt(survivorMonthlyMedicare(), '/mo') }}
+                  </span>
+                </div>
+                <div>
+                  <span class="dp-label">Post-Death Monthly (scaled lifestyle + survivor tax + Medicare)</span>
+                  <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmt(survivorPostDeathMonthly(), '/mo') }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Stepped-up basis: one-time LTCG-free benefit in death year -->
+              <h4 class="death-sub">Stepped-Up Basis (optional)</h4>
+              <p class="card-sub">
+                Jointly-held taxable accounts reset to fair-market-value basis at death —
+                the survivor can realize gains up to that step-up tax-free. One-time bump
+                in the death year. Leave 0 if you don't hold taxable brokerage accounts jointly.
+              </p>
+              <div class="death-grid">
+                <label class="param">
+                  <span class="param-label">Taxable balance at death ($)</span>
+                  <input appNumeric="currency" class="param-input" min="0" step="1000"
+                    [ngModel]="survivorStepUpTaxableBalance()" (ngModelChange)="survivorStepUpTaxableBalance.set(+$event)" />
+                </label>
+                <label class="param">
+                  <span class="param-label">Unrealized gain ratio (%)</span>
+                  <input appNumeric="percent" class="param-input" min="0" max="100" step="5"
+                    [ngModel]="survivorStepUpGainRatio()" (ngModelChange)="survivorStepUpGainRatio.set(+$event)" />
+                  <span class="param-hint">Fraction of balance that's appreciation. Typical 20–40%.</span>
+                </label>
+                <label class="param">
+                  <span class="param-label">LTCG rate (%)</span>
+                  <input appNumeric="percent" class="param-input" min="0" max="30" step="1"
+                    [ngModel]="survivorStepUpLtcgRate()" (ngModelChange)="survivorStepUpLtcgRate.set(+$event)" />
+                  <span class="param-hint">0 / 15 / 20 — depends on survivor's taxable-income bracket.</span>
+                </label>
+              </div>
+              <div class="death-preview">
+                <div>
+                  <span class="dp-label">One-time step-up benefit</span>
+                  <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmt(survivorStepUpBenefitUSD(), '') }}
                   </span>
                 </div>
               </div>
@@ -857,6 +912,7 @@ const HIST_BINS = 40;
     }
     .dp-label { display: block; font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
     .dp-value { display: block; font-size: 14px; font-weight: 600; color: var(--dark-amber); margin-top: 2px; }
+    .death-sub { font-size: 13px; font-weight: 600; color: var(--dark-text); margin: 18px 0 4px; }
 
     .results-grid {
       display: grid;
@@ -1085,10 +1141,99 @@ export class MontecarloScreenComponent implements OnInit {
     return Math.max(...benefits);
   });
 
+  /**
+   * Birth year of the surviving spouse — used by the MC kernel to gate
+   * Medicare swap on age-65 eligibility. With one adult, the survivor IS that
+   * adult. With two adults, the survivor is the one NOT at deceasedMemberIndex.
+   */
+  readonly survivorBirthYear = computed<number | null>(() => {
+    const adults = this.adults();
+    if (!adults.length) return null;
+    if (adults.length === 1) return adults[0].birthYear;
+    const deceased = this.deceasedMemberIndex();
+    const survivor = adults.find((_, i) => i !== deceased) ?? adults[0];
+    return survivor.birthYear;
+  });
+
   /** Survivor monthly income = survivor SS + other income (pension etc. kept intact). */
   readonly survivorMonthlyIncome = computed(() =>
     this.survivorMonthlySs() + this.monthlyIncome()
   );
+
+  /**
+   * Survivor monthly income tax — apply single-filer federal brackets to the
+   * survivor's taxable income. Approximates SS taxation as 85% included (the
+   * typical case for retirees with other income). Doesn't model state tax in
+   * survivor phase; the MC's per-segment `monthlyIncomeTax` carries state.
+   * Kept conservative: federal only, single stddev.
+   */
+  readonly survivorMonthlyIncomeTax = computed(() => {
+    const survivorIncomeAnnual = this.survivorMonthlyIncome() * 12;
+    if (survivorIncomeAnnual <= 0) return 0;
+    // Assume ~85% of survivor SS is federally taxable (retiree common case).
+    // The non-SS income portion is fully taxable.
+    const ssAnnual = this.survivorMonthlySs() * 12;
+    const otherAnnual = this.monthlyIncome() * 12;
+    const taxableGross = ssAnnual * 0.85 + otherAnnual;
+    const taxable = Math.max(0, taxableGross - FED_STD_DEDUCTION_2026.single);
+    let fed = 0;
+    for (const b of FED_BRACKETS_2026_SINGLE) {
+      const top = b.max ?? Number.POSITIVE_INFINITY;
+      if (taxable <= b.min) break;
+      const span = Math.min(taxable, top) - b.min;
+      if (span > 0) fed += span * b.rate;
+    }
+    return fed / 12;
+  });
+
+  /**
+   * Survivor monthly Medicare — single-filer IRMAA brackets applied to MAGI
+   * (which approximates survivor income since there's no bigger spouse to
+   * add). The MFJ threshold at 212K becomes single at 106K, so a survivor
+   * with e.g. 110K MAGI jumps from tier 0 to tier 1 even without an income
+   * change.
+   */
+  readonly survivorMonthlyMedicare = computed(() => {
+    const magi = this.survivorMonthlyIncome() * 12;
+    return monthlyMedicareFor('single', magi);
+  });
+
+  /**
+   * User-controlled stepped-up basis estimate. Default 0 — user opts in by
+   * setting a taxable-balance-at-death, unrealized-gain ratio, and LTCG rate.
+   * One-time portfolio bump applied at the death year.
+   */
+  readonly survivorStepUpTaxableBalance = signal(0);
+  readonly survivorStepUpGainRatio = signal(30); // %
+  readonly survivorStepUpLtcgRate = signal(15);   // %
+
+  readonly survivorStepUpBenefitUSD = computed(() => {
+    const bal = this.survivorStepUpTaxableBalance();
+    const gain = this.survivorStepUpGainRatio() / 100;
+    const rate = this.survivorStepUpLtcgRate() / 100;
+    return Math.max(0, bal * gain * rate);
+  });
+
+  /**
+   * Preview-only: post-death monthly cost as the kernel computes it.
+   * Lifestyle ratio applies to the non-tax / non-healthcare portion only;
+   * tax + Medicare use their survivor-specific values. This must match the
+   * lib/monte-carlo.ts segmentCostAtYear logic when survivorPhase = true.
+   */
+  readonly survivorPostDeathMonthly = computed(() => {
+    const seed = this.selectedLoc();
+    if (!seed) return 0;
+    const totalBase = this.baseCost();
+    // Best-effort decompose: subtract the seed's tax and healthcare lines so
+    // we can scale only the lifestyle remainder. Both come from the
+    // monthlyCosts seed; if missing, fall back to 0 and the ratio applies to
+    // the whole figure (legacy behaviour).
+    const taxLine = Number(seed.monthlyCosts?.taxes?.typical) || 0;
+    const hcLine = Number(seed.monthlyCosts?.healthcare?.typical) || 0;
+    const lifestyleBase = Math.max(0, totalBase - taxLine - hcLine);
+    const ratio = this.survivorCostRatio() / 100;
+    return lifestyleBase * ratio + this.survivorMonthlyIncomeTax() + this.survivorMonthlyMedicare();
+  });
 
   /** Nominal lifetime SS with compound COLA growth. */
   readonly ssLifetime = computed(() => {
@@ -1234,6 +1379,7 @@ export class MontecarloScreenComponent implements OnInit {
       this.moves(); this.movesEnabled();
       this.spouseDeathEnabled(); this.spouseDeathYear();
       this.survivorCostRatio(); this.deceasedMemberIndex();
+      this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
       // Only mark stale when there's actually a prior result to be stale.
       // This keeps the banner dormant on the initial page load. Read via
       // untracked() so that runSimulation's results.set() doesn't retrigger
@@ -1490,6 +1636,9 @@ export class MontecarloScreenComponent implements OnInit {
         spouseDeathEnabled: this.spouseDeathEnabled(),
         spouseDeathYear: this.spouseDeathYear(),
         survivorCostRatio: this.survivorCostRatio(),
+        survivorStepUpTaxableBalance: this.survivorStepUpTaxableBalance(),
+        survivorStepUpGainRatio: this.survivorStepUpGainRatio(),
+        survivorStepUpLtcgRate: this.survivorStepUpLtcgRate(),
       },
       savedAt: new Date().toISOString(),
     };
@@ -1550,6 +1699,10 @@ export class MontecarloScreenComponent implements OnInit {
           spouseDeathYear: this.spouseDeathEnabled() ? this.spouseDeathYear() : undefined,
           survivorMonthlyIncome: this.spouseDeathEnabled() ? this.survivorMonthlyIncome() : undefined,
           survivorCostRatio: this.spouseDeathEnabled() ? this.survivorCostRatio() / 100 : undefined,
+          survivorMonthlyIncomeTax: this.spouseDeathEnabled() ? this.survivorMonthlyIncomeTax() : undefined,
+          survivorMedicareMonthly: this.spouseDeathEnabled() ? this.survivorMonthlyMedicare() : undefined,
+          survivorBirthYear: this.spouseDeathEnabled() ? (this.survivorBirthYear() ?? undefined) : undefined,
+          survivorStepUpBenefitUSD: this.spouseDeathEnabled() ? this.survivorStepUpBenefitUSD() : undefined,
           partTimeMonthlyIncome: this.partTimeMonthlyIncome(),
           partTimeEndYear: this.partTimeEndYear(),
           regime: {
