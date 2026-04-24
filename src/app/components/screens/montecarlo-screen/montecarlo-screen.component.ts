@@ -486,7 +486,7 @@ const HIST_BINS = 40;
                 <div>
                   <span class="dp-label">Post-Death Monthly (scaled lifestyle + survivor tax + Medicare)</span>
                   <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
-                    {{ fmt(baseCost() * survivorCostRatio() / 100, '/mo') }}
+                    {{ fmt(survivorPostDeathMonthly(), '/mo') }}
                   </span>
                 </div>
               </div>
@@ -1125,6 +1125,20 @@ export class MontecarloScreenComponent implements OnInit {
     return Math.max(...benefits);
   });
 
+  /**
+   * Birth year of the surviving spouse — used by the MC kernel to gate
+   * Medicare swap on age-65 eligibility. With one adult, the survivor IS that
+   * adult. With two adults, the survivor is the one NOT at deceasedMemberIndex.
+   */
+  readonly survivorBirthYear = computed<number | null>(() => {
+    const adults = this.adults();
+    if (!adults.length) return null;
+    if (adults.length === 1) return adults[0].birthYear;
+    const deceased = this.deceasedMemberIndex();
+    const survivor = adults.find((_, i) => i !== deceased) ?? adults[0];
+    return survivor.birthYear;
+  });
+
   /** Survivor monthly income = survivor SS + other income (pension etc. kept intact). */
   readonly survivorMonthlyIncome = computed(() =>
     this.survivorMonthlySs() + this.monthlyIncome()
@@ -1182,6 +1196,27 @@ export class MontecarloScreenComponent implements OnInit {
     const gain = this.survivorStepUpGainRatio() / 100;
     const rate = this.survivorStepUpLtcgRate() / 100;
     return Math.max(0, bal * gain * rate);
+  });
+
+  /**
+   * Preview-only: post-death monthly cost as the kernel computes it.
+   * Lifestyle ratio applies to the non-tax / non-healthcare portion only;
+   * tax + Medicare use their survivor-specific values. This must match the
+   * lib/monte-carlo.ts segmentCostAtYear logic when survivorPhase = true.
+   */
+  readonly survivorPostDeathMonthly = computed(() => {
+    const seed = this.selectedLoc();
+    if (!seed) return 0;
+    const totalBase = this.baseCost();
+    // Best-effort decompose: subtract the seed's tax and healthcare lines so
+    // we can scale only the lifestyle remainder. Both come from the
+    // monthlyCosts seed; if missing, fall back to 0 and the ratio applies to
+    // the whole figure (legacy behaviour).
+    const taxLine = Number(seed.monthlyCosts?.taxes?.typical) || 0;
+    const hcLine = Number(seed.monthlyCosts?.healthcare?.typical) || 0;
+    const lifestyleBase = Math.max(0, totalBase - taxLine - hcLine);
+    const ratio = this.survivorCostRatio() / 100;
+    return lifestyleBase * ratio + this.survivorMonthlyIncomeTax() + this.survivorMonthlyMedicare();
   });
 
   /** Nominal lifetime SS with compound COLA growth. */
@@ -1647,6 +1682,7 @@ export class MontecarloScreenComponent implements OnInit {
           survivorCostRatio: this.spouseDeathEnabled() ? this.survivorCostRatio() / 100 : undefined,
           survivorMonthlyIncomeTax: this.spouseDeathEnabled() ? this.survivorMonthlyIncomeTax() : undefined,
           survivorMedicareMonthly: this.spouseDeathEnabled() ? this.survivorMonthlyMedicare() : undefined,
+          survivorBirthYear: this.spouseDeathEnabled() ? (this.survivorBirthYear() ?? undefined) : undefined,
           survivorStepUpBenefitUSD: this.spouseDeathEnabled() ? this.survivorStepUpBenefitUSD() : undefined,
           regime: {
             bullMean: this.regimeBullMean() / 100,

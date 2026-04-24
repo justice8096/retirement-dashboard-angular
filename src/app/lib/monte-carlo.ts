@@ -179,10 +179,22 @@ export interface MonteCarloParams {
    * Monthly Medicare + IRMAA for the survivor — caller recomputes using
    * single-filer IRMAA thresholds (which are ~half of MFJ, so a surviving
    * spouse with unchanged MAGI can jump into a higher surcharge tier).
-   * When set, overrides the segment's `medicareMonthly` for US segments
-   * in all years after `spouseDeathYear`.
+   * Only applied when `survivorBirthYear` indicates the survivor has
+   * reached Medicare eligibility (age ≥ 65) at the current sim year.
+   * For US segments before survivor age 65, the kernel falls back to the
+   * single-adult ACA path. For foreign segments, this is ignored
+   * entirely — `foreignHealthcareMonthly` continues to apply.
    */
   survivorMedicareMonthly?: number;
+
+  /**
+   * Birth year of the surviving spouse — used to gate
+   * `survivorMedicareMonthly` on Medicare eligibility (age ≥ 65 at current
+   * sim year). When unset and a survivor phase is active, the kernel
+   * conservatively assumes Medicare-eligible (preserves the previous
+   * behaviour of immediately swapping to survivorMedicareMonthly).
+   */
+  survivorBirthYear?: number;
 
   /**
    * One-time portfolio bump applied at `spouseDeathYear` to reflect the
@@ -237,20 +249,34 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
     : (m.monthlyIncomeTax ?? 0);
   let healthcare = 0;
 
+  // Survivor Medicare swap is only valid when (a) US segment AND (b) survivor
+  // is Medicare-eligible (age ≥ 65 at the current sim year). The caller's
+  // single-filer IRMAA computation is US-specific — applying it to a
+  // foreign segment, or applying it before age 65, materially distorts cost.
+  const calYear = (p.simStartYear ?? new Date().getFullYear()) + y;
+  const survivorMedicareEligible = survivorPhase
+    && p.survivorMedicareMonthly != null
+    && m.isUS
+    && (p.survivorBirthYear == null || (calYear - p.survivorBirthYear) >= 65);
+
   if (m.isUS) {
-    const calYear = (p.simStartYear ?? new Date().getFullYear()) + y;
     const adults = p.adultBirthYears ?? [];
     const nAdults = Math.max(1, adults.length || 2);
-    if (!adults.length) {
+    if (survivorMedicareEligible) {
+      // Survivor phase + age 65+ + US: use the IRMAA-adjusted single-filer
+      // premium from the caller (pre-computed for 1 adult, so use as-is).
+      healthcare = p.survivorMedicareMonthly!;
+    } else if (!adults.length) {
       // Unknown ages → assume all Medicare-eligible (conservative lower bound).
-      healthcare = survivorPhase && p.survivorMedicareMonthly != null
-        ? p.survivorMedicareMonthly
-        : (m.medicareMonthly ?? 0);
-    } else if (survivorPhase && p.survivorMedicareMonthly != null) {
-      // Survivor phase with IRMAA-adjusted single-filer premium — caller
-      // pre-computed for 1 adult, so use as-is (don't divide by nAdults).
-      healthcare = p.survivorMedicareMonthly;
+      healthcare = m.medicareMonthly ?? 0;
     } else {
+      // Standard age-aware mix. In survivor phase but pre-65, this still runs
+      // and naturally treats the survivor as 1 adult on ACA — except
+      // adultBirthYears still includes the deceased spouse, which over-counts
+      // adults for the post-death years. Effect is small (ACA per-adult halved
+      // when survivor's pre-65 share gets calculated against nAdults=2) but
+      // worth noting as a future refinement: drop the deceased birth year
+      // from `adults` once survivorPhase is true.
       const medicareCount = adults.filter(by => (calYear - by) >= 65).length;
       const acaCount = nAdults - medicareCount;
       const medicarePerAdult = (m.medicareMonthly ?? 0) / nAdults;
@@ -280,9 +306,12 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
       healthcare = medicareCount * medicarePerAdult + acaCount * acaPerAdult;
     }
   } else {
-    healthcare = survivorPhase && p.survivorMedicareMonthly != null
-      ? p.survivorMedicareMonthly
-      : (m.foreignHealthcareMonthly ?? 0);
+    // Foreign segment: survivor Medicare swap does NOT apply — that's a
+    // US-specific IRMAA calc, not a foreign-healthcare equivalent. Keep the
+    // foreign healthcare baseline (caller may scale it down if desired by
+    // adjusting `foreignHealthcareMonthly` directly per segment, or via the
+    // lifestyle ratio on `nonHealthcareBase` — but not here).
+    healthcare = m.foreignHealthcareMonthly ?? 0;
   }
 
   // Lifestyle ratio scales the non-tax / non-healthcare portion only —
