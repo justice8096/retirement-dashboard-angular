@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { CurrencyFormatService } from '@services/currency-format.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { BrokerageFees, FxProvider } from '@models/api.model';
 import { debounceTime, Subject } from 'rxjs';
@@ -318,6 +319,7 @@ import { debounceTime, Subject } from 'rxjs';
   private readonly api = inject(ApiService);
   private readonly locService = inject(LocationService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly currency = inject(CurrencyFormatService);
 
   readonly loading = signal(false);
   readonly saved = signal(false);
@@ -469,11 +471,7 @@ import { debounceTime, Subject } from 'rxjs';
     this.save$.next({ [field]: value } as Partial<BrokerageFees>);
   }
 
-  fmtUsd(amount: number): string {
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount)
-      : '$' + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
+  fmtUsd(amount: number): string { return this.currency.currencyPrecise(amount); }
 
   fmtLocal(amount: number): string {
     const cur = this.localCurrency();

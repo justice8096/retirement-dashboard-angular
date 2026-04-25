@@ -4,6 +4,7 @@ import {
   LocationSummary, LocationFull, LocationQuery, MonthlyCosts, CostRange, COST_CATEGORIES, DetailedCosts,
   NeighborhoodsSupplement, Neighborhood, SupplementType,
 } from '@models/api.model';
+import { weightedInflationFromLocation } from '@app/lib/monte-carlo';
 
 export type SortField = 'name' | 'monthlyCostTotal' | 'country';
 export type SortDir = 'asc' | 'desc';
@@ -238,6 +239,34 @@ export class LocationService {
       sum += (val?.typical ?? 0);
     }
     return sum;
+  }
+
+  /** Baseline monthly cost of a catalog location in today's USD (sum of monthlyCosts). */
+  locMonthlyCost(locId: string): number {
+    const l = this.fullLocations().find(x => x.id === locId);
+    if (!l) return 0;
+    return Object.values(l.monthlyCosts ?? {}).reduce((s, c) => s + (c?.typical ?? 0), 0);
+  }
+
+  /** Weighted per-category inflation for a location (decimal, e.g. 0.025). */
+  locInflationRate(locId: string): number {
+    const l = this.fullLocations().find(x => x.id === locId);
+    if (!l?.monthlyCosts) return 0.025;
+    return weightedInflationFromLocation(
+      l.monthlyCosts as unknown as Record<string, { typical?: number; annualInflation?: number }>,
+    );
+  }
+
+  /**
+   * Projected monthly cost at a given simulation year — compounds today's
+   * baseline by the target location's own weighted inflation rate.
+   * Deterministic preview; actual MC runs sample per year.
+   */
+  locMonthlyCostAtYear(locId: string, year: number): number {
+    const today = this.locMonthlyCost(locId);
+    const rate = this.locInflationRate(locId);
+    const factor = Math.pow(1 + rate, Math.max(0, year));
+    return today * factor;
   }
 
   /* ─── Actions ───────────────────────────────────────────────────── */

@@ -5,6 +5,8 @@ import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { CurrencyFormatService } from '@services/currency-format.service';
+import { MonteCarloScenarioService } from '@services/monte-carlo-scenario.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
@@ -382,12 +384,12 @@ const HIST_BINS = 40;
               </label>
               <div class="tl-cost-col">
                 <span class="tl-cost" [class]="dyscalculia.numberSpacingClass()">
-                  {{ fmt(locMonthlyCost(move.locationId), '/mo') }}
+                  {{ fmt(loc.locMonthlyCost(move.locationId), '/mo') }}
                 </span>
                 <span class="tl-cost-proj" [class]="dyscalculia.numberSpacingClass()"
-                      title="Projected using this location's weighted per-category inflation ({{ (locInflationRate(move.locationId) * 100).toFixed(1) }}%)">
-                  {{ fmt(locMonthlyCostAtYear(move.locationId, move.fromYear), '/mo') }} &#64; y{{ move.fromYear }}
-                  ({{ (locInflationRate(move.locationId) * 100).toFixed(1) }}%)
+                      title="Projected using this location's weighted per-category inflation ({{ (loc.locInflationRate(move.locationId) * 100).toFixed(1) }}%)">
+                  {{ fmt(loc.locMonthlyCostAtYear(move.locationId, move.fromYear), '/mo') }} &#64; y{{ move.fromYear }}
+                  ({{ (loc.locInflationRate(move.locationId) * 100).toFixed(1) }}%)
                 </span>
               </div>
               <label class="tl-field">
@@ -1193,6 +1195,8 @@ export class MontecarloScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
   readonly taxSvc = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly currency = inject(CurrencyFormatService);
+  private readonly scenarios = inject(MonteCarloScenarioService);
 
   readonly loading = signal(false);
   readonly running = signal(false);
@@ -1754,34 +1758,6 @@ export class MontecarloScreenComponent implements OnInit {
     return entries;
   }
 
-  /** Baseline monthly cost of a catalog location in today's USD (sum of monthlyCosts). */
-  locMonthlyCost(locId: string): number {
-    const l = this.loc.fullLocations().find(x => x.id === locId);
-    if (!l) return 0;
-    return Object.values(l.monthlyCosts ?? {}).reduce((s, c) => s + (c?.typical ?? 0), 0);
-  }
-
-  /** Weighted per-category inflation for a location (decimal, e.g. 0.025). */
-  locInflationRate(locId: string): number {
-    const l = this.loc.fullLocations().find(x => x.id === locId);
-    if (!l?.monthlyCosts) return 0.025;
-    return weightedInflationFromLocation(
-      l.monthlyCosts as unknown as Record<string, { typical?: number; annualInflation?: number }>,
-    );
-  }
-
-  /**
-   * Projected monthly cost at a given simulation year — compounds today's
-   * baseline by the target location's own weighted inflation rate (not the
-   * primary's). Deterministic preview; actual MC runs sample per year.
-   */
-  locMonthlyCostAtYear(locId: string, year: number): number {
-    const today = this.locMonthlyCost(locId);
-    const rate = this.locInflationRate(locId);
-    const factor = Math.pow(1 + rate, Math.max(0, year));
-    return today * factor;
-  }
-
   /** Snap mean/vol params to a named historical period. */
   applyPreset(presetId: string): void {
     this.selectedPresetId.set(presetId);
@@ -1810,68 +1786,50 @@ export class MontecarloScreenComponent implements OnInit {
     this.saveMsg.set(null);
     this.saveErr.set(false);
 
-    // Use the canonical monte_carlo_v1 envelope the backend validates.
-    // Params + extras ride along via passthrough.
-    const scenarioData = {
-      kind: 'monte_carlo_v1' as const,
-      successRate: {
-        value: r.successRate,
-        naturalFrequency: this.dyscalculia.naturalFrequency(r.successRate),
-      },
-      percentiles: {
-        p5:  { value: r.p5,     currency: 'USD' },
-        p25: { value: r.p25,    currency: 'USD' },
-        p50: { value: r.median, currency: 'USD' },
-        p75: { value: r.p75,    currency: 'USD' },
-        p95: { value: r.p95,    currency: 'USD' },
-      },
-      runs: this.runs(),
-      years: this.years(),
-      // passthrough — full param snapshot so we can rebuild later
-      params: {
-        location: { id: this.selectedLocationId(), name: this.selectedLoc()?.name },
-        portfolio: this.portfolio(),
-        ssMonthly: this.ssMonthly(),
-        monthlyIncome: this.monthlyIncome(),
-        partTimeMonthlyIncome: this.partTimeMonthlyIncome(),
-        partTimeEndYear: this.partTimeEndYear(),
-        meanReturn: this.meanReturn(),
-        volatility: this.volatility(),
-        meanInflation: this.meanInflation(),
-        inflVol: this.inflVol(),
-        currVol: this.currVol(),
-        fxDrift: this.fxDrift(),
-        incGrowth: this.incGrowth(),
-        returnMode: this.returnMode(),
-        historicalStartYear: this.historicalStartYear(),
-        apportionStrategy: this.healthcare.apportionStrategy(),
-        magiAnnual: this.healthcare.magi().magiForAca,
-        subsidyRegime: this.healthcare.subsidyRegime(),
-        transitionExtraIncome: this.healthcare.transitionYearExtraIncome(),
-        movesEnabled: this.movesEnabled(),
-        moves: this.moves(),
-        oneTimeExpensesEnabled: this.oneTimeExpensesEnabled(),
-        oneTimeExpenses: this.oneTimeExpenses(),
-        ltcMode: this.ltcMode(),
-        ltcProbability: this.ltcProbability(),
-        ltcCostPerYearUSD: this.ltcCostPerYearUSD(),
-        ltcDurationYears: this.ltcDurationYears(),
-        ltcStartAgeMin: this.ltcStartAgeMin(),
-        ltcStartAgeMax: this.ltcStartAgeMax(),
-        ltcInsuranceMonthly: this.ltcInsuranceMonthly(),
-        ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
-        fxShockEnabled: this.fxShockEnabled(),
-        fxShockYear: this.fxShockYear(),
-        fxShockPct: this.fxShockPct(),
-        spouseDeathEnabled: this.spouseDeathEnabled(),
-        spouseDeathYear: this.spouseDeathYear(),
-        survivorCostRatio: this.survivorCostRatio(),
-        survivorStepUpTaxableBalance: this.survivorStepUpTaxableBalance(),
-        survivorStepUpGainRatio: this.survivorStepUpGainRatio(),
-        survivorStepUpLtcgRate: this.survivorStepUpLtcgRate(),
-      },
-      savedAt: new Date().toISOString(),
-    };
+    // Envelope shape + summary-stat layout owned by MonteCarloScenarioService;
+    // passthrough param snapshot is built here so signal reads stay in the component.
+    const scenarioData = this.scenarios.buildPayload(r, this.runs(), this.years(), {
+      location: { id: this.selectedLocationId(), name: this.selectedLoc()?.name },
+      portfolio: this.portfolio(),
+      ssMonthly: this.ssMonthly(),
+      monthlyIncome: this.monthlyIncome(),
+      partTimeMonthlyIncome: this.partTimeMonthlyIncome(),
+      partTimeEndYear: this.partTimeEndYear(),
+      meanReturn: this.meanReturn(),
+      volatility: this.volatility(),
+      meanInflation: this.meanInflation(),
+      inflVol: this.inflVol(),
+      currVol: this.currVol(),
+      fxDrift: this.fxDrift(),
+      incGrowth: this.incGrowth(),
+      returnMode: this.returnMode(),
+      historicalStartYear: this.historicalStartYear(),
+      apportionStrategy: this.healthcare.apportionStrategy(),
+      magiAnnual: this.healthcare.magi().magiForAca,
+      subsidyRegime: this.healthcare.subsidyRegime(),
+      transitionExtraIncome: this.healthcare.transitionYearExtraIncome(),
+      movesEnabled: this.movesEnabled(),
+      moves: this.moves(),
+      oneTimeExpensesEnabled: this.oneTimeExpensesEnabled(),
+      oneTimeExpenses: this.oneTimeExpenses(),
+      ltcMode: this.ltcMode(),
+      ltcProbability: this.ltcProbability(),
+      ltcCostPerYearUSD: this.ltcCostPerYearUSD(),
+      ltcDurationYears: this.ltcDurationYears(),
+      ltcStartAgeMin: this.ltcStartAgeMin(),
+      ltcStartAgeMax: this.ltcStartAgeMax(),
+      ltcInsuranceMonthly: this.ltcInsuranceMonthly(),
+      ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
+      fxShockEnabled: this.fxShockEnabled(),
+      fxShockYear: this.fxShockYear(),
+      fxShockPct: this.fxShockPct(),
+      spouseDeathEnabled: this.spouseDeathEnabled(),
+      spouseDeathYear: this.spouseDeathYear(),
+      survivorCostRatio: this.survivorCostRatio(),
+      survivorStepUpTaxableBalance: this.survivorStepUpTaxableBalance(),
+      survivorStepUpGainRatio: this.survivorStepUpGainRatio(),
+      survivorStepUpLtcgRate: this.survivorStepUpLtcgRate(),
+    });
 
     this.api.createScenario({
       name,
@@ -1990,35 +1948,17 @@ export class MontecarloScreenComponent implements OnInit {
   /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */
   todayYear(): number { return new Date().getFullYear(); }
 
+  /** Template adapter — keeps existing `fmt(x)` / `fmt(x, '/yr')` template
+   *  call sites working. Logic lives in CurrencyFormatService. */
   fmt(amount: number, unit: '/mo' | '/yr' | '' = '/mo'): string {
-    const dollar = '$';
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount, unit)
-      : dollar + Math.round(amount).toLocaleString() + unit;
+    if (unit === '/yr') return this.currency.currencyYearly(amount);
+    if (unit === '/mo') return this.currency.currencyMonthly(amount);
+    return this.currency.currency(amount);
   }
 
-  /**
-   * Abbreviated currency for compact displays (always a lump-sum total —
-   * end balances, lifetime totals — so no time-unit suffix).
-   *
-   * Dyscalculia F-003 anti-pattern fix: when the user has dyscalculia mode on,
-   * we fall back to full `toLocaleString()` because K/M/B abbreviations force
-   * magnitude decoding that is exactly what dyscalculic users struggle with.
-   */
+  /** Abbreviated K/M/B currency. Dyscalculia mode: full digits (per F-003). */
   fmtK(amount: number): string {
-    if (this.dyscalculia.isEnabled()) {
-      return this.fmt(amount, '');
-    }
-    const dollar = String.fromCharCode(36);
-    const neg = amount < 0;
-    const n = Math.abs(amount);
-    let out: string;
-    if (n >= 1_000_000_000) out = (n / 1_000_000_000).toFixed(2) + 'B';
-    else if (n >= 1_000_000) out = (n / 1_000_000).toFixed(2) + 'M';
-    else if (n >= 10_000)    out = (n / 1_000).toFixed(0) + 'K';
-    else if (n >= 1_000)     out = (n / 1_000).toFixed(1) + 'K';
-    else                     out = Math.round(n).toString();
-    return (neg ? '-' + dollar : dollar) + out;
+    return this.currency.currencyShort(amount);
   }
 
   /** Tone class for the success-rate card. Delegates to the service. */

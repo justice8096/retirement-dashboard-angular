@@ -11,6 +11,11 @@ import {
   LocalInfoSupplement, Scenario, bulletText,
 } from '@models/api.model';
 import { escYaml as yamlStr } from '@app/lib/text-escape';
+import {
+  FIRE_WITHDRAWAL_RATE,
+  GUARDRAIL_FLOOR_RATE as GUARDRAIL_FLOOR,
+  GUARDRAIL_CEILING_RATE as GUARDRAIL_CEILING,
+} from '@app/lib/fire-math';
 
 type NeighborhoodsBag = Record<string, NeighborhoodsSupplement | null>;
 type InclusionBag = Record<string, InclusionSupplement | null>;
@@ -30,12 +35,6 @@ interface ServicesBagEntry {
 }
 type ServicesBag = Record<string, ServicesBagEntry | null>;
 
-/** Simple FIRE-number & year math replicated here so the report is a single,
- *  self-contained module. Matches the formulas used by the FIRE calc and
- *  Guardrails screens — deliberate duplication, not worth an abstraction. */
-const FIRE_WITHDRAWAL_RATE = 0.04;
-const GUARDRAIL_FLOOR = 0.03;
-const GUARDRAIL_CEILING = 0.055;
 
 @Component({
   selector: 'app-report-screen',
