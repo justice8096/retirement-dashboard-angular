@@ -470,6 +470,83 @@ const HIST_BINS = 40;
           }
         </div>
 
+        <!-- Long-Term Care planning -->
+        <div class="card death-card">
+          <h3 class="card-title">Long-Term Care</h3>
+          <p class="card-sub">
+            ~70% of US 65+ will need some long-term care; median stay 2.4 years; median
+            US private nursing-home cost ~$108K/yr (Genworth 2024). Medicare does <strong>not</strong>
+            cover custodial care. Two independent modes — self-insure (per-trial probabilistic
+            stay) and insurance (recurring premium). They can stack ("both") if you want to
+            test partial coverage.
+          </p>
+
+          <label class="param">
+            <span class="param-label">Mode</span>
+            <select class="param-input"
+              [ngModel]="ltcMode()" (ngModelChange)="ltcMode.set($event)">
+              <option value="off">Off</option>
+              <option value="self-insure">Self-insure (probabilistic shock)</option>
+              <option value="insurance">Insurance (recurring premium)</option>
+              <option value="both">Both (insurance + residual self-insure)</option>
+            </select>
+          </label>
+
+          @if (ltcMode() === 'self-insure' || ltcMode() === 'both') {
+            <div class="death-grid">
+              <label class="param">
+                <span class="param-label">Probability of needing LTC (%)</span>
+                <input appNumeric="percent" class="param-input" min="0" max="100" step="5"
+                  [ngModel]="ltcProbability()" (ngModelChange)="ltcProbability.set(+$event)" />
+                <span class="param-hint">Default 70% (Genworth lifetime estimate for US 65+).</span>
+              </label>
+              <label class="param">
+                <span class="param-label">Cost per year ($)</span>
+                <input appNumeric="currency" class="param-input" min="0" step="5000"
+                  [class]="dyscalculia.numberSpacingClass()"
+                  [ngModel]="ltcCostPerYearUSD()" (ngModelChange)="ltcCostPerYearUSD.set(+$event)" />
+                <span class="param-hint">US median ~$108K (private room nursing home). International often $30–60K.</span>
+              </label>
+              <label class="param">
+                <span class="param-label">Duration (years)</span>
+                <input appNumeric="rate" class="param-input" min="0.5" max="10" step="0.5"
+                  [ngModel]="ltcDurationYears()" (ngModelChange)="ltcDurationYears.set(+$event)" />
+                <span class="param-hint">Median 2.4 yr; ~20% of stays exceed 5 yr.</span>
+              </label>
+              <label class="param">
+                <span class="param-label">Start age range (min)</span>
+                <input appNumeric="age" class="param-input" min="60" max="100"
+                  [ngModel]="ltcStartAgeMin()" (ngModelChange)="ltcStartAgeMin.set(+$event)" />
+              </label>
+              <label class="param">
+                <span class="param-label">Start age range (max)</span>
+                <input appNumeric="age" class="param-input" min="60" max="100"
+                  [ngModel]="ltcStartAgeMax()" (ngModelChange)="ltcStartAgeMax.set(+$event)" />
+                <span class="param-hint">Anchored on the oldest adult in the household.</span>
+              </label>
+            </div>
+          }
+
+          @if (ltcMode() === 'insurance' || ltcMode() === 'both') {
+            <div class="death-grid">
+              <label class="param">
+                <span class="param-label">Insurance premium ($/mo)</span>
+                <input appNumeric="currency" class="param-input" min="0" step="25"
+                  [class]="dyscalculia.numberSpacingClass()"
+                  [ngModel]="ltcInsuranceMonthly()" (ngModelChange)="ltcInsuranceMonthly.set(+$event)" />
+                <span class="param-hint">Typical $200–500/mo for a policy bought at 60.</span>
+              </label>
+              <label class="param">
+                <span class="param-label">Premium starts at age</span>
+                <input appNumeric="age" class="param-input" min="50" max="80"
+                  [ngModel]="ltcInsuranceStartAge()" (ngModelChange)="ltcInsuranceStartAge.set(+$event)" />
+                <span class="param-hint">Anchored on the oldest adult.</span>
+              </label>
+            </div>
+          }
+        </div>
+
+
         <!-- Spouse-death scenario (deterministic) -->
         @if (adults().length >= 1) {
           <div class="card death-card">
@@ -1144,6 +1221,18 @@ export class MontecarloScreenComponent implements OnInit {
   readonly oneTimeExpenses = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
   readonly oneTimeExpensesEnabled = signal(false);
 
+  /** Long-Term Care planning (#21). Two independent modes — self-insure
+   *  (per-trial probabilistic stay) and insurance (recurring premium). */
+  readonly ltcMode = signal<'off' | 'self-insure' | 'insurance' | 'both'>('off');
+  readonly ltcProbability = signal(70);     // %
+  readonly ltcCostPerYearUSD = signal(108000); // US Genworth 2024 median private nursing-home room
+  readonly ltcDurationYears = signal(2.4);  // 2.4 yr median stay
+  readonly ltcStartAgeMin = signal(78);
+  readonly ltcStartAgeMax = signal(88);
+  readonly ltcInsuranceMonthly = signal(350);  // $4.2K/yr is mid-range LTC premium for 60yo
+  readonly ltcInsuranceStartAge = signal(60);
+
+
   /* ─── Spouse-death scenario (deterministic) ────────────────────── */
   readonly spouseDeathEnabled = signal(false);
   readonly spouseDeathYear = signal(10);
@@ -1440,6 +1529,9 @@ export class MontecarloScreenComponent implements OnInit {
       this.regimeBullToBear(); this.regimeBearToBull();
       this.moves(); this.movesEnabled();
       this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
+      this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
+      this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
+      this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();
       this.spouseDeathEnabled(); this.spouseDeathYear();
       this.survivorCostRatio(); this.deceasedMemberIndex();
       this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
@@ -1718,6 +1810,14 @@ export class MontecarloScreenComponent implements OnInit {
         moves: this.moves(),
         oneTimeExpensesEnabled: this.oneTimeExpensesEnabled(),
         oneTimeExpenses: this.oneTimeExpenses(),
+        ltcMode: this.ltcMode(),
+        ltcProbability: this.ltcProbability(),
+        ltcCostPerYearUSD: this.ltcCostPerYearUSD(),
+        ltcDurationYears: this.ltcDurationYears(),
+        ltcStartAgeMin: this.ltcStartAgeMin(),
+        ltcStartAgeMax: this.ltcStartAgeMax(),
+        ltcInsuranceMonthly: this.ltcInsuranceMonthly(),
+        ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
         spouseDeathEnabled: this.spouseDeathEnabled(),
         spouseDeathYear: this.spouseDeathYear(),
         survivorCostRatio: this.survivorCostRatio(),
@@ -1782,6 +1882,15 @@ export class MontecarloScreenComponent implements OnInit {
                 inflate: e.inflate,
               }))
             : undefined,
+          ltcSelfInsureEnabled: this.ltcMode() === 'self-insure' || this.ltcMode() === 'both',
+          ltcProbability: this.ltcProbability() / 100,
+          ltcCostPerYearUSD: this.ltcCostPerYearUSD(),
+          ltcDurationYears: this.ltcDurationYears(),
+          ltcStartAgeMin: this.ltcStartAgeMin(),
+          ltcStartAgeMax: this.ltcStartAgeMax(),
+          ltcInsuranceMonthly: (this.ltcMode() === 'insurance' || this.ltcMode() === 'both')
+            ? this.ltcInsuranceMonthly() : 0,
+          ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
           adultBirthYears: this.adults().map(m => m.birthYear),
           simStartYear: this.household()?.planningStartYear ?? new Date().getFullYear(),
           magiAnnual: this.healthcare.magi().magiForAca,
