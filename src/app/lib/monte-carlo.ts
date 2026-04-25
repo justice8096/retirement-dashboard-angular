@@ -557,6 +557,13 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     ? Math.min(...p.adultBirthYears)
     : null;
   const oldestAge0 = oldestBirthYear != null ? (calStart - oldestBirthYear) : null;
+  // Single-run modes (historical-sequence) can't average across trials, so a
+  // per-trial coin flip would make identical inputs flip between "LTC happened"
+  // / "didn't" — unstable success rate and percentiles. In those modes we
+  // switch to an expected-value LTC: always-on at the midpoint start age,
+  // scaled by ltcProbability. Cross-trial average of the random mode equals
+  // the per-year EV deduction, so this preserves intent without the noise.
+  const ltcUseExpectedValue = effectiveRuns === 1;
 
   for (let r = 0; r < effectiveRuns; r++) {
     let bal = portfolio;
@@ -582,12 +589,24 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
 
     // Per-trial LTC roll. Resolves once at trial start; deterministic across
     // years within the trial. willNeedLtc: 70% of 65+ Americans by Genworth.
+    //
+    // Single-run modes (historical-sequence, effectiveRuns === 1) can't
+    // average across trials, so a per-trial coin flip would make identical
+    // inputs flip between "LTC happened" / "LTC didn't" — unstable result.
+    // Switch to expected-value: always-on shock at the midpoint start age,
+    // scaled by `ltcProbability` (cross-trial average == EV per year).
     let ltcStartSimYear = -1;
     let ltcEndSimYear = -1;
-    if (ltcSelfInsure && oldestAge0 != null && Math.random() < ltcProbability) {
-      const ltcStartAge = ltcStartAgeMin + Math.random() * (ltcStartAgeMax - ltcStartAgeMin);
-      ltcStartSimYear = Math.max(0, Math.floor(ltcStartAge - oldestAge0));
-      ltcEndSimYear = ltcStartSimYear + Math.max(1, Math.round(ltcDurationY));
+    if (ltcSelfInsure && oldestAge0 != null) {
+      if (ltcUseExpectedValue) {
+        const ltcStartAge = (ltcStartAgeMin + ltcStartAgeMax) / 2;
+        ltcStartSimYear = Math.max(0, Math.floor(ltcStartAge - oldestAge0));
+        ltcEndSimYear = ltcStartSimYear + Math.max(1, Math.round(ltcDurationY));
+      } else if (Math.random() < ltcProbability) {
+        const ltcStartAge = ltcStartAgeMin + Math.random() * (ltcStartAgeMax - ltcStartAgeMin);
+        ltcStartSimYear = Math.max(0, Math.floor(ltcStartAge - oldestAge0));
+        ltcEndSimYear = ltcStartSimYear + Math.max(1, Math.round(ltcDurationY));
+      }
     }
 
     for (let y = 0; y < years; y++) {
@@ -659,7 +678,11 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // Self-insure: per-trial probabilistic LTC stay. Insurance: flat
       // monthly premium once the oldest adult crosses ltcInsuranceStartAge.
       if (ltcSelfInsure && y >= ltcStartSimYear && y < ltcEndSimYear && ltcStartSimYear >= 0) {
-        bal -= ltcCostUSD * cumInfl;
+        // EV mode: scale by ltcProbability so the per-year deduction matches
+        // the cross-trial average of the random mode. Random mode: full cost
+        // (the roll already gated whether this trial sees LTC at all).
+        const ltcWeight = ltcUseExpectedValue ? ltcProbability : 1;
+        bal -= ltcCostUSD * cumInfl * ltcWeight;
       }
       if (ltcInsMonthly > 0 && oldestAge0 != null && (oldestAge0 + y) >= ltcInsStartAge) {
         bal -= ltcInsMonthly * 12 * cumInfl;
