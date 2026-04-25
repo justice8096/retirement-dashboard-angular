@@ -546,6 +546,7 @@ const HIST_BINS = 40;
           }
         </div>
 
+
         <!-- Spouse-death scenario (deterministic) -->
         @if (adults().length >= 1) {
           <div class="card death-card">
@@ -1230,6 +1231,7 @@ export class MontecarloScreenComponent implements OnInit {
   readonly ltcStartAgeMax = signal(88);
   readonly ltcInsuranceMonthly = signal(350);  // $4.2K/yr is mid-range LTC premium for 60yo
   readonly ltcInsuranceStartAge = signal(60);
+
 
   /* ─── Spouse-death scenario (deterministic) ────────────────────── */
   readonly spouseDeathEnabled = signal(false);
