@@ -297,13 +297,14 @@ export interface MonteCarloParams {
    * Distinct from `fxDrift` (ongoing per-year drift) and `currVol` (annual
    * random shock per year). This shock is deterministic: if you set
    * +0.10, the USD weakens 10% in a single year against the local
-   * currency, raising all foreign-cost-of-living deductions by 10×
+   * currency, raising all foreign-cost-of-living deductions by ~10%
    * thereafter. Negative values represent USD strengthening.
    *
-   * Only applied to foreign segments — no-op for US-segment years.
-   * Permanent: the shock multiplier persists in `fxMult` so the rest
-   * of the sim runs at the new exchange-rate level. Useful for asking
-   * "what if EUR/USD goes from 0.93 to 1.05 in a recession?"
+   * The shock fires at `fxShockYear` regardless of which segment is active
+   * (a USD repricing happens whether or not the user is abroad that year)
+   * and persists across subsequent moves — only its application to cost is
+   * gated on `curIsForeign`. Useful for asking "what if EUR/USD goes from
+   * 0.93 to 1.05 in a recession?"
    *
    * Default: no shock applied.
    */
