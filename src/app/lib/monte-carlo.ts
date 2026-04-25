@@ -18,6 +18,29 @@ import { HISTORICAL_RETURNS, bootstrapYear } from '../data/historical-returns';
 
 export type ReturnMode = 'normal' | 'bootstrap' | 'regime' | 'historical-sequence';
 
+/**
+ * One-time discrete expense at a specific sim year — modelled as a balance
+ * deduction in the year it hits. Use cases: car replacement every 7–8
+ * years, new roof in year 12, grandchild college tuition in year 18, big
+ * trip every 5 years, late-life nursing-home stay (LTC).
+ *
+ * The amount is in today's USD; the kernel multiplies by accumulated
+ * inflation when `inflate` is true (default — true for almost everything
+ * lumpy, since costs grow with CPI / vehicle / construction inflation),
+ * skipping inflation only when the user has hedged in nominal dollars
+ * (e.g., a fixed-price annuity payout, or a known nominal mortgage payoff).
+ */
+export interface OneTimeExpense {
+  /** Sim year (0-based from start). 0 = today. */
+  year: number;
+  /** Amount in today's USD. Positive number; kernel deducts from balance. */
+  amountUSD: number;
+  /** Optional human-readable label (rendered in scenario passthrough only). */
+  label?: string;
+  /** Whether to inflate by accumulated inflation at the year. Default true. */
+  inflate?: boolean;
+}
+
 export interface LocationMove {
   /** Year from simulation start when this segment begins (0 = start). */
   fromYear: number;
@@ -142,6 +165,17 @@ export interface MonteCarloParams {
    * so you move to "$X in today's dollars" regardless of when the move happens.
    */
   moveSchedule?: LocationMove[];
+
+  /**
+   * One-time discrete expenses applied at specific sim years. Items with
+   * `inflate: true` (default) scale by accumulated inflation when they hit;
+   * `inflate: false` treats the amount as a nominal-dollar shock at that
+   * year. Multiple expenses in the same year stack. Negative or zero
+   * amounts are silently skipped. Used for lumpy realistic costs (cars,
+   * roof, tuition, late-life nursing-home stay) that a recurring monthly
+   * cost line can't represent.
+   */
+  oneTimeExpenses?: OneTimeExpense[];
 
   /**
    * Deterministic spouse-death scenario. When set, at year `spouseDeathYear`
@@ -432,6 +466,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   for (const m of schedule) movesByYear.set(m.fromYear, m);
   const initial = schedule[0];
 
+  // One-time expenses indexed by year for O(1) lookup. Multiple expenses
+  // in the same year stack via array. Skipped silently when amount <= 0.
+  const expensesByYear = new Map<number, OneTimeExpense[]>();
+  for (const e of (p.oneTimeExpenses ?? [])) {
+    if (!e || !(e.amountUSD > 0) || e.year < 0 || e.year >= years) continue;
+    const list = expensesByYear.get(e.year) ?? [];
+    list.push(e);
+    expensesByYear.set(e.year, list);
+  }
+
   // Per-year active-segment lookup (schedule is sorted ascending by fromYear).
   const activeSegmentAt = (y: number): LocationMove => {
     let active = schedule[0];
@@ -509,6 +553,17 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
 
       bal *= (1 + ret);
       bal += (income + activePartTime) * 12 - cost * 12 * currShock * fxMult;
+
+      // One-time expenses for this year — stacked deductions, scaled by
+      // accumulated inflation by default (lumpy real-world costs grow with CPI).
+      const lumpsThisYear = expensesByYear.get(y);
+      if (lumpsThisYear) {
+        for (const e of lumpsThisYear) {
+          const inflated = (e.inflate ?? true) ? e.amountUSD * cumInfl : e.amountUSD;
+          bal -= inflated;
+        }
+      }
+
       cost *= (1 + inf);
       cumInfl *= (1 + inf);
       income *= (1 + incGrowth);
