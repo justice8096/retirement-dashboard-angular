@@ -570,6 +570,10 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     let curIsForeign = initial.isForeign;
     let curDrift = initial.fxDrift ?? drift;
     let fxMult = 1;
+    // Durable across moves: a one-time FX shock is a global USD repricing
+    // and survives segment changes, unlike per-segment drift in fxMult.
+    // Only applied to cost when in a foreign segment.
+    let fxShockMult = 1;
     let cumInfl = 1; // accumulated inflation from year 0 — used to re-baseline cost on moves
     let survivorPhase = false;
     const regimeState = { inBear: false };
@@ -625,16 +629,20 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       const { ret, inf } = sampleYear(mode, y, p, regimeState);
       const currShock = curIsForeign ? 1 + currVol * normalRandom() : 1;
       if (curIsForeign && curDrift) fxMult *= (1 + curDrift);
-      // FX stress test: deterministic one-time shock at fxShockYear, foreign-only.
-      if (curIsForeign && p.fxShockYear != null && y === p.fxShockYear && p.fxShockPct) {
-        fxMult *= (1 + p.fxShockPct);
+      // FX stress test: deterministic one-time shock at fxShockYear. Fires
+      // regardless of current segment (a USD repricing happens whether or not
+      // the user is abroad that year), but its multiplier is only applied to
+      // cost when in a foreign segment — see the cost-deduction line below.
+      if (p.fxShockYear != null && y === p.fxShockYear && p.fxShockPct) {
+        fxShockMult *= (1 + p.fxShockPct);
       }
 
       // Part-time income stops at `partTimeEndYear` (exclusive — year == end is zero).
       const activePartTime = (partTimeEndYear > 0 && y < partTimeEndYear) ? partTime : 0;
 
       bal *= (1 + ret);
-      bal += (income + activePartTime) * 12 - cost * 12 * currShock * fxMult;
+      const effectiveFxShock = curIsForeign ? fxShockMult : 1;
+      bal += (income + activePartTime) * 12 - cost * 12 * currShock * fxMult * effectiveFxShock;
 
       // One-time expenses for this year — stacked deductions, scaled by
       // accumulated inflation by default (lumpy real-world costs grow with CPI).
