@@ -509,7 +509,7 @@ const HIST_BINS = 40;
               </label>
               <label class="param">
                 <span class="param-label">Duration (years)</span>
-                <input class="param-input" type="number" min="0.5" max="10" step="0.5"
+                <input appNumeric="rate" class="param-input" min="0.5" max="10" step="0.5"
                   [ngModel]="ltcDurationYears()" (ngModelChange)="ltcDurationYears.set(+$event)" />
                 <span class="param-hint">Median 2.4 yr; ~20% of stays exceed 5 yr.</span>
               </label>
@@ -574,13 +574,14 @@ const HIST_BINS = 40;
               </label>
               <label class="param">
                 <span class="param-label">Shock magnitude (%)</span>
-                <input type="number" class="param-input" min="-50" max="50" step="1"
+                <input appNumeric="percent" class="param-input" min="-50" max="50" step="1"
                   [ngModel]="fxShockPct()" (ngModelChange)="fxShockPct.set(+$event)" />
                 <span class="param-hint">+10 = USD weakens 10% (foreign cost +10%). Try ±10 / ±20 to bracket.</span>
               </label>
             </div>
           }
         </div>
+
 
         <!-- Spouse-death scenario (deterministic) -->
         @if (adults().length >= 1) {
@@ -1271,6 +1272,7 @@ export class MontecarloScreenComponent implements OnInit {
   readonly fxShockEnabled = signal(false);
   readonly fxShockYear = signal(5);
   readonly fxShockPct = signal(10);  // % — positive = USD weakens (cost rises)
+
 
   /* ─── Spouse-death scenario (deterministic) ────────────────────── */
   readonly spouseDeathEnabled = signal(false);
