@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { CurrencyFormatService } from '@services/currency-format.service';
 import { ApiService } from '@services/api.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { HouseholdProfile } from '@models/api.model';
@@ -192,6 +193,7 @@ export class TaxesScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
   readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly currency = inject(CurrencyFormatService);
   private readonly api = inject(ApiService);
 
   readonly fedBracketSources = FED_BRACKETS_2026_SOURCES;
@@ -257,20 +259,12 @@ export class TaxesScreenComponent implements OnInit {
     }
   }
 
-  fmt(amount: number): string {
-    // Whole dollars — cents add noise on a cost-of-living dashboard. Use
-    // `fmtCents` explicitly when to-the-penny precision is needed.
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount)
-      : '$' + Math.round(amount).toLocaleString();
-  }
+  /** Whole dollars — cents add noise on a cost-of-living dashboard.
+   *  Use `fmtCents` explicitly when to-the-penny precision is needed. */
+  fmt(amount: number): string { return this.currency.currency(amount); }
 
-  /** Currency with cents precision — taxes display to-the-penny.
-   *  Threads through DyscalculiaService so spaced / words formats are honored
-   *  (Dashboard Dyscalculia F-013). */
-  fmtCents(amount: number): string {
-    return this.dyscalculia.formatCurrencyPrecise(amount, { fractionDigits: 2 });
-  }
+  /** Currency with cents — taxes display to-the-penny. */
+  fmtCents(amount: number): string { return this.currency.currencyPrecise(amount); }
 
   /** Normalize rate (decimal 0.22 or whole 22 → "22"). Whole-percent
    *  display for ≥1% values; sub-1% keeps one decimal (a 0.25% fee

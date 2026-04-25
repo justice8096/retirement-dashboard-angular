@@ -4,8 +4,14 @@ import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { CurrencyFormatService } from '@services/currency-format.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings, HouseholdProfile, COST_CATEGORIES, LocationFull } from '@models/api.model';
+import {
+  FIRE_WITHDRAWAL_RATE as BASE_RATE,
+  GUARDRAIL_FLOOR_RATE as FLOOR_RATE,
+  GUARDRAIL_CEILING_RATE as CEILING_RATE,
+} from '@app/lib/fire-math';
 
 /* Guyton-Klinger guardrails.
  *   Base rate   : 4.0% of initial portfolio (inflation-adjusted annually).
@@ -15,9 +21,6 @@ import { FinancialSettings, HouseholdProfile, COST_CATEGORIES, LocationFull } fr
  *   Preservation: if current rate > 120% of initial → −10% cut.
  * All guardrails track inflation after year 0.
  */
-const BASE_RATE = 0.04;
-const FLOOR_RATE = 0.03;
-const CEILING_RATE = 0.055;
 const NOMINAL_RETURN = 0.07;
 const INFLATION_RATE = 0.03;
 const PROJECTION_YEARS = 20;
@@ -336,6 +339,7 @@ export class GuardrailsScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
   readonly healthcareSvc = inject(HealthcareService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly currencySvc = inject(CurrencyFormatService);
 
   readonly PROJECTION_YEARS = PROJECTION_YEARS;
 
@@ -539,23 +543,11 @@ export class GuardrailsScreenComponent implements OnInit {
   }
 
   /** Annual-dollar amount — used for withdrawals, expenses, floor/ceiling. */
-  fmt(amount: number): string {
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(Math.round(amount), '/yr')
-      : '$' + Math.round(amount).toLocaleString() + '/yr';
-  }
+  fmt(amount: number): string { return this.currencySvc.currencyYearly(amount); }
 
   /** Lump sum, no time-unit suffix — used for the portfolio column. */
-  lump(amount: number): string {
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(Math.round(amount), '')
-      : '$' + Math.round(amount).toLocaleString();
-  }
+  lump(amount: number): string { return this.currencySvc.currency(amount); }
 
   /** Monthly amount — used for the headroom card. */
-  monthly(amount: number): string {
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(Math.round(amount), '/mo')
-      : '$' + Math.round(amount).toLocaleString() + '/mo';
-  }
+  monthly(amount: number): string { return this.currencySvc.currencyMonthly(amount); }
 }

@@ -5,6 +5,7 @@ import { TaxService } from '@services/tax.service';
 import { NavigationService } from '@services/navigation.service';
 import { fpl2026 } from '@app/lib/aca-constants';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { CurrencyFormatService } from '@services/currency-format.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { LocationFull, COST_CATEGORIES, bulletText } from '@models/api.model';
 
@@ -854,6 +855,7 @@ export class LocationCompareComponent implements OnInit {
   readonly healthcare = inject(HealthcareService);
   private readonly nav = inject(NavigationService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly currency = inject(CurrencyFormatService);
 
   /** Toggle: view Year 1 (transition) or Year 2+ (steady state) healthcare numbers. */
   readonly viewYear = signal<'transition' | 'steady'>('steady');
@@ -1016,26 +1018,13 @@ export class LocationCompareComponent implements OnInit {
 
   /* ─── Helpers ─────────────────────────────────── */
 
-  fmt(val: number): string {
-    if (this.dyscalculia.isEnabled()) {
-      return this.dyscalculia.formatCurrency(val);
-    }
-    return '$' + Math.round(val).toLocaleString();
-  }
+  fmt(val: number): string { return this.currency.currency(val); }
 
-  /** Currency with cents — for the Total Monthly + Income Tax rows.
-   *  Threads through DyscalculiaService so spaced / words formats are honored
-   *  (Dashboard Dyscalculia F-013). */
-  fmtCents(val: number): string {
-    return this.dyscalculia.formatCurrencyPrecise(val, { fractionDigits: 2 });
-  }
+  /** Currency with cents — for the Total Monthly + Income Tax rows. */
+  fmtCents(val: number): string { return this.currency.currencyPrecise(val); }
 
-  /** Yearly currency — whole dollars + "/yr" suffix. For the audit banner.
-   *  Threads through DyscalculiaService so spaced/words formats and the user's
-   *  number-spacing class apply consistently (Dashboard Dyscalculia F-012). */
-  fmtYear(val: number): string {
-    return this.dyscalculia.formatCurrency(Math.round(val), '/yr');
-  }
+  /** Yearly currency — whole dollars + "/yr" suffix. For the audit banner. */
+  fmtYear(val: number): string { return this.currency.currencyYearly(val); }
 
   /** FPL percentage formatted in plain language + threaded through dyscalculia
    *  count formatting (Dashboard Dyslexia DFA-2026-04-19-001). */

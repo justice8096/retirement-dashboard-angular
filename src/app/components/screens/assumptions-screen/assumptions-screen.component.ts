@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { CurrencyFormatService } from '@services/currency-format.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { LocationService } from '@services/location.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
@@ -557,6 +558,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
 export class AssumptionsScreenComponent implements OnInit {
   private readonly api = inject(ApiService);
   readonly dyscalculia = inject(DyscalculiaService);
+  private readonly currency = inject(CurrencyFormatService);
   readonly healthcare = inject(HealthcareService);
   readonly loc = inject(LocationService);
 
@@ -614,8 +616,8 @@ export class AssumptionsScreenComponent implements OnInit {
   }
 
   /** Currency formatters that honor the user's dyscalculia number-format preference. */
-  fmtYearly(v: number): string { return this.dyscalculia.formatCurrency(Math.round(v), '/yr'); }
-  fmtMonthly(v: number): string { return this.dyscalculia.formatCurrency(Math.round(v), '/mo'); }
+  fmtYearly(v: number): string { return this.currency.currencyYearly(v); }
+  fmtMonthly(v: number): string { return this.currency.currencyMonthly(v); }
   fmtFplPct(pct: number): string { return this.dyscalculia.formatCount(Math.round(pct), '% of the poverty line'); }
 
   patch(partial: Partial<HouseholdProfile>): void {
@@ -744,9 +746,5 @@ export class AssumptionsScreenComponent implements OnInit {
     });
   }
 
-  fmt(amount: number): string {
-    return this.dyscalculia.isEnabled()
-      ? this.dyscalculia.formatCurrency(amount)
-      : '$' + Math.round(amount).toLocaleString();
-  }
+  fmt(amount: number): string { return this.currency.currency(amount); }
 }
