@@ -509,7 +509,7 @@ const HIST_BINS = 40;
               </label>
               <label class="param">
                 <span class="param-label">Duration (years)</span>
-                <input class="param-input" type="number" min="0.5" max="10" step="0.5"
+                <input appNumeric="rate" class="param-input" min="0.5" max="10" step="0.5"
                   [ngModel]="ltcDurationYears()" (ngModelChange)="ltcDurationYears.set(+$event)" />
                 <span class="param-hint">Median 2.4 yr; ~20% of stays exceed 5 yr.</span>
               </label>
