@@ -1,0 +1,537 @@
+    <div class="compare-view">
+
+      <!-- Empty state -->
+      @if (locations().length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <h2>Compare Locations</h2>
+          <p>
+            Select cities on the
+            <button mat-button class="link-btn" (click)="goToOverview()">
+              Overview
+            </button>
+            tab using the checkboxes, then come back here to compare them side-by-side.
+          </p>
+        </div>
+      } @else {
+
+        <!-- Header: selected count + clear -->
+        <div class="compare-header">
+          <h2>Comparing {{ locations().length }} Locations</h2>
+          <button mat-button class="clear-btn" (click)="loc.deselectAll()">
+            Clear all
+          </button>
+        </div>
+
+        <!-- Year-view toggle — shows Year 1 (transition) vs Year 2+ (steady). -->
+        @if (healthcare.transitionYearExtraIncome() > 0) {
+          <div class="year-toggle">
+            <span class="year-toggle-label">View:</span>
+            <button class="year-btn" [class.active]="viewYear() === 'steady'"
+                    (click)="viewYear.set('steady')">Year 2+ (steady)</button>
+            <button class="year-btn" [class.active]="viewYear() === 'transition'"
+                    (click)="viewYear.set('transition')">Year 1 (first year)</button>
+            <span class="year-toggle-hint" [class]="dyscalculia.numberSpacingClass()">
+              First year includes
+              {{ fmtYear(healthcare.transitionYearExtraIncome()) }} of one-time income
+            </span>
+          </div>
+        }
+
+        <!-- Audit banner: shows the household inputs driving the numbers -->
+        <div class="audit-banner" [class]="dyscalculia.numberSpacingClass()">
+          <span class="audit-item"><strong>Adults:</strong> {{ auditAdults() }}</span>
+          <span class="audit-sep">·</span>
+          <span class="audit-item">
+            <strong>Yearly income counted for ACA:</strong>
+            {{ fmtYear(auditMagi()) }} · {{ fmtFplPct(auditFplPct()) }}
+            <span class="audit-anchor">({{ dyscalculia.getAnchor(auditFplPct(), 'fpl-pct') }})</span>
+          </span>
+          <span class="audit-sep">·</span>
+          <span class="audit-item">
+            <strong>Rule set:</strong>
+            {{ healthcare.subsidyRegime() === 'cliff' ? 'Cliff (cutoff at about $82k/yr)' : 'Enhanced (capped at 8.5% of income)' }}
+          </span>
+          @if (healthcare.apportionStrategy() !== 'manual') {
+            <span class="audit-sep">·</span>
+            <span class="audit-item audit-mode">
+              <strong>Income adjusts per city:</strong> ON
+            </span>
+          }
+          <span class="audit-hint">
+            @if (healthcare.apportionStrategy() !== 'manual') {
+              Each city uses its own cost of living.
+              Cheaper cities shrink your counted income.
+              That may drop you below the cutoff and unlock help.
+              Hover any health-insurance cell to see that city's counted income.
+            } @else {
+              Your income is fixed across all cities.
+              Turn on auto-adjust in Setup → Assumptions to vary it by city.
+            }
+          </span>
+        </div>
+
+        <!-- Scrollable comparison table -->
+        <div class="table-scroll">
+          <table class="compare-table" role="grid">
+
+            <!-- City header row -->
+            <thead>
+              <tr>
+                <th class="label-col sticky-col">Location</th>
+                @for (city of locations(); track city.id) {
+                  <th class="city-col">
+                    <div class="city-header">
+                      <span class="city-name">{{ city.name }}</span>
+                      <span class="city-country">{{ city.country }}</span>
+                    </div>
+                  </th>
+                }
+              </tr>
+            </thead>
+
+            <tbody>
+              <!-- Total monthly cost (incl. computed income tax) -->
+              <tr class="total-row">
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">💰</span> Total Monthly
+                  <span class="row-sub">as-is — with your current MAGI and the resulting ACA regime</span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col total-cell"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [class.cheapest]="isCheapest(city)"
+                    [class.priciest]="isPriciest(city)">
+                    {{ fmtCents(totalWithTax(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Aspirational total — if ACA subsidy fully applied -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">✓</span> Total if ACA-subsidized
+                  <span class="row-sub">
+                    what you'd pay with healthcare capped at 8.5% × MAGI (i.e. under the 400% FPL cliff)
+                  </span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col subsidized-cell"
+                    [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmtCents(totalIfSubsidized(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Worst-case total with cliff penalty baked in -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">⚠</span> Total w/ Cliff Penalty
+                  <span class="row-sub">
+                    worst-case monthly: Total Monthly + what you'd pay extra if you drew the full
+                    city cost from taxable sources (no Roth). Equals Total Monthly when already under the cliff.
+                  </span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col penalty-cell"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [class.penalty-zero]="cliffPenaltyMonthly(city) === 0">
+                    {{ fmtCents(totalWithTax(city) + cliffPenaltyMonthly(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Income tax line -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">🏛️</span> Income Tax
+                  <span class="row-sub">computed from your {{ fmt(loc.annualIncome()) }}/yr income</span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col"
+                    [class]="dyscalculia.numberSpacingClass()">
+                    {{ fmtCents(monthlyTax(city)) }}
+                  </td>
+                }
+              </tr>
+
+              <!-- Healthcare (effective) -->
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">🏥</span> Healthcare
+                  <span class="row-sub">
+                    @switch (healthcareSource(locations()[0])) {
+                      @case ('medicare') { Medicare — all adults 65+ }
+                      @case ('aca-subsidized') { ACA subsidized ({{ fmt(loc.annualIncome()) }}/yr MAGI) }
+                      @case ('aca-unsubsidized') { ACA full sticker — income above subsidy cutoff }
+                      @case ('mixed') { Mixed — one spouse Medicare, one ACA }
+                      @default { — }
+                    }
+                  </span>
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [title]="healthcareTooltip(city)">
+                    {{ fmtCents(healthcareMonthly(city)) }}
+                    @if (acaEstimateFor(city); as est) {
+                      <span class="aca-badge"
+                            [title]="(est.rateArea ? est.rateArea + ' · ' : '') + (est.disclaimer ?? 'estimated')">
+                        ~{{ est.level?.charAt(0) ?? '?' }}
+                      </span>
+                    }
+                  </td>
+                }
+              </tr>
+
+              <!-- Section: Cost breakdown -->
+              <tr class="section-header-row">
+                <td [attr.colspan]="locations().length + 1" class="section-label">
+                  Monthly Costs
+                </td>
+              </tr>
+              @for (cat of costRows(); track cat.key) {
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">{{ cat.icon }}</span> {{ cat.label }}
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col"
+                      [class]="dyscalculia.numberSpacingClass()"
+                      [class.best-in-row]="isBestInRow(cat.key, city)"
+                      [class.worst-in-row]="isWorstInRow(cat.key, city)">
+                      {{ fmtCost(city, cat.key) }}
+                    </td>
+                  }
+                </tr>
+              }
+
+              <!-- Section: Lifestyle -->
+              @if (hasLifestyle()) {
+                <tr class="section-header-row">
+                  <td [attr.colspan]="locations().length + 1" class="section-label">
+                    Lifestyle &amp; Safety
+                  </td>
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🛡️</span> Safety
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Safety</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.safetyRating ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.safetyRating ?? '–' }}/10</span>
+                        </div>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🐾</span> Dog Friendly
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Dog Friendly</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.dogFriendly ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.dogFriendly ?? '–' }}/10</span>
+                        </div>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🌐</span> Expat Community
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Expat Community</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.expatCommunity ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.expatCommunity ?? '–' }}/10</span>
+                        </div>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🗣️</span> English Spoken
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">English Spoken</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill" [style.width.%]="(city.lifestyle?.englishPrevalence ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.lifestyle?.englishPrevalence ?? '–' }}/10</span>
+                        </div>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">📶</span> Internet
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Internet</span>
+                        <span class="metric-text-val">{{ city.lifestyle?.internetSpeed ?? '–' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+              }
+
+              <!-- Section: Healthcare -->
+              @if (hasHealthcare()) {
+                <tr class="section-header-row">
+                  <td [attr.colspan]="locations().length + 1" class="section-label">
+                    Healthcare
+                  </td>
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🏥</span> System
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">System</span>
+                        <span class="metric-text-val">{{ city.healthcare?.system ?? '–' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">⭐</span> Quality
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Quality</span>
+                        <div class="bar-row">
+                          <div class="bar-track">
+                            <div class="bar-fill bar-fill--health" [style.width.%]="(city.healthcare?.qualityRating ?? 0) * 10"></div>
+                          </div>
+                          <span class="rating-label">{{ city.healthcare?.qualityRating ?? '–' }}/10</span>
+                        </div>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🦷</span> Dental
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Dental</span>
+                        <span class="metric-text-val">{{ city.healthcare?.dentalIncluded ? '✓ Included' : '✗ Extra' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">⏱️</span> Wait Times
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Wait Times</span>
+                        <span class="metric-text-val">{{ city.healthcare?.waitTimes ?? '–' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+              }
+
+              <!-- Section: Climate -->
+              @if (hasClimate()) {
+                <tr class="section-header-row">
+                  <td [attr.colspan]="locations().length + 1" class="section-label">
+                    Climate
+                  </td>
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🌡️</span> Summer High
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Summer High</span>
+                        <span class="metric-text-val">{{ climateHigh(city) }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">❄️</span> Winter Low
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Winter Low</span>
+                        <span class="metric-text-val">{{ climateLow(city) }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">☔</span> Rainy Days/Yr
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Rainy Days/Yr</span>
+                        <span class="metric-text-val">{{ city.climate?.rainyDaysPerYear ?? '–' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+              }
+
+              <!-- Section: Visa -->
+              @if (hasVisa()) {
+                <tr class="section-header-row">
+                  <td [attr.colspan]="locations().length + 1" class="section-label">
+                    Visa &amp; Residency
+                  </td>
+                </tr>
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">🛂</span> Visa Type
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Visa Type</span>
+                        <span class="metric-text-val">{{ city.visa?.type ?? '–' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                @if (anyVisaIncomeReq()) {
+                  <tr>
+                    <td class="label-col sticky-col row-label">
+                      <span class="row-icon">💰</span> Income Req. (mo)
+                    </td>
+                    @for (city of locations(); track city.id) {
+                      <td class="city-col"
+                        [class]="dyscalculia.numberSpacingClass()">
+                        <div class="metric-cell">
+                          <span class="metric-name">Income Req. (mo)</span>
+                          <span class="metric-text-val">{{ visaIncomeReq(city) }}</span>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
+                <tr>
+                  <td class="label-col sticky-col row-label">
+                    <span class="row-icon">📝</span> Notes
+                  </td>
+                  @for (city of locations(); track city.id) {
+                    <td class="city-col">
+                      <div class="metric-cell">
+                        <span class="metric-name">Notes</span>
+                        <span class="metric-text-val metric-notes">{{ city.visa?.notes ?? '–' }}</span>
+                      </div>
+                    </td>
+                  }
+                </tr>
+                @if (anyVisaCost()) {
+                  <tr>
+                    <td class="label-col sticky-col row-label">
+                      <span class="row-icon">💵</span> Visa Cost
+                    </td>
+                    @for (city of locations(); track city.id) {
+                      <td class="city-col"
+                        [class]="dyscalculia.numberSpacingClass()">
+                        <div class="metric-cell">
+                          <span class="metric-name">Visa Cost</span>
+                          <span class="metric-text-val">{{ city.visa?.costUSD ? fmt(city.visa!.costUSD!) : '–' }}</span>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
+              }
+
+              <!-- Section: Pros & Cons -->
+              <tr class="section-header-row">
+                <td [attr.colspan]="locations().length + 1" class="section-label">
+                  Pros &amp; Cons
+                </td>
+              </tr>
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">👍</span> Pros
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col">
+                    <div class="metric-cell">
+                      <span class="metric-name">Pros</span>
+                      <div class="tags-wrap">
+                        @if (city.pros?.length) {
+                          @for (p of (city.pros ?? []).slice(0, 4); track $index) {
+                            <span class="pro-tag">{{ bulletText(p) }}</span>
+                          }
+                        } @else {
+                          <span class="metric-text-val">–</span>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                }
+              </tr>
+              <tr>
+                <td class="label-col sticky-col row-label">
+                  <span class="row-icon">👎</span> Cons
+                </td>
+                @for (city of locations(); track city.id) {
+                  <td class="city-col">
+                    <div class="metric-cell">
+                      <span class="metric-name">Cons</span>
+                      <div class="tags-wrap">
+                        @if (city.cons?.length) {
+                          @for (c of (city.cons ?? []).slice(0, 4); track $index) {
+                            <span class="con-tag">{{ bulletText(c) }}</span>
+                          }
+                        } @else {
+                          <span class="metric-text-val">–</span>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                }
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>

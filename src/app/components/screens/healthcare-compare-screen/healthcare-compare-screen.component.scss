@@ -1,0 +1,119 @@
+    .hc-screen { display: flex; flex-direction: column; gap: 16px; }
+    .screen-header { display: flex; align-items: center; gap: 12px; }
+    .header-icon { font-size: 32px; }
+    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    .badge-new {
+      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
+    }
+
+    .card {
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-radius: 12px; padding: 20px;
+    }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+
+    .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .result-card {
+      padding: 14px; background: var(--dark-bg-card);
+      border: 1px solid var(--dark-border); border-radius: 10px;
+    }
+    .result-card.highlight { border-color: var(--dark-green); background: rgba(76, 175, 80, 0.06); }
+    .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
+    .result-value { font-size: 20px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .result-explain { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; }
+
+    .table-wrap { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th, .data-table td {
+      padding: 8px 10px; border-bottom: 1px solid var(--dark-border); text-align: left;
+    }
+    .data-table th {
+      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .data-table td { color: var(--dark-text); }
+    .data-table .right { text-align: right; font-variant-numeric: tabular-nums; }
+    .data-table .center { text-align: center; }
+    .data-table .strong { font-weight: 700; }
+    .data-table tr { cursor: pointer; }
+    .data-table tr:hover { background: var(--dark-bg-secondary); }
+    .data-table tr.selected { background: rgba(212, 148, 58, 0.08); }
+
+    .q-good { color: var(--dark-green); font-weight: 700; }
+    .q-mid  { color: var(--dark-amber); font-weight: 700; }
+    .q-low  { color: var(--dark-neutral); font-weight: 700; }
+    .green { color: var(--dark-green); }
+    .red   { color: var(--dark-neutral); }
+
+    .scatter { display: flex; flex-direction: column; }
+    .scatter-axes { display: grid; grid-template-columns: 36px 1fr; gap: 4px; height: 320px; }
+    .y-axis {
+      display: flex; flex-direction: column; justify-content: space-between;
+      font-size: 11px; color: var(--dark-text-muted); padding: 2px 4px 2px 0; text-align: right;
+    }
+    .plot {
+      position: relative; background: var(--dark-bg-secondary); border-radius: 8px;
+      border: 1px solid var(--dark-border);
+    }
+    .plot-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(to right, var(--dark-border) 1px, transparent 1px),
+        linear-gradient(to top, var(--dark-border) 1px, transparent 1px);
+      background-size: 25% 20%;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .dot {
+      position: absolute; width: 10px; height: 10px;
+      background: var(--dark-amber); border-radius: 50%;
+      transform: translate(-50%, 50%);
+      cursor: pointer; transition: transform 0.15s, background 0.15s;
+      border: 1px solid var(--dark-bg-secondary);
+    }
+    .dot:hover { background: var(--dark-text); transform: translate(-50%, 50%) scale(1.4); z-index: 2; }
+    .dot.selected { background: var(--dark-green); transform: translate(-50%, 50%) scale(1.6); z-index: 3; }
+    .x-axis {
+      display: flex; justify-content: space-between; padding: 6px 0 0 40px;
+      font-size: 11px; color: var(--dark-text-muted); font-variant-numeric: tabular-nums;
+    }
+    .axis-labels { display: flex; justify-content: space-between; padding: 6px 0 0 0; font-size: 11px; color: var(--dark-text-sec); }
+    .y-label { padding-left: 4px; }
+    .x-label { padding-right: 12px; }
+
+    .detail-card {
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-left: 4px solid var(--dark-green);
+      border-radius: 12px; padding: 20px;
+    }
+    .quality-meter { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .qm-label { font-size: 12px; color: var(--dark-text-muted); min-width: 60px; }
+    .qm-track { flex: 1; height: 14px; background: var(--dark-bg-secondary); border-radius: 7px; overflow: hidden; }
+    .qm-fill { height: 100%; transition: width 0.3s; }
+    .qm-fill.q-good { background: var(--dark-green); }
+    .qm-fill.q-mid  { background: var(--dark-amber); }
+    .qm-fill.q-low  { background: var(--dark-neutral); }
+    .qm-val { font-size: 14px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .detail-cell { padding: 12px; background: var(--dark-bg-secondary); border-radius: 8px; }
+    .detail-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 4px; }
+    .detail-val { font-size: 16px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
+    .detail-val.green { color: var(--dark-green); }
+    .detail-val.red { color: var(--dark-neutral); }
+
+    .aca-note, .warning-block {
+      padding: 12px 14px; border-radius: 8px; font-size: 13px;
+      color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5);
+      margin-top: 10px;
+    }
+    .aca-note {
+      background: rgba(212, 148, 58, 0.08); border-left: 3px solid var(--dark-amber);
+    }
+    .aca-note strong { color: var(--dark-amber); }
+    .warning-block {
+      background: rgba(229, 115, 115, 0.08); border-left: 3px solid var(--dark-red);
+    }
+    .warning-block strong { color: var(--dark-red); }
