@@ -1,0 +1,197 @@
+    <div class="hc-screen">
+      <div class="screen-header">
+        <span class="header-icon">🏥</span>
+        <div>
+          <h2 class="header-title">Healthcare Comparison</h2>
+          <p class="header-sub">
+            Healthcare quality vs. cost across locations — quality-per-dollar value, with pre-Medicare ACA context for US-bound returns.
+          </p>
+        </div>
+        <span class="badge-new">NEW</span>
+      </div>
+
+      <!-- Summary -->
+      <div class="results">
+        @if (stats().bestQuality; as bq) {
+          <div class="result-card">
+            <div class="result-label">Best Quality</div>
+            <div class="result-value">{{ bq.quality.toFixed(1) }}/10</div>
+            <div class="result-explain">{{ bq.loc.name }} · {{ fmt(bq.monthlyHealth) }}/mo</div>
+          </div>
+        }
+        @if (stats().cheapest; as ch) {
+          <div class="result-card">
+            <div class="result-label">Cheapest</div>
+            <div class="result-value">{{ fmt(ch.monthlyHealth) }}/mo</div>
+            <div class="result-explain">{{ ch.loc.name }} · Q {{ ch.quality.toFixed(1) }}</div>
+          </div>
+        }
+        @if (stats().bestValue; as bv) {
+          <div class="result-card highlight">
+            <div class="result-label">Best Value</div>
+            <div class="result-value">{{ bv.value.toFixed(1) }}</div>
+            <div class="result-explain">{{ bv.loc.name }} · quality per $100/mo</div>
+          </div>
+        }
+        <div class="result-card">
+          <div class="result-label">Average Cost</div>
+          <div class="result-value">{{ fmt(stats().avgCost) }}/mo</div>
+          <div class="result-explain">All locations with healthcare data</div>
+        </div>
+      </div>
+
+      <!-- Full table -->
+      <div class="card">
+        <h3 class="card-title">Healthcare Systems & Monthly Cost</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Country</th>
+                <th>City / Region</th>
+                <th class="right">Quality</th>
+                <th class="right">Monthly</th>
+                <th class="right">Annual</th>
+                <th class="center">Medicare</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of allMetrics(); track m.loc.id) {
+                <tr [class.selected]="selectedId() === m.loc.id" (click)="toggleSelect(m.loc.id)">
+                  <td>{{ m.loc.country }}</td>
+                  <td>{{ m.loc.name }}</td>
+                  <td class="right" [class.q-good]="m.quality >= 6"
+                                    [class.q-mid]="m.quality >= 4 && m.quality < 6"
+                                    [class.q-low]="m.quality < 4"
+                                    [attr.aria-label]="'Quality ' + m.quality.toFixed(1) + ' out of 10 — ' + qualityTierLabel(m.quality)">
+                    {{ m.quality.toFixed(1) }}/10<span class="sr-only">&nbsp;— {{ qualityTierLabel(m.quality) }}</span>
+                  </td>
+                  <td class="right">{{ fmt(m.monthlyHealth) }}</td>
+                  <td class="right">{{ fmtYr(m.annualHealth) }}</td>
+                  <td class="center">{{ m.medCoverageAvail ? '✓' : '✗' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Scatter (quality vs cost, CSS-positioned dots) -->
+      <div class="card">
+        <h3 class="card-title">Quality vs. Monthly Cost</h3>
+        <div class="scatter" role="img" aria-label="Healthcare quality plotted against monthly cost">
+          <div class="scatter-axes">
+            <div class="y-axis">
+              <span>10</span><span>8</span><span>6</span><span>4</span><span>2</span><span>0</span>
+            </div>
+            <div class="plot">
+              @for (m of allMetrics(); track m.loc.id) {
+                <div class="dot"
+                  [class.selected]="selectedId() === m.loc.id"
+                  [style.left.%]="dotX(m.monthlyHealth)"
+                  [style.bottom.%]="dotY(m.quality)"
+                  [title]="m.loc.name + ' — Q ' + m.quality.toFixed(1) + ' · ' + fmt(m.monthlyHealth) + '/mo'"
+                  (click)="toggleSelect(m.loc.id)">
+                </div>
+              }
+              <div class="plot-grid"></div>
+            </div>
+          </div>
+          <div class="x-axis">
+            <span>$0</span>
+            <span>{{ fmt(xMax() * 0.25) }}</span>
+            <span>{{ fmt(xMax() * 0.5) }}</span>
+            <span>{{ fmt(xMax() * 0.75) }}</span>
+            <span>{{ fmt(xMax()) }}</span>
+          </div>
+          <div class="axis-labels">
+            <span class="y-label">Quality (1-10) ↑</span>
+            <span class="x-label">Monthly cost →</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail card -->
+      @if (selected(); as sel) {
+        <div class="detail-card">
+          <h3 class="card-title">{{ sel.loc.name }} — Healthcare Details</h3>
+
+          <div class="quality-meter">
+            <span class="qm-label">Quality</span>
+            <div class="qm-track">
+              <div class="qm-fill"
+                [class.q-good]="sel.quality >= 6"
+                [class.q-mid]="sel.quality >= 4 && sel.quality < 6"
+                [class.q-low]="sel.quality < 4"
+                [style.width.%]="sel.quality * 10"></div>
+            </div>
+            <span class="qm-val">{{ sel.quality.toFixed(1) }}/10</span>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail-cell">
+              <div class="detail-label">Monthly Cost</div>
+              <div class="detail-val">{{ fmt(sel.monthlyHealth) }}/mo</div>
+            </div>
+            <div class="detail-cell">
+              <div class="detail-label">Annual Cost</div>
+              <div class="detail-val">{{ fmtYr(sel.annualHealth) }}</div>
+            </div>
+            <div class="detail-cell">
+              <div class="detail-label">Quality / $100/mo</div>
+              <div class="detail-val green">{{ sel.value.toFixed(1) }}</div>
+            </div>
+            <div class="detail-cell">
+              <div class="detail-label">Medicare</div>
+              <div class="detail-val" [class.green]="sel.medCoverageAvail" [class.red]="!sel.medCoverageAvail">
+                {{ sel.medCoverageAvail ? 'Yes' : 'No' }}
+              </div>
+            </div>
+          </div>
+
+          <div class="aca-note">
+            <strong>Pre-Medicare (Ages 60-64):</strong>
+            ACA premium estimate ~{{ acaLabel }}/mo.
+            <app-source-tooltip [sources]="acaSources" label="ACA 2026 sources" />
+            Typical bronze/silver plans run \$800 – \$1,500/mo depending on age, state, and subsidy eligibility.
+          </div>
+
+          @if (!sel.medCoverageAvail) {
+            <div class="warning-block">
+              <strong>Medicare doesn't pay abroad.</strong>
+              Except for limited cross-border emergency situations, Medicare won't cover care outside the US.
+              Plan on local insurance or private international medical coverage.
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Best value ranking -->
+      <div class="card">
+        <h3 class="card-title">Top 10 Healthcare Values (quality per $100/mo)</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Location</th>
+                <th class="right">Quality</th>
+                <th class="right">Monthly</th>
+                <th class="right">Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of topValues(); track m.loc.id; let i = $index) {
+                <tr>
+                  <td>{{ i + 1 }}</td>
+                  <td>{{ m.loc.name }}</td>
+                  <td class="right">{{ m.quality.toFixed(1) }}</td>
+                  <td class="right">{{ fmt(m.monthlyHealth) }}</td>
+                  <td class="right strong green">{{ m.value.toFixed(1) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>

@@ -1,0 +1,234 @@
+    <div class="settings-screen">
+      <div class="screen-header">
+        <span class="header-icon">⚙️</span>
+        <div>
+          <h2 class="header-title">Financial Settings</h2>
+          <p class="header-sub">Portfolio allocation, return assumptions, and risk parameters</p>
+        </div>
+        @if (dirty()) {
+          <button mat-flat-button class="save-btn" (click)="save()" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save Changes' }}
+          </button>
+        }
+        @if (saveMsg()) {
+          <span class="save-msg" [class.error]="saveError()">{{ saveMsg() }}</span>
+        }
+      </div>
+
+      @if (loading()) {
+        <div class="status-msg">Loading settings…</div>
+      } @else {
+
+        <!-- Portfolio -->
+        <div class="card">
+          <h3 class="card-title">Portfolio</h3>
+          <div class="field-grid">
+            <label class="field">
+              <span class="field-label">Total Balance</span>
+              <div class="input-wrap dollar">
+                <span class="input-prefix">$</span>
+                <input appNumeric="currency" class="field-input lg"
+                  [class]="dyscalculia.numberSpacingClass()"
+                  [ngModel]="form().portfolioBalance"
+                  (ngModelChange)="patch('portfolioBalance', $event)"
+                  step="10000" />
+              </div>
+            </label>
+            <label class="field">
+              <span class="field-label">Retirement Path</span>
+              <select class="field-input"
+                [ngModel]="form().retirementPath"
+                (ngModelChange)="patch('retirementPath', $event)">
+                <option value="traditional">Traditional</option>
+                <option value="fire">FIRE</option>
+                <option value="semi-retire">Semi-Retire</option>
+                <option value="coast-fire">Coast FIRE</option>
+                <option value="barista-fire">Barista FIRE</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <!-- Account Balances -->
+        <div class="card">
+          <h3 class="card-title">Account Balances</h3>
+          <p class="card-sub">
+            Load and fees are recurring annual drags on return — both subtract from your effective growth rate.
+          </p>
+          <div class="account-grid">
+            <div class="account-head">
+              <span>Account</span><span>Balance</span><span>Load %/yr</span><span>Fees %/yr</span>
+            </div>
+            @for (acct of accountRows; track acct.key) {
+              <div class="account-row">
+                <span class="acct-name">{{ acct.label }}</span>
+                <div class="input-wrap dollar">
+                  <span class="input-prefix">$</span>
+                  <input appNumeric="currency" class="field-input"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [ngModel]="form()[acct.balanceKey]"
+                    (ngModelChange)="patch(acct.balanceKey, $event)"
+                    step="1000" />
+                </div>
+                <div class="input-wrap pct">
+                  <input appNumeric="percent" class="field-input"
+                    [ngModel]="form()[acct.loadKey] ?? 0"
+                    (ngModelChange)="patch(acct.loadKey, $event)"
+                    max="10" step="0.05" />
+                  <span class="input-suffix">%</span>
+                </div>
+                <div class="input-wrap pct">
+                  <input appNumeric="percent" class="field-input"
+                    [ngModel]="form()[acct.feesKey] ?? 0"
+                    (ngModelChange)="patch(acct.feesKey, $event)"
+                    max="10" step="0.05" />
+                  <span class="input-suffix">%</span>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="drag-summary">
+            Portfolio-weighted drag: <strong>{{ weightedDragPct().toFixed(2) }}%</strong>/yr
+            · Effective return after drag: <strong>{{ effectiveReturnPct().toFixed(2) }}%</strong>
+          </div>
+        </div>
+
+        <!-- Asset Allocation -->
+        <div class="card">
+          <h3 class="card-title">Asset Allocation</h3>
+          <div class="alloc-bars">
+            <div class="alloc-segment" [style.flex]="form().equityPct || 1">
+              <div class="alloc-fill equity"></div>
+              <span class="alloc-label">Equity {{ fmtPct(form().equityPct) }}%</span>
+            </div>
+            <div class="alloc-segment" [style.flex]="form().bondPct || 1">
+              <div class="alloc-fill bond"></div>
+              <span class="alloc-label">Bond {{ fmtPct(form().bondPct) }}%</span>
+            </div>
+            <div class="alloc-segment" [style.flex]="form().cashPct || 1">
+              <div class="alloc-fill cash"></div>
+              <span class="alloc-label">Cash {{ fmtPct(form().cashPct) }}%</span>
+            </div>
+            @if (form().intlPct) {
+              <div class="alloc-segment" [style.flex]="form().intlPct || 1">
+                <div class="alloc-fill intl"></div>
+                <span class="alloc-label">Int'l {{ fmtPct(form().intlPct) }}%</span>
+              </div>
+            }
+          </div>
+          <div class="field-grid alloc-inputs">
+            <label class="field">
+              <span class="field-label">Equity %</span>
+              <input appNumeric="percent" class="field-input sm"
+                [ngModel]="form().equityPct"
+                (ngModelChange)="patch('equityPct', $event)"
+                step="5" />
+            </label>
+            <label class="field">
+              <span class="field-label">Bond %</span>
+              <input appNumeric="percent" class="field-input sm"
+                [ngModel]="form().bondPct"
+                (ngModelChange)="patch('bondPct', $event)"
+                step="5" />
+            </label>
+            <label class="field">
+              <span class="field-label">Cash %</span>
+              <input appNumeric="percent" class="field-input sm"
+                [ngModel]="form().cashPct"
+                (ngModelChange)="patch('cashPct', $event)"
+                step="5" />
+            </label>
+            <label class="field">
+              <span class="field-label">Int'l %</span>
+              <input appNumeric="percent" class="field-input sm"
+                [ngModel]="form().intlPct"
+                (ngModelChange)="patch('intlPct', $event)"
+                step="5" />
+            </label>
+          </div>
+          @if (allocTotal() !== 100) {
+            <div class="alloc-warning">
+              Allocation totals {{ fmtPct(allocTotal()) }}% — should be 100%
+            </div>
+          }
+        </div>
+
+        <!-- Return & Inflation -->
+        <div class="card">
+          <h3 class="card-title">Return &amp; Inflation Assumptions</h3>
+          <div class="field-grid">
+            <label class="field">
+              <span class="field-label">Expected Annual Return</span>
+              <div class="input-wrap pct">
+                <input appNumeric="percent" class="field-input sm"
+                  [ngModel]="form().expectedReturn"
+                  (ngModelChange)="patch('expectedReturn', $event)"
+                  max="20" step="0.1" />
+                <span class="input-suffix">%</span>
+              </div>
+            </label>
+            <label class="field">
+              <span class="field-label">Expected Inflation</span>
+              <div class="input-wrap pct">
+                <input appNumeric="percent" class="field-input sm"
+                  [ngModel]="form().expectedInflation"
+                  (ngModelChange)="patch('expectedInflation', $event)"
+                  max="15" step="0.1" />
+                <span class="input-suffix">%</span>
+              </div>
+            </label>
+            <label class="field">
+              <span class="field-label">Social Security COLA</span>
+              <div class="input-wrap pct">
+                <input appNumeric="percent" class="field-input sm"
+                  [ngModel]="form().ssCola"
+                  (ngModelChange)="patch('ssCola', $event)"
+                  max="10" step="0.1" />
+                <span class="input-suffix">%</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Risk Adjustments -->
+        <div class="card">
+          <h3 class="card-title">Risk Adjustments</h3>
+          <div class="toggle-grid">
+            <div class="toggle-row">
+              <mat-slide-toggle
+                [checked]="form().fxDriftEnabled"
+                (change)="patch('fxDriftEnabled', $event.checked)" />
+              <span class="toggle-label">FX Drift</span>
+              @if (form().fxDriftEnabled) {
+                <label class="inline-field">
+                  <span class="field-label">Rate</span>
+                  <div class="input-wrap pct compact">
+                    <input appNumeric="percent" class="field-input sm"
+                      [ngModel]="form().fxDriftAnnualRate"
+                      (ngModelChange)="patch('fxDriftAnnualRate', $event)"
+                      max="10" step="0.1" />
+                    <span class="input-suffix">%/yr</span>
+                  </div>
+                </label>
+              }
+            </div>
+            <div class="toggle-row">
+              <mat-slide-toggle
+                [checked]="form().ssCutEnabled"
+                (change)="patch('ssCutEnabled', $event.checked)" />
+              <span class="toggle-label">Social Security Cut</span>
+              @if (form().ssCutEnabled) {
+                <label class="inline-field">
+                  <span class="field-label">Year</span>
+                  <input appNumeric="year" class="field-input sm"
+                    [ngModel]="form().ssCutYear"
+                    (ngModelChange)="patch('ssCutYear', $event)"
+                    min="2025" max="2060" />
+                </label>
+              }
+            </div>
+          </div>
+        </div>
+
+      }
+    </div>
