@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
+import { HealthcareService } from '@services/healthcare.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings, HouseholdProfile, COST_CATEGORIES, LocationFull } from '@models/api.model';
@@ -333,6 +334,7 @@ interface ProjectionRow {
 export class GuardrailsScreenComponent implements OnInit {
   readonly api = inject(ApiService);
   readonly loc = inject(LocationService);
+  readonly healthcareSvc = inject(HealthcareService);
   readonly dyscalculia = inject(DyscalculiaService);
 
   readonly PROJECTION_YEARS = PROJECTION_YEARS;
@@ -410,10 +412,19 @@ export class GuardrailsScreenComponent implements OnInit {
     const mc = target.monthlyCosts ?? {};
     let total = 0;
     for (const cat of COST_CATEGORIES) {
+      // Skip both healthcare alternates here — the effective cost (Medicare
+      // vs ACA-subsidized vs ACA-unsubsidized, household-age + MAGI aware)
+      // is added below via HealthcareService. Skipping the seed `healthcare`
+      // line here avoids double-counting and underrepresenting pre-Medicare
+      // households whose actual floor includes ACA premiums, not Medicare.
       if (cat.alternate) continue;
+      if (cat.key === 'healthcare') continue;
       if (!!cat.essential !== wantEssential) continue;
       const v = mc[cat.key]?.typical;
       if (typeof v === 'number') total += v;
+    }
+    if (wantEssential) {
+      total += this.healthcareSvc.decide(target).monthlyCost;
     }
     return total;
   }
