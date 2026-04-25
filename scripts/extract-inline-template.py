@@ -114,18 +114,22 @@ def main() -> int:
         print(f"no inline template or styles found in {ts_path}")
         return 0
 
+    # Preflight ALL destinations before writing anything — refusing midway
+    # would leave the .ts still-inline but one of html/scss already created,
+    # and a rerun would then collide on the freshly-written file.
+    if template is not None and html_path.exists():
+        print(f"refusing to overwrite existing {html_path}", file=sys.stderr)
+        return 1
+    if styles is not None and scss_path.exists():
+        print(f"refusing to overwrite existing {scss_path}", file=sys.stderr)
+        return 1
+
     if template is not None:
-        if html_path.exists():
-            print(f"refusing to overwrite existing {html_path}", file=sys.stderr)
-            return 1
         html_path.write_text(template, encoding='utf-8')
         src = src.replace('__HTMLNAME__', html_name)
         print(f"wrote {html_path} ({len(template.splitlines())} lines)")
 
     if styles is not None:
-        if scss_path.exists():
-            print(f"refusing to overwrite existing {scss_path}", file=sys.stderr)
-            return 1
         scss_path.write_text(styles, encoding='utf-8')
         src = src.replace('__SCSSNAME__', scss_name)
         print(f"wrote {scss_path} ({len(styles.splitlines())} lines)")
