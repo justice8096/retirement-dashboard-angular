@@ -1,0 +1,34 @@
+/* .card / .card-title / param / param-label / param-input inherit from
+ * styles.scss "Screen Layout Utilities" + the parent component's
+ * .param-* rules (which the parent template still uses). The sampling-
+ * specific rules below stay local: hist-row layout + the bull/bear
+ * regime grid. */
+
+.hist-card { display: flex; flex-direction: column; gap: 14px; }
+.hist-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+
+.regime-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  margin-top: 4px;
+}
+.regime-col {
+  padding: 12px; border-radius: 8px; border: 1px solid var(--dark-border);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.regime-col.bull { border-left: 3px solid var(--dark-green); }
+.regime-col.bear { border-left: 3px solid var(--dark-neutral); }
+.regime-title { font-size: 12px; margin: 0; color: var(--dark-text); font-weight: 600; }
+
+/* Local copies of param input styles (sub-component-encapsulated SCSS
+ * doesn't inherit from sibling component scopes). Kept identical to the
+ * parent's ones so the visual is unchanged. */
+.param { display: flex; flex-direction: column; gap: 4px; }
+.param-label { font-size: 11px; color: var(--dark-text-muted); font-weight: 500; }
+.param-hint { font-size: 10px; color: var(--dark-text-muted); }
+.param-input {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
+  background: var(--dark-bg-secondary); color: var(--dark-text);
+  font-size: 14px; font-family: var(--font-sans); outline: none;
+}
+.param-input:focus { border-color: var(--dark-blue); }
+select.param-input { appearance: auto; }

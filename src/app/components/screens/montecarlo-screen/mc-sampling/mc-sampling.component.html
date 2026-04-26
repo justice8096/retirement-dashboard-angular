@@ -1,0 +1,99 @@
+<div class="card hist-card">
+  <h3 class="card-title">Historical &amp; Cycles</h3>
+
+  <div class="hist-row">
+    <label class="param">
+      <span class="param-label">Sampling Mode</span>
+      <select class="param-input"
+        [ngModel]="state.returnMode()"
+        (ngModelChange)="state.returnMode.set($event)">
+        <option value="normal">Normal (Gaussian draws)</option>
+        <option value="bootstrap">Bootstrap (resample history)</option>
+        <option value="regime">Bull/Bear regimes</option>
+        <option value="historical-sequence">Historical sequence (backtest)</option>
+      </select>
+      <span class="param-hint">
+        @switch (state.returnMode()) {
+          @case ('normal') { Draws return/inflation from a normal distribution (classic MC). }
+          @case ('bootstrap') { Each year picks a random historical year — realistic tails + return/inflation correlation. }
+          @case ('regime') { Alternates bull &amp; bear regimes via a 2-state Markov chain. Deterministic mean per state, runs still vary. }
+          @case ('historical-sequence') { Replays actual {{ state.historicalStartYear() }}+ sequence forward. Deterministic — 1 path. }
+        }
+      </span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Historical Preset</span>
+      <select class="param-input"
+        [ngModel]="state.selectedPresetId()"
+        (ngModelChange)="applyPreset($event)">
+        <option value="">— custom —</option>
+        @for (p of state.historicalPresets; track p.id) {
+          <option [value]="p.id">{{ p.label }}</option>
+        }
+      </select>
+      <span class="param-hint">
+        Snaps mean &amp; vol to the averages of a named period.
+      </span>
+    </label>
+  </div>
+
+  @if (state.returnMode() === 'historical-sequence') {
+    <div class="hist-row">
+      <label class="param">
+        <span class="param-label">Start Year</span>
+        <select class="param-input"
+          [ngModel]="state.historicalStartYear()"
+          (ngModelChange)="state.historicalStartYear.set(+$event)">
+          @for (y of state.historicalYears; track y) {
+            <option [value]="y">{{ y }}</option>
+          }
+        </select>
+        <span class="param-hint">
+          "If you retired in {{ state.historicalStartYear() }} with this plan…" — uses real annual returns forward.
+        </span>
+      </label>
+    </div>
+  }
+
+  @if (state.returnMode() === 'regime') {
+    <div class="regime-grid">
+      <div class="regime-col bull">
+        <h4 class="regime-title">🐂 Bull regime</h4>
+        <label class="param">
+          <span class="param-label">Mean Return (%)</span>
+          <input appNumeric="percent" class="param-input" step="0.5"
+            [ngModel]="state.regimeBullMean()" (ngModelChange)="state.regimeBullMean.set(+$event)" />
+        </label>
+        <label class="param">
+          <span class="param-label">Volatility (%)</span>
+          <input appNumeric="percent" class="param-input" step="0.5"
+            [ngModel]="state.regimeBullVol()" (ngModelChange)="state.regimeBullVol.set(+$event)" />
+        </label>
+        <label class="param">
+          <span class="param-label">Annual P(switch to bear) %</span>
+          <input appNumeric="percent" class="param-input" step="1"
+            [ngModel]="state.regimeBullToBear()" (ngModelChange)="state.regimeBullToBear.set(+$event)" />
+        </label>
+      </div>
+      <div class="regime-col bear">
+        <h4 class="regime-title">🐻 Bear regime</h4>
+        <label class="param">
+          <span class="param-label">Mean Return (%)</span>
+          <input appNumeric="percent" class="param-input" step="0.5"
+            [ngModel]="state.regimeBearMean()" (ngModelChange)="state.regimeBearMean.set(+$event)" />
+        </label>
+        <label class="param">
+          <span class="param-label">Volatility (%)</span>
+          <input appNumeric="percent" class="param-input" step="0.5"
+            [ngModel]="state.regimeBearVol()" (ngModelChange)="state.regimeBearVol.set(+$event)" />
+        </label>
+        <label class="param">
+          <span class="param-label">Annual P(switch to bull) %</span>
+          <input appNumeric="percent" class="param-input" step="1"
+            [ngModel]="state.regimeBearToBull()" (ngModelChange)="state.regimeBearToBull.set(+$event)" />
+        </label>
+      </div>
+    </div>
+  }
+</div>

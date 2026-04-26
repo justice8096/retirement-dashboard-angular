@@ -1,0 +1,370 @@
+<!-- Multi-location schedule -->
+<div class="card moves-card">
+  <h3 class="card-title">Location Schedule</h3>
+  <p class="card-sub">
+    Model multiple moves over the retirement horizon. Year 0 is your primary location
+    (selected above); add additional moves at later years. FX baseline resets at each
+    move; inflation accumulates across segments so "$X in today's dollars" stays consistent.
+  </p>
+
+  <div class="timeline-row primary-row">
+    <span class="tl-year">Year 0</span>
+    <span class="tl-loc">{{ state.selectedLoc()?.name || '—' }}</span>
+    <div class="tl-cost-col">
+      <span class="tl-cost" [class]="dyscalculia.numberSpacingClass()">
+        {{ fmt(state.baseCost(), '/mo') }}
+      </span>
+      <span class="tl-cost-proj">today's $</span>
+    </div>
+    <span class="tl-cost"></span>
+    <span class="tl-spacer"></span>
+  </div>
+
+  @for (move of state.moves(); track $index; let i = $index) {
+    <div class="timeline-row">
+      <label class="tl-field">
+        <span class="tl-small-label">Year</span>
+        <input appNumeric="age" class="tl-input" min="1" [max]="state.years() - 1"
+          [ngModel]="move.fromYear"
+          (ngModelChange)="patchMove(i, { fromYear: +$event })" />
+      </label>
+      <label class="tl-field tl-field-loc">
+        <span class="tl-small-label">Move to</span>
+        <select class="tl-input"
+          [ngModel]="move.locationId"
+          (ngModelChange)="patchMove(i, { locationId: $event })">
+          @for (l of loc.fullLocations(); track l.id) {
+            <option [value]="l.id">{{ l.name }}</option>
+          }
+        </select>
+      </label>
+      <div class="tl-cost-col">
+        <span class="tl-cost" [class]="dyscalculia.numberSpacingClass()">
+          {{ fmt(loc.locMonthlyCost(move.locationId), '/mo') }}
+        </span>
+        <span class="tl-cost-proj" [class]="dyscalculia.numberSpacingClass()"
+              title="Projected using this location's weighted per-category inflation ({{ (loc.locInflationRate(move.locationId) * 100).toFixed(1) }}%)">
+          {{ fmt(loc.locMonthlyCostAtYear(move.locationId, move.fromYear), '/mo') }} &#64; y{{ move.fromYear }}
+          ({{ (loc.locInflationRate(move.locationId) * 100).toFixed(1) }}%)
+        </span>
+      </div>
+      <label class="tl-field">
+        <span class="tl-small-label">Move cost ($)</span>
+        <input appNumeric="currency" class="tl-input" step="500"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="move.moveCostUSD"
+          (ngModelChange)="patchMove(i, { moveCostUSD: +$event })" />
+      </label>
+      <button class="tl-remove" (click)="removeMove(i)" aria-label="Remove move">✕</button>
+    </div>
+  }
+
+  <button mat-stroked-button class="add-move-btn" (click)="addMove()">
+    + Add Move
+  </button>
+
+  @if (state.moves().length > 0) {
+    <label class="moves-toggle">
+      <input type="checkbox"
+        [checked]="state.movesEnabled()"
+        (change)="state.movesEnabled.set(!state.movesEnabled())" />
+      <span>Apply schedule to next simulation run</span>
+    </label>
+  }
+</div>
+
+<!-- One-time future expenses -->
+<div class="card moves-card">
+  <h3 class="card-title">One-Time Future Expenses</h3>
+  <p class="card-sub">
+    Lumpy expenses a recurring monthly cost line can't represent — car replacement,
+    new roof, grandchild tuition, big trip, late-life nursing-home stay. Each row
+    deducts at year Y, scaled by accumulated inflation by default. Multiple rows
+    in the same year stack.
+  </p>
+
+  @for (e of state.oneTimeExpenses(); track $index; let i = $index) {
+    <div class="timeline-row">
+      <label class="tl-field">
+        <span class="tl-small-label">Year</span>
+        <input appNumeric="age" class="tl-input" min="0" [max]="state.years() - 1"
+          [ngModel]="e.year"
+          (ngModelChange)="patchOneTimeExpense(i, { year: +$event })" />
+      </label>
+      <label class="tl-field tl-field-loc">
+        <span class="tl-small-label">Label</span>
+        <input class="tl-input" type="text"
+          [ngModel]="e.label"
+          (ngModelChange)="patchOneTimeExpense(i, { label: $event })" />
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Amount ($)</span>
+        <input appNumeric="currency" class="tl-input" step="500"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="e.amountUSD"
+          (ngModelChange)="patchOneTimeExpense(i, { amountUSD: +$event })" />
+      </label>
+      <label class="tl-field tl-inflate">
+        <input type="checkbox"
+          [checked]="e.inflate"
+          (change)="patchOneTimeExpense(i, { inflate: !e.inflate })" />
+        <span class="tl-small-label">Inflate</span>
+      </label>
+      <button class="tl-remove" (click)="removeOneTimeExpense(i)" aria-label="Remove expense">✕</button>
+    </div>
+  }
+
+  <button mat-stroked-button class="add-move-btn" (click)="addOneTimeExpense()">
+    + Add One-Time Expense
+  </button>
+
+  @if (state.oneTimeExpenses().length > 0) {
+    <label class="moves-toggle">
+      <input type="checkbox"
+        [checked]="state.oneTimeExpensesEnabled()"
+        (change)="state.oneTimeExpensesEnabled.set(!state.oneTimeExpensesEnabled())" />
+      <span>Apply expenses to next simulation run</span>
+    </label>
+  }
+</div>
+
+<!-- Long-Term Care planning -->
+<div class="card death-card">
+  <h3 class="card-title">Long-Term Care</h3>
+  <p class="card-sub">
+    ~70% of US 65+ will need some long-term care; median stay 2.4 years; median
+    US private nursing-home cost ~$108K/yr (Genworth 2024). Medicare does <strong>not</strong>
+    cover custodial care. Two independent modes — self-insure (per-trial probabilistic
+    stay) and insurance (recurring premium). They can stack ("both") if you want to
+    test partial coverage.
+  </p>
+
+  <label class="param">
+    <span class="param-label">Mode</span>
+    <select class="param-input"
+      [ngModel]="state.ltcMode()" (ngModelChange)="state.ltcMode.set($event)">
+      <option value="off">Off</option>
+      <option value="self-insure">Self-insure (probabilistic shock)</option>
+      <option value="insurance">Insurance (recurring premium)</option>
+      <option value="both">Both (insurance + residual self-insure)</option>
+    </select>
+  </label>
+
+  @if (state.ltcMode() === 'self-insure' || state.ltcMode() === 'both') {
+    <div class="death-grid">
+      <label class="param">
+        <span class="param-label">Probability of needing LTC (%)</span>
+        <input appNumeric="percent" class="param-input" min="0" max="100" step="5"
+          [ngModel]="state.ltcProbability()" (ngModelChange)="state.ltcProbability.set(+$event)" />
+        <span class="param-hint">Default 70% (Genworth lifetime estimate for US 65+).</span>
+      </label>
+      <label class="param">
+        <span class="param-label">Cost per year ($)</span>
+        <input appNumeric="currency" class="param-input" min="0" step="5000"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="state.ltcCostPerYearUSD()" (ngModelChange)="state.ltcCostPerYearUSD.set(+$event)" />
+        <span class="param-hint">US median ~$108K (private room nursing home). International often $30–60K.</span>
+      </label>
+      <label class="param">
+        <span class="param-label">Duration (years)</span>
+        <input appNumeric="rate" class="param-input" min="0.5" max="10" step="0.5"
+          [ngModel]="state.ltcDurationYears()" (ngModelChange)="state.ltcDurationYears.set(+$event)" />
+        <span class="param-hint">Median 2.4 yr; ~20% of stays exceed 5 yr.</span>
+      </label>
+      <label class="param">
+        <span class="param-label">Start age range (min)</span>
+        <input appNumeric="age" class="param-input" min="60" max="100"
+          [ngModel]="state.ltcStartAgeMin()" (ngModelChange)="state.ltcStartAgeMin.set(+$event)" />
+      </label>
+      <label class="param">
+        <span class="param-label">Start age range (max)</span>
+        <input appNumeric="age" class="param-input" min="60" max="100"
+          [ngModel]="state.ltcStartAgeMax()" (ngModelChange)="state.ltcStartAgeMax.set(+$event)" />
+        <span class="param-hint">Anchored on the oldest adult in the household.</span>
+      </label>
+    </div>
+  }
+
+  @if (state.ltcMode() === 'insurance' || state.ltcMode() === 'both') {
+    <div class="death-grid">
+      <label class="param">
+        <span class="param-label">Insurance premium ($/mo)</span>
+        <input appNumeric="currency" class="param-input" min="0" step="25"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="state.ltcInsuranceMonthly()" (ngModelChange)="state.ltcInsuranceMonthly.set(+$event)" />
+        <span class="param-hint">Typical $200–500/mo for a policy bought at 60.</span>
+      </label>
+      <label class="param">
+        <span class="param-label">Premium starts at age</span>
+        <input appNumeric="age" class="param-input" min="50" max="80"
+          [ngModel]="state.ltcInsuranceStartAge()" (ngModelChange)="state.ltcInsuranceStartAge.set(+$event)" />
+        <span class="param-hint">Anchored on the oldest adult.</span>
+      </label>
+    </div>
+  }
+</div>
+
+<!-- FX stress test (#26) — only meaningful for foreign-segment plans -->
+<div class="card death-card">
+  <h3 class="card-title">FX Stress Test</h3>
+  <p class="card-sub">
+    One-time abrupt currency shock at year Y, applied to foreign segments only.
+    Distinct from the ongoing FX drift parameter above. Use to ask "what if EUR
+    jumps 10% against USD in a single year?" — the multiplier persists, raising
+    all subsequent foreign-cost-of-living deductions. Positive % = USD weakens
+    (foreign cost rises); negative = USD strengthens.
+  </p>
+
+  <label class="param death-toggle">
+    <input type="checkbox"
+      [checked]="state.fxShockEnabled()"
+      (change)="state.fxShockEnabled.set(!state.fxShockEnabled())" />
+    <span>Apply FX stress shock to next simulation run</span>
+  </label>
+
+  @if (state.fxShockEnabled()) {
+    <div class="death-grid">
+      <label class="param">
+        <span class="param-label">Shock year</span>
+        <input type="range" class="param-range" min="0" [max]="state.years() - 1" step="1"
+          [ngModel]="state.fxShockYear()" (ngModelChange)="state.fxShockYear.set(+$event)" />
+        <span class="param-hint">Year {{ state.fxShockYear() }} of {{ state.years() }}.</span>
+      </label>
+      <label class="param">
+        <span class="param-label">Shock magnitude (%)</span>
+        <input appNumeric="percent" class="param-input" min="-50" max="50" step="1"
+          [ngModel]="state.fxShockPct()" (ngModelChange)="state.fxShockPct.set(+$event)" />
+        <span class="param-hint">+10 = USD weakens 10% (foreign cost +10%). Try ±10 / ±20 to bracket.</span>
+      </label>
+    </div>
+  }
+</div>
+
+
+<!-- Spouse-death scenario (deterministic) -->
+@if (state.adults().length >= 1) {
+  <div class="card death-card">
+    <h3 class="card-title">Spouse-Death Scenario</h3>
+    <p class="card-sub">
+      One deterministic toggle: pick a year in the sim horizon at which one adult dies.
+      Income steps down to the survivor's higher SS benefit; the lifestyle portion of
+      expenses multiplies by the survivor ratio (fixed costs don't halve). Federal tax
+      is recalculated with single-filer brackets (wider MFJ → tighter single bumps
+      survivor tax); Medicare is recalculated with single-filer IRMAA thresholds
+      (half of MFJ, so unchanged MAGI can jump a tier). Optional: one-time stepped-up-
+      basis bump in the death year. Probabilistic mortality is a future extension.
+    </p>
+
+    <label class="param death-toggle">
+      <input type="checkbox"
+        [checked]="state.spouseDeathEnabled()"
+        (change)="state.spouseDeathEnabled.set(!state.spouseDeathEnabled())" />
+      <span>Enable spouse-death scenario</span>
+    </label>
+
+    @if (state.spouseDeathEnabled()) {
+      <div class="death-grid">
+        <label class="param">
+          <span class="param-label">Year of Death (from sim start)</span>
+          <input type="range" class="param-range" min="1" [max]="state.years() - 1" step="1"
+            [ngModel]="state.spouseDeathYear()" (ngModelChange)="state.spouseDeathYear.set(+$event)" />
+          <span class="param-hint">
+            Year {{ state.spouseDeathYear() }} of {{ state.years() }} ·
+            calendar year {{ (state.household()?.planningStartYear ?? todayYear()) + state.spouseDeathYear() }}
+          </span>
+        </label>
+
+        <label class="param">
+          <span class="param-label">Who dies</span>
+          <select class="param-input"
+            [ngModel]="state.deceasedMemberIndex()"
+            (ngModelChange)="state.deceasedMemberIndex.set(+$event)">
+            @for (m of state.adults(); track m.id; let i = $index) {
+              <option [value]="i">{{ m.name || 'Adult ' + (i + 1) }} ({{ m.role }})</option>
+            }
+          </select>
+          <span class="param-hint">
+            Survivor keeps the higher SS benefit of the two adults.
+          </span>
+        </label>
+
+        <label class="param">
+          <span class="param-label">Survivor Cost Ratio (%)</span>
+          <input appNumeric="percent" class="param-input" min="40" max="100" step="1"
+            [ngModel]="state.survivorCostRatio()" (ngModelChange)="state.survivorCostRatio.set(+$event)" />
+          <span class="param-hint">
+            Typical 70–80%. Fixed costs (rent, utilities) don't halve; variable (food, healthcare) do.
+          </span>
+        </label>
+      </div>
+
+      <div class="death-preview">
+        <div>
+          <span class="dp-label">Survivor SS</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+            {{ fmt(state.survivorMonthlySs(), '/mo') }}
+          </span>
+        </div>
+        <div>
+          <span class="dp-label">Survivor Income (incl. other)</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+            {{ fmt(state.survivorMonthlyIncome(), '/mo') }}
+          </span>
+        </div>
+        <div>
+          <span class="dp-label">Survivor Federal Tax (single brackets)</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+            {{ fmt(state.survivorMonthlyIncomeTax(), '/mo') }}
+          </span>
+        </div>
+        <div>
+          <span class="dp-label">Survivor Medicare + IRMAA (single)</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+            {{ fmt(state.survivorMonthlyMedicare(), '/mo') }}
+          </span>
+        </div>
+        <div>
+          <span class="dp-label">Post-Death Monthly (scaled lifestyle + survivor tax + Medicare)</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+            {{ fmt(state.survivorPostDeathMonthly(), '/mo') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Stepped-up basis: one-time LTCG-free benefit in death year -->
+      <h4 class="death-sub">Stepped-Up Basis (optional)</h4>
+      <p class="card-sub">
+        Jointly-held taxable accounts reset to fair-market-value basis at death —
+        the survivor can realize gains up to that step-up tax-free. One-time bump
+        in the death year. Leave 0 if you don't hold taxable brokerage accounts jointly.
+      </p>
+      <div class="death-grid">
+        <label class="param">
+          <span class="param-label">Taxable balance at death ($)</span>
+          <input appNumeric="currency" class="param-input" min="0" step="1000"
+            [ngModel]="state.survivorStepUpTaxableBalance()" (ngModelChange)="state.survivorStepUpTaxableBalance.set(+$event)" />
+        </label>
+        <label class="param">
+          <span class="param-label">Unrealized gain ratio (%)</span>
+          <input appNumeric="percent" class="param-input" min="0" max="100" step="5"
+            [ngModel]="state.survivorStepUpGainRatio()" (ngModelChange)="state.survivorStepUpGainRatio.set(+$event)" />
+          <span class="param-hint">Fraction of balance that's appreciation. Typical 20–40%.</span>
+        </label>
+        <label class="param">
+          <span class="param-label">LTCG rate (%)</span>
+          <input appNumeric="percent" class="param-input" min="0" max="30" step="1"
+            [ngModel]="state.survivorStepUpLtcgRate()" (ngModelChange)="state.survivorStepUpLtcgRate.set(+$event)" />
+          <span class="param-hint">0 / 15 / 20 — depends on survivor's taxable-income bracket.</span>
+        </label>
+      </div>
+      <div class="death-preview">
+        <div>
+          <span class="dp-label">One-time step-up benefit</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()">
+            {{ fmt(state.survivorStepUpBenefitUSD(), '') }}
+          </span>
+        </div>
+      </div>
+    }
+  </div>
+}

@@ -1,5 +1,4 @@
 import { Component, inject, signal, effect, OnInit } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
@@ -8,12 +7,13 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
-import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings, LocationFull, HouseholdMember } from '@models/api.model';
 import { runMonteCarlo, weightedInflationFromLocation } from '@app/lib/monte-carlo';
-import { HISTORICAL_PRESETS, statsForRange } from '@app/data/historical-returns';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 import { McResultsComponent } from './mc-results/mc-results.component';
+import { McParametersComponent } from './mc-parameters/mc-parameters.component';
+import { McSamplingComponent } from './mc-sampling/mc-sampling.component';
+import { McScenariosComponent } from './mc-scenarios/mc-scenarios.component';
 
 /**
  * Portfolio-weighted annual drag % from per-account load + fees. Decision:
@@ -52,7 +52,7 @@ function estimateBenefitAtClaim(m: HouseholdMember): number {
 @Component({
   selector: 'app-montecarlo-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, NumericInputDirective, SourceTooltipComponent, McResultsComponent],
+  imports: [MatButtonModule, SourceTooltipComponent, McResultsComponent, McParametersComponent, McSamplingComponent, McScenariosComponent],
   templateUrl: './montecarlo-screen.component.html',
   styleUrls: ['./montecarlo-screen.component.scss'],
   // Component-scoped so each visit to the screen starts with a fresh state
@@ -235,51 +235,6 @@ export class MontecarloScreenComponent implements OnInit {
     this.meanInflation.set(+(w * 100).toFixed(2));
   }
 
-  /** Add a move to the schedule — defaults to halfway through the horizon at the cheapest location. */
-  addMove(): void {
-    const locs = this.loc.fullLocations();
-    if (!locs.length) return;
-    const defaultLoc = [...locs].sort((a, b) =>
-      (a.monthlyCostTotal ?? 0) - (b.monthlyCostTotal ?? 0)
-    )[0];
-    const current = this.moves();
-    const lastYear = current.length ? current[current.length - 1].fromYear : 0;
-    const newYear = Math.min(this.years() - 1, Math.max(lastYear + 5, Math.floor(this.years() / 2)));
-    this.moves.set([
-      ...current,
-      { fromYear: newYear, locationId: defaultLoc.id, moveCostUSD: 5000 },
-    ]);
-    this.movesEnabled.set(true);
-  }
-
-  removeMove(idx: number): void {
-    this.moves.update(list => list.filter((_, i) => i !== idx));
-  }
-
-  patchMove(idx: number, partial: Partial<{ fromYear: number; locationId: string; moveCostUSD: number }>): void {
-    this.moves.update(list => list.map((m, i) => i === idx ? { ...m, ...partial } : m));
-  }
-
-  /** Add a one-time expense row — defaults to year 5, $20K, "Car replacement". */
-  addOneTimeExpense(): void {
-    const current = this.oneTimeExpenses();
-    const lastYear = current.length ? current[current.length - 1].year : 0;
-    const newYear = Math.min(this.years() - 1, Math.max(lastYear + 3, 5));
-    this.oneTimeExpenses.set([
-      ...current,
-      { year: newYear, amountUSD: 20000, label: 'Car replacement', inflate: true },
-    ]);
-    this.oneTimeExpensesEnabled.set(true);
-  }
-
-  removeOneTimeExpense(idx: number): void {
-    this.oneTimeExpenses.update(list => list.filter((_, i) => i !== idx));
-  }
-
-  patchOneTimeExpense(idx: number, partial: Partial<{ year: number; amountUSD: number; label: string; inflate: boolean }>): void {
-    this.oneTimeExpenses.update(list => list.map((e, i) => i === idx ? { ...e, ...partial } : e));
-  }
-
   /**
    * Build one kernel-ready segment for a given location. Includes the richer
    * healthcare/tax breakdown so the sim can swap ACA → Medicare per year.
@@ -332,18 +287,6 @@ export class MontecarloScreenComponent implements OnInit {
     // Always return at least the year-0 segment so the kernel uses the
     // rich breakdown (Medicare transition, income tax) even without moves.
     return entries;
-  }
-
-  /** Snap mean/vol params to a named historical period. */
-  applyPreset(presetId: string): void {
-    this.selectedPresetId.set(presetId);
-    const preset = HISTORICAL_PRESETS.find(p => p.id === presetId);
-    if (!preset) return;
-    const s = statsForRange(preset.startYear, preset.endYear);
-    this.meanReturn.set(+(s.meanReturn * 100).toFixed(2));
-    this.volatility.set(+(s.volReturn * 100).toFixed(2));
-    this.meanInflation.set(+(s.meanInflation * 100).toFixed(2));
-    this.inflVol.set(+(s.volInflation * 100).toFixed(2));
   }
 
   runSimulation(): void {
