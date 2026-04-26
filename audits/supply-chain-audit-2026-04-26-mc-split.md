@@ -52,7 +52,7 @@ This is the cleanest possible refactor batch from a supply-chain perspective: th
 `.github/workflows/` was not touched. Inherited properties from prior audits hold:
 
 - Every `uses:` pinned to a full 40-char commit SHA
-- `actions/attest-build-provenance@v2` produces a Sigstore-signed SLSA L2 attestation on `master`-branch pushes
+- `actions/attest-build-provenance@v2` produces a Sigstore-signed SLSA L2 attestation on `main`-branch pushes (gated by `github.ref == 'refs/heads/main'` in `.github/workflows/ci.yml:74`)
 - CycloneDX SBOM produced on every push with 90-day retention
 - `provenance` job correctly skips on PR-context
 
