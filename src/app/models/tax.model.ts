@@ -28,6 +28,37 @@ export interface PropertyTaxInfo {
   notes?: string;
 }
 
+/**
+ * Inheritance / estate tax info. Phase 1 of the foreign-inheritance-tax
+ * data layer populates `notes` and `sources` only; structured fields
+ * (`topRate`, `exemptionLocal`, `spouseExemption`, `basis`,
+ * `scopeWhenResident`) are filled in Phase 2 for high-impact countries.
+ * Injected by retirement-api from `shared/country-inheritance-tax.js`
+ * keyed on `loc.country` at read time — the seed data doesn't carry
+ * these per-location.
+ *
+ * Per-relationship rate tables, treaty interactions, and wealth taxes
+ * are intentionally out of scope for this layer.
+ */
+export interface InheritanceTaxInfo {
+  /** Whether the spouse inherits free of tax. */
+  spouseExemption?: 'full' | 'partial' | 'none';
+  /** Top marginal rate, as a fraction 0..1. */
+  topRate?: number;
+  /** Threshold below which no tax owed, in local currency. */
+  exemptionLocal?: number;
+  /** 'estate' (taxed at the estate, US/UK pattern) vs 'inheritance'
+   *  (taxed at the recipient, most of Europe / Latin America). */
+  basis?: 'estate' | 'inheritance';
+  /** Whether residence-based (worldwide assets) or situs-based
+   *  (local-only assets) when deceased was a resident. */
+  scopeWhenResident?: 'worldwide' | 'local-only';
+  /** Free-text caveats — regional variation, per-relationship rate
+   *  differences, treaty notes, recent reforms. */
+  notes?: string;
+  sources?: Source[];
+}
+
 export interface TaxInfo {
   notes?: string;
   vatRate?: number;
@@ -42,6 +73,12 @@ export interface TaxInfo {
   ssExempt?: boolean;
   ssTaxedInCountry?: boolean;
   socialCharges?: unknown;
+  /**
+   * Inheritance / estate tax info — country-keyed. Injected by
+   * retirement-api at read time from `shared/country-inheritance-tax.js`.
+   * Phase 1: notes + sources only. Phase 2 will add structured rates.
+   */
+  inheritance?: InheritanceTaxInfo;
   /**
    * Structured citations for the tax rates on this location. Injected by
    * retirement-api from its `shared/country-tax-sources.js` map based on
