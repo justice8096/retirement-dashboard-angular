@@ -1,0 +1,111 @@
+/* Save bar (above the results grid) */
+.save-scenario-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(92, 156, 230, 0.08);
+  border: 1px solid rgba(92, 156, 230, 0.25);
+  border-radius: 8px;
+}
+.save-scenario-btn {
+  --mat-button-outlined-container-height: 32px;
+  --mat-button-outlined-label-text-size: 12px;
+}
+.save-msg { font-size: 11px; color: var(--dark-green); font-weight: 600; }
+.save-msg.err { color: var(--dark-red); }
+.save-hint { font-size: 10px; color: var(--dark-text-muted); font-style: italic; flex-basis: 100%; }
+
+/* Results grid (success / median / worst / best) */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.result-card {
+  padding: 14px; background: var(--dark-bg-card);
+  border: 1px solid var(--dark-border); border-radius: 10px;
+}
+.result-card.success { border-color: var(--dark-green); }
+.result-card.warn    { border-color: var(--dark-amber); }
+.result-card.neutral { border-color: var(--dark-neutral); background: rgba(139, 157, 195, 0.08); }
+
+/* Success bar — 0 to 100 proportional fill, Dyscalculia F-004:
+   relieves the burden of mapping a percentage to a mental quantity. */
+.success-bar {
+  position: relative;
+  height: 10px;
+  background: var(--dark-bg-secondary);
+  border-radius: 5px;
+  overflow: hidden;
+  margin: 8px 0 6px;
+}
+.success-bar-fill {
+  height: 100%;
+  background: var(--dark-neutral);
+  border-radius: 5px;
+  transition: width 0.4s ease;
+}
+.result-card.success .success-bar-fill { background: var(--dark-green); }
+.result-card.warn    .success-bar-fill { background: var(--dark-amber); }
+.result-card.neutral .success-bar-fill { background: var(--dark-neutral); }
+/* Quarter-point ticks for quick eyeballing — 25 / 50 / 75. */
+.success-bar-tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.success-bar-tick.tick-25 { left: 25%; }
+.success-bar-tick.tick-50 { left: 50%; background: rgba(255, 255, 255, 0.25); }
+.success-bar-tick.tick-75 { left: 75%; }
+
+.result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.result-value { font-size: 22px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; line-height: 1.1; word-break: break-word; }
+.result-value.worst { color: var(--dark-neutral); }
+.result-value.best { color: var(--dark-green); }
+.result-sub { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
+
+/* Calm-mode pacer (Dyscalculia F-006) */
+.calm-pacer {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px;
+  background: rgba(92, 156, 230, 0.08);
+  border: 1px solid rgba(92, 156, 230, 0.25);
+  border-radius: 8px;
+}
+.calm-next-btn { --mat-button-outlined-container-height: 36px; }
+.calm-progress { font-size: 11px; color: var(--dark-text-muted); margin-left: auto; }
+
+/* Plain-language summary card */
+.calm-summary {
+  background: rgba(92, 156, 230, 0.06);
+  border-color: rgba(92, 156, 230, 0.25);
+}
+.summary-text {
+  font-size: 14px;
+  color: var(--dark-text);
+  line-height: var(--prose-line-height, 1.5);
+  letter-spacing: var(--prose-letter-spacing, 0);
+  word-spacing: var(--prose-word-spacing, 0);
+}
+.summary-text strong { color: var(--dark-amber); }
+
+/* Charts (paths + histogram) */
+.chart-svg { width: 100%; height: auto; display: block; }
+.axis-text { font-size: 10px; fill: var(--dark-text-muted); font-family: var(--font-sans); }
+
+/* Percentile breakdown bars */
+.pct-list { display: flex; flex-direction: column; gap: 8px; }
+.pct-row { display: flex; align-items: center; gap: 12px; }
+.pct-label { width: 140px; font-size: 12px; color: var(--dark-text-sec); flex-shrink: 0; }
+.pct-track {
+  flex: 1; background: var(--dark-bg-secondary);
+  border-radius: 4px; height: 24px; overflow: hidden;
+}
+.pct-fill {
+  height: 100%; border-radius: 4px;
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 8px; min-width: 60px;
+}
+.pct-val { font-size: 12px; font-weight: 600; color: #fff; }
