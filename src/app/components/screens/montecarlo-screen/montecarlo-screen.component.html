@@ -9,7 +9,7 @@
 
       @if (loading()) {
         <div class="status-msg">Loading financial settings…</div>
-      } @else if (!fin()) {
+      } @else if (!state.fin()) {
         <div class="status-msg">Configure financial settings in Setup first.</div>
       } @else {
 
@@ -20,11 +20,9 @@
         <app-mc-sampling />
         <app-mc-scenarios />
 
-        <!-- Run trigger + stale banner. Lives at parent level because
-             runSimulation() orchestrates state, kernel call, and result
-             persistence — keeping the action with its method-owner avoids
-             a complex Output event back across the sub-component boundary. -->
-        @if (results() && simDirty() && !running()) {
+        <!-- Run trigger + stale banner. Action lives on MonteCarloRunnerService
+             (Phase 2c) — the parent component only invokes it. -->
+        @if (state.results() && state.simDirty() && !runner.running()) {
           <div class="stale-banner">
             <span class="stale-icon">⟳</span>
             <span class="stale-text">
@@ -34,9 +32,9 @@
           </div>
         }
         <button mat-flat-button class="run-btn"
-          [class.stale]="results() && simDirty() && !running()"
-          [disabled]="running()" (click)="runSimulation()">
-          {{ running() ? 'Running…' : 'Run Simulation' }}
+          [class.stale]="state.results() && state.simDirty() && !runner.running()"
+          [disabled]="runner.running()" (click)="runner.run()">
+          {{ runner.running() ? 'Running…' : 'Run Simulation' }}
         </button>
 
         <!-- Social Security summary card -->
@@ -46,22 +44,22 @@
             <div class="ss-label">Social Security included</div>
             <div class="ss-row">
               <div>
-                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(ssMonthly(), '/mo') }}</div>
+                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(state.ssMonthly(), '/mo') }}</div>
                 <div class="ss-sub">monthly benefit</div>
               </div>
               <div>
-                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(ssMonthly() * 12, '/yr') }}</div>
+                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(state.ssMonthly() * 12, '/yr') }}</div>
                 <div class="ss-sub">annual (nominal)</div>
               </div>
               <div>
-                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(ssLifetime(), '') }}</div>
-                <div class="ss-sub">over {{ years() }} yrs, with {{ incGrowth() }}% COLA</div>
+                <div class="ss-num" [class]="dyscalculia.numberSpacingClass()">{{ fmt(state.ssLifetime(), '') }}</div>
+                <div class="ss-sub">over {{ state.years() }} yrs, with {{ state.incGrowth() }}% COLA</div>
               </div>
             </div>
-            @if (fin()?.ssCutEnabled) {
+            @if (state.fin()?.ssCutEnabled) {
               <div class="ss-note">
-                ⚠ SS cut enabled in settings — benefit reduces after {{ fin()?.ssCutYear }}.
-                <app-source-tooltip [sources]="ssCutSources" label="SS trust fund projection" />
+                ⚠ SS cut enabled in settings — benefit reduces after {{ state.fin()?.ssCutYear }}.
+                <app-source-tooltip [sources]="state.ssCutSources" label="SS trust fund projection" />
               </div>
             }
           </div>
