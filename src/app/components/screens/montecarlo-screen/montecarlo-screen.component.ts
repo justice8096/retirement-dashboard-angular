@@ -6,7 +6,6 @@ import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
-import { MonteCarloScenarioService } from '@services/monte-carlo-scenario.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
@@ -14,6 +13,7 @@ import { FinancialSettings, LocationFull, HouseholdMember } from '@models/api.mo
 import { runMonteCarlo, weightedInflationFromLocation } from '@app/lib/monte-carlo';
 import { HISTORICAL_PRESETS, statsForRange } from '@app/data/historical-returns';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
+import { McResultsComponent } from './mc-results/mc-results.component';
 
 /**
  * Portfolio-weighted annual drag % from per-account load + fees. Decision:
@@ -52,7 +52,7 @@ function estimateBenefitAtClaim(m: HouseholdMember): number {
 @Component({
   selector: 'app-montecarlo-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, NumericInputDirective, SourceTooltipComponent],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective, SourceTooltipComponent, McResultsComponent],
   templateUrl: './montecarlo-screen.component.html',
   styleUrls: ['./montecarlo-screen.component.scss'],
   // Component-scoped so each visit to the screen starts with a fresh state
@@ -67,23 +67,13 @@ export class MontecarloScreenComponent implements OnInit {
   readonly dyscalculia = inject(DyscalculiaService);
   readonly healthcare = inject(HealthcareService);
   private readonly currency = inject(CurrencyFormatService);
-  private readonly scenarios = inject(MonteCarloScenarioService);
   private readonly state = inject(MonteCarloStateService);
 
-  /* ─── Screen-only UX state (loading flags, save messages, calm reveal) ─── */
+  /* ─── Screen-only UX state (data-loading flags only — the post-run
+   *  save bar / save messages / calm-reveal moved into McResultsComponent
+   *  along with the rest of the Results section.) ─── */
   readonly loading = signal(false);
   readonly running = signal(false);
-
-  /** Calm-mode reveal step (Dashboard Dyscalculia F-006). 0=none shown,
-   *  1=success, 2=+median, 3=+worst, 4=+best, 5=+summary, 6=+paths chart,
-   *  7=+histogram, 8=+percentile bars. Reset on every new run. Only consulted
-   *  when `dyscalculia.isCalmMc()` is true. */
-  readonly calmStep = signal(1);
-  readonly calmMax = 8;
-
-  readonly savingScenario = signal(false);
-  readonly saveMsg = signal<string | null>(null);
-  readonly saveErr = signal(false);
 
   /* ─── Sim state pass-throughs ──────────────────────────────────────────
    * Phase 1 of audit follow-up #1: state moved to MonteCarloStateService.
@@ -356,84 +346,6 @@ export class MontecarloScreenComponent implements OnInit {
     this.inflVol.set(+(s.volInflation * 100).toFixed(2));
   }
 
-  /**
-   * Save the current MC inputs + results as a named scenario. Captures the
-   * full parameter snapshot so we can reconstruct / re-run later, plus the
-   * key summary stats for at-a-glance comparison on the Scenarios screen.
-   */
-  saveCurrentScenario(): void {
-    const r = this.results();
-    if (!r) return;
-    const name = window.prompt('Name this scenario:',
-      `${this.selectedLoc()?.name ?? 'Scenario'} — ${new Date().toLocaleDateString()}`);
-    if (!name) return;
-
-    this.savingScenario.set(true);
-    this.saveMsg.set(null);
-    this.saveErr.set(false);
-
-    // Envelope shape + summary-stat layout owned by MonteCarloScenarioService;
-    // passthrough param snapshot is built here so signal reads stay in the component.
-    const scenarioData = this.scenarios.buildPayload(r, this.runs(), this.years(), {
-      location: { id: this.selectedLocationId(), name: this.selectedLoc()?.name },
-      portfolio: this.portfolio(),
-      ssMonthly: this.ssMonthly(),
-      monthlyIncome: this.monthlyIncome(),
-      partTimeMonthlyIncome: this.partTimeMonthlyIncome(),
-      partTimeEndYear: this.partTimeEndYear(),
-      meanReturn: this.meanReturn(),
-      volatility: this.volatility(),
-      meanInflation: this.meanInflation(),
-      inflVol: this.inflVol(),
-      currVol: this.currVol(),
-      fxDrift: this.fxDrift(),
-      incGrowth: this.incGrowth(),
-      returnMode: this.returnMode(),
-      historicalStartYear: this.historicalStartYear(),
-      apportionStrategy: this.healthcare.apportionStrategy(),
-      magiAnnual: this.healthcare.magi().magiForAca,
-      subsidyRegime: this.healthcare.subsidyRegime(),
-      transitionExtraIncome: this.healthcare.transitionYearExtraIncome(),
-      movesEnabled: this.movesEnabled(),
-      moves: this.moves(),
-      oneTimeExpensesEnabled: this.oneTimeExpensesEnabled(),
-      oneTimeExpenses: this.oneTimeExpenses(),
-      ltcMode: this.ltcMode(),
-      ltcProbability: this.ltcProbability(),
-      ltcCostPerYearUSD: this.ltcCostPerYearUSD(),
-      ltcDurationYears: this.ltcDurationYears(),
-      ltcStartAgeMin: this.ltcStartAgeMin(),
-      ltcStartAgeMax: this.ltcStartAgeMax(),
-      ltcInsuranceMonthly: this.ltcInsuranceMonthly(),
-      ltcInsuranceStartAge: this.ltcInsuranceStartAge(),
-      fxShockEnabled: this.fxShockEnabled(),
-      fxShockYear: this.fxShockYear(),
-      fxShockPct: this.fxShockPct(),
-      spouseDeathEnabled: this.spouseDeathEnabled(),
-      spouseDeathYear: this.spouseDeathYear(),
-      survivorCostRatio: this.survivorCostRatio(),
-      survivorStepUpTaxableBalance: this.survivorStepUpTaxableBalance(),
-      survivorStepUpGainRatio: this.survivorStepUpGainRatio(),
-      survivorStepUpLtcgRate: this.survivorStepUpLtcgRate(),
-    });
-
-    this.api.createScenario({
-      name,
-      scenarioData,
-    }).subscribe({
-      next: () => {
-        this.savingScenario.set(false);
-        this.saveMsg.set('✓ Saved. View on Simulate → Scenarios.');
-        setTimeout(() => this.saveMsg.set(null), 4000);
-      },
-      error: (err) => {
-        this.savingScenario.set(false);
-        this.saveErr.set(true);
-        this.saveMsg.set('Save failed: ' + (err?.error?.error ?? err?.message ?? 'unknown'));
-      },
-    });
-  }
-
   runSimulation(): void {
     const f = this.fin();
     const l = this.selectedLoc();
@@ -509,26 +421,13 @@ export class MontecarloScreenComponent implements OnInit {
         });
         this.results.set(result);
         this.simDirty.set(false);
-        // Calm mode (Dashboard Dyscalculia F-006): reset reveal to the first
-        // card so the user steps through the results one at a time.
-        this.calmStep.set(1);
+        // McResultsComponent watches state.results() and resets its
+        // calm-mode reveal step (F-006) via an effect — parent doesn't
+        // need to coordinate it.
       } finally {
         this.running.set(false);
       }
     }, 30);
-  }
-
-  /** Reveal the next calm-mode card. Capped at `calmMax`. */
-  revealNext(): void {
-    this.calmStep.update(n => Math.min(n + 1, this.calmMax));
-  }
-  /** Reveal everything at once — "Skip to full results". */
-  revealAll(): void {
-    this.calmStep.set(this.calmMax);
-  }
-  /** Predicate used by the template: true when the card at `step` should render. */
-  showStep(step: number): boolean {
-    return !this.dyscalculia.isCalmMc() || this.calmStep() >= step;
   }
 
   /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */
@@ -542,212 +441,4 @@ export class MontecarloScreenComponent implements OnInit {
     return this.currency.currency(amount);
   }
 
-  /** Abbreviated K/M/B currency. Dyscalculia mode: full digits (per F-003). */
-  fmtK(amount: number): string {
-    return this.currency.currencyShort(amount);
-  }
-
-  /** Tone class for the success-rate card. Delegates to the service. */
-  toneClass(fraction: number): 'success' | 'warn' | 'neutral' {
-    return this.dyscalculia.toneForSuccessRate(fraction);
-  }
-
-  /** Annual spending reference for the percentile anchors. */
-  annualSpending(): number {
-    return (this.baseCost() - this.ssMonthly() - this.monthlyIncome()) * 12;
-  }
-
-  /** Download a PNG snapshot of the paths + histogram + percentile summary.
-   *  Rebuilds the charts into a single self-contained SVG (no external CSS
-   *  dependency), rasterizes via a data-URL Image → canvas pipeline, then
-   *  triggers a browser download. No new deps. */
-  saveChartsPng(): void {
-    const r = this.results();
-    if (!r) return;
-    const svgStr = this.buildStandaloneSvg();
-    svgToPngBlob(svgStr, 2).then(blob => {
-      const name = `monte-carlo-${new Date().toISOString().slice(0, 10)}-${Math.round(r.successRate * 100)}pct.png`;
-      downloadBlob(name, blob);
-    }).catch(err => {
-      console.warn('Save PNG failed:', err);
-      this.saveMsg.set('Save PNG failed: ' + (err?.message ?? 'unknown'));
-      this.saveErr.set(true);
-    });
-  }
-
-  /** Open a new window navigated to a Blob URL containing print-styled HTML
-   *  with the charts + summary, then trigger the print dialog. The window
-   *  owns its own stylesheet so the dashboard's dark theme doesn't bleed in. */
-  printCharts(): void {
-    const r = this.results();
-    if (!r) return;
-    const svgStr = this.buildStandaloneSvg();
-    const html = buildPrintHtml(svgStr);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    // `noopener` severs `window.opener` in the new window, blocking tab-nabbing
-    // and any future regression that might pass API data into the SVG builder
-    // unescaped. Some browsers return null for win under noopener — the
-    // null-check below handles that path the same as a popup-block.
-    const win = window.open(url, '_blank', 'width=820,height=1000,noopener,noreferrer');
-    if (!win) {
-      URL.revokeObjectURL(url);
-      this.saveMsg.set('Popup blocked — allow popups for this site to print.');
-      this.saveErr.set(true);
-      return;
-    }
-    // With noopener we can't listen for the child's load event, so use a
-    // timeout fallback long enough for the new window to fetch the blob URL.
-    setTimeout(() => URL.revokeObjectURL(url), 2500);
-  }
-
-  /** Build a standalone SVG document string containing: title, success rate,
-   *  paths chart, histogram, and percentile list. Self-contained — no
-   *  external CSS needed to render correctly. */
-  private buildStandaloneSvg(): string {
-    const r = this.results()!;
-    const locName = this.selectedLoc()?.name ?? 'No location';
-    const headerH = 90;
-    const gap = 24;
-    const pctH = 120;
-    const totalW = this.pathW;
-    const totalH = headerH + this.pathH + gap + this.histH + gap + pctH + 30;
-
-    const paths = this.pathData();
-    const pathZeroY = this.pathZeroY();
-    const pathYMax = this.pathYMax();
-    const pathYMin = this.pathYMin();
-    const histBars = this.histBars();
-    const histMinStr = this.fmt(this.histMin(), '');
-    const histMaxStr = this.fmt(this.histMax(), '');
-    const medianX = this.medianX();
-    const pctBars = this.percentileBars();
-
-    const esc = (s: string) => String(s).replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!)
-    );
-
-    let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalW} ${totalH}" width="${totalW}" height="${totalH}">`;
-    svg += `<rect x="0" y="0" width="${totalW}" height="${totalH}" fill="#ffffff"/>`;
-    svg += `<text x="16" y="28" font-family="system-ui" font-size="18" font-weight="700" fill="#111">Monte Carlo — ${esc(locName)}</text>`;
-    svg += `<text x="16" y="50" font-family="system-ui" font-size="13" fill="#333">`
-         + `Success rate: ${(r.successRate * 100).toFixed(0)}% · `
-         + `${this.runs().toLocaleString()} simulated futures over ${this.years()} years`
-         + `</text>`;
-    svg += `<text x="16" y="70" font-family="system-ui" font-size="12" fill="#666">`
-         + `Median ${this.fmt(r.median, '')} · 5th ${this.fmt(r.p5, '')} · 95th ${this.fmt(r.p95, '')}`
-         + `</text>`;
-
-    const pY = headerH;
-    svg += `<g transform="translate(0,${pY})">`;
-    svg += `<text x="16" y="16" font-family="system-ui" font-size="12" font-weight="600" fill="#333">Portfolio Paths</text>`;
-    svg += `<g transform="translate(0,24)">`;
-    svg += `<line x1="0" x2="${this.pathW}" y1="${pathZeroY}" y2="${pathZeroY}" stroke="#999" stroke-dasharray="3,3" stroke-width="1"/>`;
-    for (const pd of paths) {
-      svg += `<polyline points="${esc(pd.points)}" stroke="${pd.color}" stroke-width="1" fill="none" opacity="0.6"/>`;
-    }
-    svg += `<text x="4" y="12" font-family="system-ui" font-size="10" fill="#666">${esc(this.fmt(pathYMax, ''))}</text>`;
-    svg += `<text x="4" y="${pathZeroY - 4}" font-family="system-ui" font-size="10" fill="#666">$0</text>`;
-    svg += `<text x="4" y="${this.pathH - 4}" font-family="system-ui" font-size="10" fill="#666">${esc(this.fmt(pathYMin, ''))}</text>`;
-    svg += `<text x="${this.pathW - 4}" y="${this.pathH - 4}" text-anchor="end" font-family="system-ui" font-size="10" fill="#666">Year ${this.years()}</text>`;
-    svg += `</g></g>`;
-
-    const hY = headerH + this.pathH + 24 + gap;
-    svg += `<g transform="translate(0,${hY})">`;
-    svg += `<text x="16" y="16" font-family="system-ui" font-size="12" font-weight="600" fill="#333">End Balance Distribution</text>`;
-    svg += `<g transform="translate(0,24)">`;
-    for (const bar of histBars) {
-      svg += `<rect x="${bar.x}" y="${bar.y}" width="${bar.w}" height="${bar.h}" fill="${bar.color}"/>`;
-    }
-    svg += `<line x1="${medianX}" x2="${medianX}" y1="0" y2="${this.histH - 18}" stroke="#D4943A" stroke-width="2"/>`;
-    svg += `<text x="${medianX}" y="12" text-anchor="middle" font-family="system-ui" font-size="10" fill="#333">Median</text>`;
-    svg += `<text x="4" y="${this.histH - 4}" font-family="system-ui" font-size="10" fill="#666">${esc(histMinStr)}</text>`;
-    svg += `<text x="${this.histW - 4}" y="${this.histH - 4}" text-anchor="end" font-family="system-ui" font-size="10" fill="#666">${esc(histMaxStr)}</text>`;
-    svg += `</g></g>`;
-
-    const bY = headerH + this.pathH + 24 + gap + this.histH + 24 + gap;
-    svg += `<g transform="translate(0,${bY})">`;
-    svg += `<text x="16" y="16" font-family="system-ui" font-size="12" font-weight="600" fill="#333">Percentile Breakdown</text>`;
-    const rowH = 16;
-    const labelW = 80;
-    const barW = totalW - labelW - 40;
-    pctBars.forEach((p, i) => {
-      const y = 24 + i * rowH;
-      const fillW = Math.max(2, (p.width / 100) * barW);
-      svg += `<text x="16" y="${y + 11}" font-family="system-ui" font-size="11" fill="#333">${esc(p.label)}</text>`;
-      svg += `<rect x="${labelW + 16}" y="${y}" width="${barW}" height="12" fill="#eee" rx="2"/>`;
-      svg += `<rect x="${labelW + 16}" y="${y}" width="${fillW}" height="12" fill="${p.color}" rx="2"/>`;
-      svg += `<text x="${labelW + 16 + fillW + 4}" y="${y + 10}" font-family="system-ui" font-size="10" fill="#333">${esc(this.fmt(p.value, ''))}</text>`;
-    });
-    svg += `</g>`;
-
-    svg += `</svg>`;
-    return svg;
-  }
-}
-
-/** Build a print-ready HTML document wrapping the SVG with print CSS and an
- *  autoprint trigger. All interpolated values (the SVG string) are already
- *  escaped during SVG assembly. */
-function buildPrintHtml(svgStr: string): string {
-  return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Monte Carlo Results</title>
-<style>
-  @page { size: letter; margin: 0.5in; }
-  body { font-family: system-ui, sans-serif; color: #111; margin: 0; padding: 24px; background: #fff; }
-  svg { display: block; max-width: 100%; height: auto; }
-  .noprint { margin-bottom: 16px; color: #666; font-size: 12px; }
-  .noprint button {
-    padding: 6px 12px; border-radius: 4px; border: 1px solid #999;
-    background: #eee; cursor: pointer; margin-right: 8px;
-  }
-  @media print { .noprint { display: none; } }
-</style></head>
-<body onload="setTimeout(function(){window.print()},250)">
-  <div class="noprint">
-    <button onclick="window.print()">Print</button>
-    <button onclick="window.close()">Close</button>
-  </div>
-  ${svgStr}
-</body></html>`;
-}
-
-/** Convert an SVG string to a PNG Blob via an off-screen canvas. Scales by
- *  `pixelRatio` so the export looks crisp on retina displays. */
-function svgToPngBlob(svgStr: string, pixelRatio = 2): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const widthMatch = svgStr.match(/width="(\d+)"/);
-    const heightMatch = svgStr.match(/height="(\d+)"/);
-    const w = widthMatch ? parseInt(widthMatch[1]!, 10) : 800;
-    const h = heightMatch ? parseInt(heightMatch[1]!, 10) : 600;
-    const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = w * pixelRatio;
-      canvas.height = h * pixelRatio;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { URL.revokeObjectURL(url); reject(new Error('no 2d context')); return; }
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.scale(pixelRatio, pixelRatio);
-      ctx.drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob returned null')), 'image/png');
-    };
-    img.onerror = (e) => { URL.revokeObjectURL(url); reject(new Error('image load failed: ' + e)); };
-    img.src = url;
-  });
-}
-
-function downloadBlob(filename: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.style.display = 'none';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
