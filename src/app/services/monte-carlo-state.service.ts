@@ -1,0 +1,398 @@
+import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
+import { LocationService } from '@services/location.service';
+import { HealthcareService } from '@services/healthcare.service';
+import {
+  FinancialSettings, WithdrawalStrategy, LocationFull,
+  HouseholdProfile, HouseholdMember,
+} from '@models/api.model';
+import {
+  MonteCarloResult,
+  ReturnMode,
+  DEFAULT_REGIME,
+} from '@app/lib/monte-carlo';
+import { HISTORICAL_PRESETS, HISTORICAL_RETURNS } from '@app/data/historical-returns';
+import {
+  SS_CUT_SOURCES, RMD_AGE_SOURCES,
+  FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026,
+} from '@app/lib/tax-sources';
+import { monthlyMedicareFor } from '@app/lib/irmaa';
+
+const PATH_CHART_W = 640;
+const PATH_CHART_H = 260;
+const HIST_CHART_W = 640;
+const HIST_CHART_H = 220;
+const HIST_BINS = 40;
+
+/**
+ * Monthly SS benefit adjusted for claim age. Mirrors the same helper in
+ * ss-screen.component.ts:estimateBenefit so screens stay consistent.
+ */
+function estimateBenefitAtClaim(m: HouseholdMember): number {
+  const pia = Number(m.ssPia) || 0;
+  if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
+  const diff = m.ssClaimAge - m.ssFra;
+  if (diff === 0) return pia;
+  if (diff > 0) return Math.round(pia * (1 + diff * 0.08));
+  const yearsEarly = Math.abs(diff);
+  const reduction = yearsEarly <= 3
+    ? yearsEarly * 0.0667
+    : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
+  return Math.round(pia * (1 - reduction));
+}
+
+/**
+ * Owns the user-controllable Monte Carlo simulation state — every input
+ * signal, every derived computed, plus the latest results and the
+ * stale-results flag. The screen component is a thin layer of UX state
+ * (loading flags, save-message strings, calm-step reveal counter) plus
+ * methods that orchestrate the kernel call and persist scenarios.
+ *
+ * Component-scoped (not providedIn: 'root') so each visit to the screen
+ * starts with a fresh slate, matching the pre-extraction behavior where
+ * all signals were class fields recreated on mount.
+ *
+ * Phase 1 of the god-component split (audit follow-up #1). Phase 2 will
+ * carve the screen component into Parameters / Healthcare / Scenarios /
+ * Results sub-components, each injecting this service to read and write
+ * shared state without prop-drilling.
+ */
+@Injectable()
+export class MonteCarloStateService {
+  private readonly loc = inject(LocationService);
+  private readonly healthcare = inject(HealthcareService);
+
+  /* ─── Async-loaded snapshots ───────────────────────────────────── */
+  readonly fin = signal<FinancialSettings | null>(null);
+  readonly wd = signal<WithdrawalStrategy | null>(null);
+  readonly household = signal<HouseholdProfile | null>(null);
+
+  /* ─── Inputs (all persist across the session via signals) ──────── */
+  readonly selectedLocationId = signal<string>('');
+  readonly portfolio = signal(0);
+  readonly ssMonthly = signal(0);
+  readonly monthlyIncome = signal(0);
+  readonly partTimeMonthlyIncome = signal(0);
+  readonly partTimeEndYear = signal(0);
+  readonly runs = signal(5000);
+  readonly ssCutSources = SS_CUT_SOURCES;
+  readonly rmdSources = RMD_AGE_SOURCES;
+
+  readonly years = signal(25);
+  readonly meanReturn = signal(7);
+  readonly volatility = signal(15);
+  readonly meanInflation = signal(3);
+  readonly inflVol = signal(1.5);
+  readonly currVol = signal(5);
+  readonly fxDrift = signal(0);
+  readonly incGrowth = signal(2);
+
+  /* ─── Historical / sampling-mode inputs ────────────────────────── */
+  readonly returnMode = signal<ReturnMode>('normal');
+  readonly selectedPresetId = signal<string>('');
+  /** Start year for historical-sequence backtest. Defaults to earliest data. */
+  readonly historicalStartYear = signal<number>(HISTORICAL_RETURNS[0].year);
+
+  /** Regime parameters (bull/bear Markov switching). */
+  readonly regimeBullMean = signal(DEFAULT_REGIME.bullMean * 100);
+  readonly regimeBullVol = signal(DEFAULT_REGIME.bullVol * 100);
+  readonly regimeBearMean = signal(DEFAULT_REGIME.bearMean * 100);
+  readonly regimeBearVol = signal(DEFAULT_REGIME.bearVol * 100);
+  readonly regimeBullToBear = signal(DEFAULT_REGIME.pBullToBear * 100);
+  readonly regimeBearToBull = signal(DEFAULT_REGIME.pBearToBull * 100);
+
+  readonly historicalPresets = HISTORICAL_PRESETS;
+  readonly historicalYears = HISTORICAL_RETURNS.map(r => r.year);
+
+  /* ─── Multi-location schedule (deterministic) ──────────────────── */
+  readonly moves = signal<{ fromYear: number; locationId: string; moveCostUSD: number }[]>([]);
+  readonly movesEnabled = signal(false);
+
+  /** One-time future expenses (cars, roof, tuition, big trips). */
+  readonly oneTimeExpenses = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
+  readonly oneTimeExpensesEnabled = signal(false);
+
+  /** Long-Term Care planning (#21). */
+  readonly ltcMode = signal<'off' | 'self-insure' | 'insurance' | 'both'>('off');
+  readonly ltcProbability = signal(70);
+  readonly ltcCostPerYearUSD = signal(108000);
+  readonly ltcDurationYears = signal(2.4);
+  readonly ltcStartAgeMin = signal(78);
+  readonly ltcStartAgeMax = signal(88);
+  readonly ltcInsuranceMonthly = signal(350);
+  readonly ltcInsuranceStartAge = signal(60);
+
+  /** FX stress test (#26). */
+  readonly fxShockEnabled = signal(false);
+  readonly fxShockYear = signal(5);
+  readonly fxShockPct = signal(10);
+
+  /* ─── Spouse-death scenario (deterministic) ────────────────────── */
+  readonly spouseDeathEnabled = signal(false);
+  readonly spouseDeathYear = signal(10);
+  readonly survivorCostRatio = signal(75);
+  readonly deceasedMemberIndex = signal(0);
+
+  /** Stepped-up basis estimate. User opts in by setting balance / gain ratio / LTCG rate. */
+  readonly survivorStepUpTaxableBalance = signal(0);
+  readonly survivorStepUpGainRatio = signal(30);
+  readonly survivorStepUpLtcgRate = signal(15);
+
+  /* ─── Results + stale-results flag ─────────────────────────────── */
+  readonly results = signal<MonteCarloResult | null>(null);
+  /** True when a sim input changed since the last completed run. */
+  readonly simDirty = signal(false);
+
+  /* ─── Chart dimensions ─────────────────────────────────────────── */
+  readonly pathW = PATH_CHART_W;
+  readonly pathH = PATH_CHART_H;
+  readonly histW = HIST_CHART_W;
+  readonly histH = HIST_CHART_H;
+
+  /* ─── Derived from selected location ───────────────────────────── */
+  readonly selectedLoc = computed<LocationFull | null>(() => {
+    const id = this.selectedLocationId();
+    return this.loc.fullLocations().find((l) => l.id === id) ?? null;
+  });
+
+  readonly isForeign = computed(() => {
+    const l = this.selectedLoc();
+    return !!l && l.currency !== 'USD';
+  });
+
+  readonly baseCost = computed(() => {
+    const l = this.selectedLoc();
+    if (!l?.monthlyCosts) return 0;
+    return this.loc.nonHealthcareBaseMonthly(l) + this.healthcare.decide(l).monthlyCost;
+  });
+
+  /** Non-dependent adults in the household, in sort order. */
+  readonly adults = computed(() =>
+    (this.household()?.members ?? []).filter(m => m.role !== 'dependent')
+  );
+
+  readonly survivorMonthlySs = computed(() => {
+    const adults = this.adults();
+    if (adults.length === 0) return 0;
+    const benefits = adults.map(m => estimateBenefitAtClaim(m));
+    return Math.max(...benefits);
+  });
+
+  readonly survivorBirthYear = computed<number | null>(() => {
+    const adults = this.adults();
+    if (!adults.length) return null;
+    if (adults.length === 1) return adults[0].birthYear;
+    const deceased = this.deceasedMemberIndex();
+    const survivor = adults.find((_, i) => i !== deceased) ?? adults[0];
+    return survivor.birthYear;
+  });
+
+  readonly survivorMonthlyIncome = computed(() =>
+    this.survivorMonthlySs() + this.monthlyIncome()
+  );
+
+  readonly survivorMonthlyIncomeTax = computed(() => {
+    const survivorIncomeAnnual = this.survivorMonthlyIncome() * 12;
+    if (survivorIncomeAnnual <= 0) return 0;
+    const ssAnnual = this.survivorMonthlySs() * 12;
+    const otherAnnual = this.monthlyIncome() * 12;
+    const taxableGross = ssAnnual * 0.85 + otherAnnual;
+    const taxable = Math.max(0, taxableGross - FED_STD_DEDUCTION_2026.single);
+    let fed = 0;
+    for (const b of FED_BRACKETS_2026_SINGLE) {
+      const top = b.max ?? Number.POSITIVE_INFINITY;
+      if (taxable <= b.min) break;
+      const span = Math.min(taxable, top) - b.min;
+      if (span > 0) fed += span * b.rate;
+    }
+    return fed / 12;
+  });
+
+  readonly survivorMonthlyMedicare = computed(() => {
+    const magi = this.survivorMonthlyIncome() * 12;
+    return monthlyMedicareFor('single', magi);
+  });
+
+  readonly survivorStepUpBenefitUSD = computed(() => {
+    const bal = this.survivorStepUpTaxableBalance();
+    const gain = this.survivorStepUpGainRatio() / 100;
+    const rate = this.survivorStepUpLtcgRate() / 100;
+    return Math.max(0, bal * gain * rate);
+  });
+
+  readonly survivorPostDeathMonthly = computed(() => {
+    const seed = this.selectedLoc();
+    if (!seed) return 0;
+    const totalBase = this.baseCost();
+    const taxLine = Number(seed.monthlyCosts?.taxes?.typical) || 0;
+    const hcLine = Number(seed.monthlyCosts?.healthcare?.typical) || 0;
+    const lifestyleBase = Math.max(0, totalBase - taxLine - hcLine);
+    const ratio = this.survivorCostRatio() / 100;
+    return lifestyleBase * ratio + this.survivorMonthlyIncomeTax() + this.survivorMonthlyMedicare();
+  });
+
+  /** Nominal lifetime SS with compound COLA growth. */
+  readonly ssLifetime = computed(() => {
+    const monthly = this.ssMonthly();
+    const g = this.incGrowth() / 100;
+    const yrs = this.years();
+    if (monthly <= 0 || yrs <= 0) return 0;
+    if (g === 0) return monthly * 12 * yrs;
+    return monthly * 12 * (Math.pow(1 + g, yrs) - 1) / g;
+  });
+
+  /* ─── Path chart data ──────────────────────────────────────────── */
+  readonly pathYMax = computed(() => {
+    const r = this.results();
+    if (!r) return 1;
+    let mx = 0;
+    for (const p of r.paths) for (const v of p) if (v > mx) mx = v;
+    return Math.max(mx, this.portfolio() * 2);
+  });
+
+  readonly pathYMin = computed(() => {
+    const r = this.results();
+    if (!r) return 0;
+    let mn = 0;
+    for (const p of r.paths) for (const v of p) if (v < mn) mn = v;
+    return Math.min(mn, 0);
+  });
+
+  readonly pathZeroY = computed(() => {
+    const mx = this.pathYMax();
+    const mn = this.pathYMin();
+    const range = mx - mn || 1;
+    return this.pathH - ((0 - mn) / range) * this.pathH;
+  });
+
+  readonly pathData = computed(() => {
+    const r = this.results();
+    if (!r) return [];
+    const mx = this.pathYMax();
+    const mn = this.pathYMin();
+    const range = mx - mn || 1;
+    const yrs = this.years();
+    return r.paths.map((path) => {
+      const points = path
+        .map((v, i) => {
+          const x = (i / yrs) * this.pathW;
+          const y = this.pathH - ((v - mn) / range) * this.pathH;
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        })
+        .join(' ');
+      const endedPositive = path[path.length - 1] > 0;
+      return {
+        points,
+        color: endedPositive ? 'rgba(42,123,123,0.6)' : 'rgba(229,115,115,0.6)',
+      };
+    });
+  });
+
+  /* ─── Histogram data ───────────────────────────────────────────── */
+  readonly histMin = computed(() => {
+    const r = this.results();
+    return r ? r.results[0] ?? 0 : 0;
+  });
+
+  readonly histMax = computed(() => {
+    const r = this.results();
+    return r ? r.results[r.results.length - 1] ?? 0 : 0;
+  });
+
+  readonly histBars = computed(() => {
+    const r = this.results();
+    if (!r || !r.results.length) return [];
+    const min = this.histMin();
+    const max = this.histMax();
+    const range = max - min || 1;
+    const binWidth = range / HIST_BINS;
+    const counts = new Array<number>(HIST_BINS).fill(0);
+    for (const v of r.results) {
+      let idx = Math.floor((v - min) / binWidth);
+      if (idx >= HIST_BINS) idx = HIST_BINS - 1;
+      if (idx < 0) idx = 0;
+      counts[idx]++;
+    }
+    const maxCount = Math.max(...counts) || 1;
+    const barW = this.histW / HIST_BINS;
+    const chartH = this.histH - 20;
+    return counts.map((c, i) => {
+      const h = (c / maxCount) * chartH;
+      const binStart = min + i * binWidth;
+      const color = binStart < 0 ? 'rgba(229,115,115,0.7)' : 'rgba(74,144,226,0.7)';
+      return {
+        x: i * barW,
+        y: chartH - h,
+        w: Math.max(barW - 1, 1),
+        h,
+        color,
+      };
+    });
+  });
+
+  readonly medianX = computed(() => {
+    const r = this.results();
+    if (!r) return 0;
+    const min = this.histMin();
+    const max = this.histMax();
+    const range = max - min || 1;
+    return ((r.median - min) / range) * this.histW;
+  });
+
+  /* ─── Percentile bars (numeric list) ───────────────────────────── */
+  readonly percentileBars = computed(() => {
+    const r = this.results();
+    if (!r) return [];
+    const maxP = Math.max(r.p95, this.portfolio() * 2);
+    const minP = Math.min(0, r.p5);
+    const range = maxP - minP || 1;
+    return PERCENTILE_COLORS.map(({ label, key, color }) => {
+      const value = r[key] as number;
+      const width = Math.max(2, Math.min(100, ((value - minP) / range) * 100));
+      return { label, value, color, width };
+    });
+  });
+
+  constructor() {
+    // FU-012 — mark results stale as soon as any sim input signal changes,
+    // so the template can surface a "Rerun simulation" banner. Cleared at
+    // the end of a successful run by the screen component's runSimulation().
+    effect(() => {
+      // Dependency-read each input. Order doesn't matter; Angular tracks
+      // any signal read inside this effect body.
+      this.portfolio(); this.ssMonthly(); this.monthlyIncome();
+      this.partTimeMonthlyIncome(); this.partTimeEndYear();
+      this.runs(); this.years();
+      this.meanReturn(); this.volatility();
+      this.meanInflation(); this.inflVol(); this.currVol(); this.fxDrift();
+      this.incGrowth();
+      this.returnMode(); this.selectedLocationId(); this.historicalStartYear();
+      this.regimeBullMean(); this.regimeBullVol();
+      this.regimeBearMean(); this.regimeBearVol();
+      this.regimeBullToBear(); this.regimeBearToBull();
+      this.moves(); this.movesEnabled();
+      this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
+      this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
+      this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
+      this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();
+      this.fxShockEnabled(); this.fxShockYear(); this.fxShockPct();
+      this.spouseDeathEnabled(); this.spouseDeathYear();
+      this.survivorCostRatio(); this.deceasedMemberIndex();
+      this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
+      // Only mark stale when there's actually a prior result to be stale.
+      // Read via untracked() so runSimulation's results.set() doesn't
+      // retrigger this effect and immediately re-set simDirty back to true.
+      if (untracked(this.results)) this.simDirty.set(true);
+    });
+  }
+}
+
+/* Dyscalculia F-002: Removed red `#E57373` for the lowest percentile — now
+ * uses the same neutral amber gradient as the rest. Anxiety-inducing red is
+ * reserved for hard errors, not user outcomes. */
+const PERCENTILE_COLORS: { label: string; key: keyof MonteCarloResult; color: string }[] = [
+  { label: '5th Percentile',  key: 'p5',     color: '#B0752A' },
+  { label: '25th Percentile', key: 'p25',    color: '#D4943A' },
+  { label: '50th (Median)',   key: 'median', color: '#E8B86D' },
+  { label: '75th Percentile', key: 'p75',    color: '#3AA0A0' },
+  { label: '95th Percentile', key: 'p95',    color: '#4CAF50' },
+];
