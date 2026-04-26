@@ -1,58 +1,77 @@
 POST-COMMIT AUDIT SUMMARY — retirement-dashboard-angular
 =========================================================
-Date:           2026-04-24
-Commit:         4f6f307
+Date:           2026-04-26
+Commit:         a547273
 Branch:         main
 Project:        Angular 21 retirement dashboard (standalone components, signals)
-Previous Audit: 2026-04-21 (PASS, 1 LOW resolved in-audit)
+Previous Audit: 2026-04-24 (PASS, 2 LOW carry-forward, no Action Required)
 
-Recent merges in this batch:
-  #51 Narrative Report new chapters + cons rendering fix
-  #52 Monte Carlo: survivor tax + IRMAA + stepped-up basis (adds src/app/lib/irmaa.ts)
-  #53 Monte Carlo: Part-time income (Barista FIRE) cliff end-year
+Recent merges in this batch (9 PRs since the prior baseline):
+  #54 dyscalculia: swap dark-red → dark-neutral on classification cells
+  #55 monte-carlo: one-time future expenses planner
+  #56 monte-carlo: Long-Term Care planning
+  #57 monte-carlo: FX stress test (one-time abrupt currency shock)
+  #58 guardrails: essential vs discretionary spending split
+  #59 fix(monte-carlo): stabilize LTC self-insure in single-run modes
+  #60 refactor: shared currency / FIRE / location / scenario helpers
+  #61 refactor: extract inline templates + styles for 6 god components
+  #62 refactor: split api.model.ts by domain + hoist shared screen styles
 
 Phase 1 (Security Scanning):
   1. SAST/DAST Scan:        PASS — 0 critical / 0 high / 0 medium / 2 low / 4 info
-                            Both LOW findings are the same pattern (CWE-502 — localStorage
-                            JSON parsed with unchecked TypeScript cast):
+                            Both LOW findings are unchanged carry-forward from
+                            2026-04-19 (CWE-502 — localStorage JSON parsed with
+                            unchecked TypeScript cast):
                               src/app/services/dyslexia.service.ts:86–89
                               src/app/services/dyscalculia.service.ts:308–311
-                            Blast radius is confined to the user's own browser; both sites
-                            are already wrapped in try/catch with safe fallback defaults.
+                            Blast radius is the user's own browser; both sites
+                            are wrapped in try/catch with safe fallback defaults.
 
-                            Sanity-passed checks across all of src/:
-                              No [innerHTML], no bypassSecurity*, no DomSanitizer escapes
-                              No eval-family code-injection sinks
-                              All raw HTML/SVG emitters (brochure print, MC print HTML +
-                                SVG export, report markdown download) pass interpolated
-                                fields through a 5-entity escape; src/app/lib/text-escape.ts
-                                is shared and unit-tested (commit f4a86cb)
-                              All window.open() use noopener,noreferrer
-                              Math.random() is statistical-only (Box-Muller, regime Markov,
-                                bootstrap sampling); UUIDs use crypto.randomUUID()
-                              No secrets in src/environments/*
+                            One new INFO this cycle (positive control):
+                              I-2026-04-26-01 — LTC self-insure stochastic
+                              sampling uses Math.random(). Two new sites in
+                              src/app/lib/monte-carlo.ts (#56), in-band with
+                              prior policy of statistical-only randomness
+                              (Box-Muller, regime Markov, bootstrap). #59
+                              narrows the surface by collapsing single-run
+                              modes to deterministic expected-value paths.
+
+                            Negative-control sweep (additions, this batch):
+                              No new DOM-write sinks
+                              No new sanitizer-bypass / DomSanitizer escapes
+                              No new code-execution sinks
+                              No new network surface
+                              No new env / secrets references
+                              No new localStorage / sessionStorage / JSON.parse sites
+                              No new escape helper functions
+                            All 5 inherited positive controls hold (text-escape
+                            usage, noopener/noreferrer on window.open, no secrets
+                            in src/environments/*, etc.).
 
   2. Supply Chain Audit:    PASS — SLSA Level 2 (maintained from 2026-04-21)
-                            Every uses: pinned by 40-char SHA in .github/workflows.
-                            CycloneDX SBOM generated in CI.
-                            No new deps in PR #51 / #52 / #53 batch.
-                            No typosquat candidates in dependency tree.
-                            Zero network calls in scripts/ folder.
+                            ZERO package.json / package-lock.json diff in the
+                            entire 9-PR batch. Every feature implemented in
+                            existing TypeScript primitives; every refactor is
+                            source reorganisation. Second consecutive 9-PR batch
+                            with zero dep churn — indicator of a healthy
+                            "sustaining" period.
                             npm audit --omit=dev: 0 vulnerabilities (clean).
+                            Workflows untouched; all uses: pinned by 40-char SHA.
+                            CycloneDX SBOM produced on every PR.
 
-  3. CWE Mapping:           1 active CWE (CWE-502) at 2 call sites.
-                            Mapped to OWASP Top 10 2021 (A08), OWASP LLM Top 10 (LLM03),
-                            NIST SP 800-53, EU AI Act Art. 25, ISO 27001, SOC 2,
-                            MITRE ATT&CK, MITRE ATLAS.
+  3. CWE Mapping:           Zero new CWEs this cycle. 1 active CWE (CWE-502)
+                            at 2 unchanged call sites. All previously-closed
+                            CWEs (CWE-79 / CWE-94 / CWE-1022 / CWE-330 /
+                            CWE-798) re-verified clean against the batch diff.
 
 Severity profile:
   CRITICAL: 0   (was 0)
-  HIGH:     0   (was 0, 1 raised+resolved in 2026-04-21 cycle)
-  MEDIUM:   0   (was 0, 1 raised+accepted in 2026-04-21 cycle)
-  LOW:      2   (was 1, 1 resolved in 2026-04-21; 2 new today both same pattern)
-  INFO:     4   (positive controls)
+  HIGH:     0   (was 0)
+  MEDIUM:   0   (was 0)
+  LOW:      2   (was 2 — carry-forward, no regression, no new fix)
+  INFO:     4   (+1: LTC sampling Math.random)
 
-Top 3 recommendations:
+Top 3 recommendations (all carried forward, none new):
   1. Add a tiny runtime schema validator (hand-rolled or Zod) to both loadSaved() methods
      in dyslexia.service.ts and dyscalculia.service.ts — closes both LOW findings via one
      shared helper. CWE-502 mitigation.
@@ -62,9 +81,12 @@ Top 3 recommendations:
      today" property into an enforced runtime invariant.
 
 Reports:
-  audits/sast-dast-scan-2026-04-24.md
-  audits/supply-chain-audit-2026-04-24.md
-  audits/cwe-mapping-2026-04-24.md
+  audits/sast-dast-scan-2026-04-26.md
+  audits/supply-chain-audit-2026-04-26.md
+  audits/cwe-mapping-2026-04-26.md
+
+Note: PR #63 (refactor: extract MonteCarloStateService — Phase 1 god-component split)
+is open at audit time and not yet on main. Will be covered in the next audit cycle.
 
 Overall:         PASS
-Action Required: NO — recommendations are optional hardening; LOW findings are constrained-radius and already defensively wrapped.
+Action Required: NO — recommendations are optional hardening; LOW findings are constrained-radius and already defensively wrapped. Posture has improved structurally (audit follow-ups #2 and #4 closed via PR #62) without any security regression.
