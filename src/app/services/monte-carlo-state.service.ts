@@ -220,6 +220,42 @@ export class MonteCarloStateService {
     return Math.max(0, bal * gain * rate);
   });
 
+  /**
+   * Preview-only: Phase 3b spouse-death inheritance tax hit at the
+   * selected location, using current inputs (no per-trial FX volatility,
+   * no portfolio growth to deathYear). Shown in the spouse-death card so
+   * the user sees the modeled hit before running a sim.
+   *
+   *   deceasedShareUSD = portfolio × 0.5
+   *   exemptionUSD     = exemptionLocal / loc.exchangeRate
+   *   effectiveRate    = 0 if 'full' or topRate=0
+   *                     topRate if 'none'
+   *                     directFamilyEffectiveRate ?? topRate otherwise
+   *   hit              = max(0, deceasedShareUSD − exemptionUSD) × rate
+   *
+   * The kernel applies the same logic per-trial with FX volatility on
+   * the exemption — see MonteCarloParams.inheritanceTaxByYear in
+   * lib/monte-carlo.ts. The preview here uses today's $ at year-0 FX,
+   * so the on-screen number is a baseline estimate.
+   */
+  readonly survivorInheritanceTaxHit = computed(() => {
+    const loc = this.selectedLoc();
+    const inh = loc?.taxes?.inheritance;
+    if (!inh || !inh.topRate) return 0;
+
+    let effectiveRate = 0;
+    if (inh.spouseExemption === 'full') return 0;
+    if (inh.spouseExemption === 'none') effectiveRate = inh.topRate;
+    else effectiveRate = inh.directFamilyEffectiveRate ?? inh.topRate;
+    if (effectiveRate <= 0) return 0;
+
+    const exchangeRate = loc?.exchangeRate ?? 1;
+    const exemptionUSD = (inh.exemptionLocal ?? 0) / exchangeRate;
+    const deceasedShareUSD = this.portfolio() * 0.5;
+    const taxableUSD = Math.max(0, deceasedShareUSD - exemptionUSD);
+    return taxableUSD * effectiveRate;
+  });
+
   readonly survivorPostDeathMonthly = computed(() => {
     const seed = this.selectedLoc();
     if (!seed) return 0;

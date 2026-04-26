@@ -242,6 +242,35 @@ export interface MonteCarloParams {
   survivorStepUpBenefitUSD?: number;
 
   /**
+   * Phase 3b — foreign inheritance tax hit at the spouse-death year.
+   * Indexed by sim year (0..years-1). Each entry describes the active
+   * location's spouse-effective tax rate and USD-baseline exemption.
+   *
+   * Caller (MonteCarloRunnerService) pre-computes per year:
+   *   - effectiveRate: 0 for `'full'` spouse exemption (US, France,
+   *     Portugal, Ireland, etc.); `topRate` for `'none'` (Colombia);
+   *     `directFamilyEffectiveRate ?? topRate` for `'partial'` (Spain,
+   *     Italy, Ecuador, Greece, Malta).
+   *   - exemptionUSDBaseline: `exemptionLocal × USDperLocal` at the
+   *     location's seed FX rate.
+   *
+   * Kernel applies at deathYear:
+   *   deceasedShareUSD = bal × 0.5
+   *   exemptionUSD     = exemptionUSDBaseline × per-trial FX multiplier
+   *   hit              = max(0, deceasedShareUSD − exemptionUSD) × rate
+   *   bal             −= hit
+   *
+   * The 50% deceased-share assumption is a community-property
+   * approximation. Per-trial FX (segment-drift × shocks × year-random)
+   * means in trials where the local currency strengthens, the exemption's
+   * USD value goes up — realistic for cross-border planning.
+   *
+   * For US locations (full marital deduction → effectiveRate 0) and zero-tax
+   * countries (topRate 0 → effectiveRate 0), the hit is silently zero.
+   */
+  inheritanceTaxByYear?: ({ effectiveRate: number; exemptionUSDBaseline: number } | undefined)[];
+
+  /**
    * Part-time / Barista-FIRE income that runs for a bounded number of years
    * then cliffs to zero. Models the common Coast / Barista pattern where a
    * retiree works a low-stress job for 3–10 years to bridge to full SS claim
@@ -651,6 +680,23 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // cost when in a foreign segment — see the cost-deduction line below.
       if (p.fxShockYear != null && y === p.fxShockYear && p.fxShockPct) {
         fxShockMult *= (1 + p.fxShockPct);
+      }
+
+      // Phase 3b — spouse-death inheritance tax. One-time hit at the death
+      // year, applied AFTER the FX state is settled for year y so the
+      // exemption-in-USD reflects per-trial FX volatility (segment-drift ×
+      // accumulated shocks × current-year random shock). Skipped silently
+      // when the active location has spouseExemption='full' or topRate=0
+      // (effectiveRate=0 — caller pre-flattened that logic).
+      if (deathYear != null && y === deathYear) {
+        const inhEntry = p.inheritanceTaxByYear?.[y];
+        if (inhEntry && inhEntry.effectiveRate > 0) {
+          const effectiveFx = curIsForeign ? currShock * fxMult * fxShockMult : 1;
+          const exemptionUSD = inhEntry.exemptionUSDBaseline * effectiveFx;
+          const deceasedShareUSD = bal * 0.5;
+          const taxableUSD = Math.max(0, deceasedShareUSD - exemptionUSD);
+          bal -= taxableUSD * inhEntry.effectiveRate;
+        }
       }
 
       // Part-time income stops at `partTimeEndYear` (exclusive — year == end is zero).
