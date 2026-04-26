@@ -31,6 +31,13 @@ jobs:
       - name: Build (development)
         run: npx ng build --configuration development
 
+      # Production build also runs in PR CI so bundle-budget overruns
+      # are caught before merge. Without this, only the main-branch
+      # `provenance` job exercises production, and PR signal is green
+      # for builds that actually fail on main.
+      - name: Build (production)
+        run: npx ng build --configuration production
+
       - name: Readability lint
         # Dyslexia audit DFA-2026-04-19-004 — flags prose above grade 9.
         # Warn-only for now; promote to --fail-on-exceed once baseline is clean.
