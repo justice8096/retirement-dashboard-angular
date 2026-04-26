@@ -1,0 +1,118 @@
+<div class="card">
+  <h3 class="card-title">Simulation Parameters</h3>
+  <div class="param-grid">
+
+    <label class="param">
+      <span class="param-label">Location</span>
+      <select class="param-input"
+        [ngModel]="state.selectedLocationId()"
+        (ngModelChange)="state.selectedLocationId.set($event)">
+        @for (l of loc.fullLocations(); track l.id) {
+          <option [value]="l.id">{{ l.name }}</option>
+        }
+      </select>
+      <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ state.selectedLoc()?.currency || '—' }} · monthly cost ≈ {{ fmt(state.baseCost()) }}</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Portfolio ($)</span>
+      <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+        [ngModel]="state.portfolio()" (ngModelChange)="state.portfolio.set($event)" />
+      <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ fmt(state.portfolio(), '') }} · {{ dyscalculia.getAnchor(state.portfolio(), 'portfolio') }}</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Social Security ($/mo)</span>
+      <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+        [ngModel]="state.ssMonthly()" (ngModelChange)="state.ssMonthly.set($event)" />
+      <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Household PIA total · {{ fmt(state.ssMonthly() * 12, '/yr') }}</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Other Income ($/mo)</span>
+      <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+        [ngModel]="state.monthlyIncome()" (ngModelChange)="state.monthlyIncome.set($event)" />
+      <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Permanent pension / annuity · {{ fmt(state.monthlyIncome() * 12, '/yr') }}</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Part-Time Income ($/mo)</span>
+      <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+        [ngModel]="state.partTimeMonthlyIncome()" (ngModelChange)="state.partTimeMonthlyIncome.set($event)" />
+      <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">Barista-FIRE / bridge income · {{ fmt(state.partTimeMonthlyIncome() * 12, '/yr') }} · cliffs to $0 at year {{ state.partTimeEndYear() }}</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Part-Time Ends (year)</span>
+      <input appNumeric="age" class="param-input" min="0" [max]="state.years()"
+        [ngModel]="state.partTimeEndYear()" (ngModelChange)="state.partTimeEndYear.set($event)" />
+      <span class="param-hint">0 = no part-time. Common: 5 years bridging to full SS at FRA.</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Simulations</span>
+      <select class="param-input"
+        [ngModel]="state.runs()" (ngModelChange)="state.runs.set(+$event)">
+        <option [value]="1000">1,000</option>
+        <option [value]="5000">5,000</option>
+        <option [value]="10000">10,000</option>
+      </select>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Years</span>
+      <input appNumeric="age" class="param-input" min="5" max="50"
+        [ngModel]="state.years()" (ngModelChange)="state.years.set($event)" />
+    </label>
+
+    <label class="param">
+      <span class="param-label">Mean Return (%)</span>
+      <input appNumeric="percent" class="param-input" step="0.5"
+        [ngModel]="state.meanReturn()" (ngModelChange)="state.meanReturn.set($event)" />
+    </label>
+
+    <label class="param">
+      <span class="param-label">Return Volatility (%)</span>
+      <input appNumeric="percent" class="param-input" step="0.5"
+        [ngModel]="state.volatility()" (ngModelChange)="state.volatility.set($event)" />
+    </label>
+
+    <label class="param">
+      <span class="param-label">Mean Inflation (%)</span>
+      <input appNumeric="percent" class="param-input" step="0.5"
+        [ngModel]="state.meanInflation()" (ngModelChange)="state.meanInflation.set($event)" />
+      <span class="param-hint">Weighted avg from location</span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Inflation Vol (%)</span>
+      <input appNumeric="percent" class="param-input" step="0.5"
+        [ngModel]="state.inflVol()" (ngModelChange)="state.inflVol.set($event)" />
+    </label>
+
+    <label class="param">
+      <span class="param-label">Currency Vol (%)</span>
+      <input appNumeric="percent" class="param-input" step="0.5"
+        [ngModel]="state.currVol()" (ngModelChange)="state.currVol.set($event)" />
+      <span class="param-hint" [class.muted]="!state.isForeign()">
+        {{ state.isForeign() ? 'Applied to foreign costs' : 'USD location — no effect' }}
+      </span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">FX Drift (%/yr)</span>
+      <input appNumeric="percent" class="param-input" step="0.25"
+        [ngModel]="state.fxDrift()" (ngModelChange)="state.fxDrift.set($event)" />
+      <span class="param-hint" [class.muted]="!state.isForeign()">
+        {{ state.isForeign() ? 'Positive = USD weakens' : 'USD location — no effect' }}
+      </span>
+    </label>
+
+    <label class="param">
+      <span class="param-label">Income Growth (%)</span>
+      <input appNumeric="percent" class="param-input" step="0.5"
+        [ngModel]="state.incGrowth()" (ngModelChange)="state.incGrowth.set($event)" />
+    </label>
+
+  </div>
+</div>

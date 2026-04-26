@@ -1,0 +1,18 @@
+/* .card / .card-title inherit from styles.scss "Screen Layout Utilities". */
+
+.param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+.param { display: flex; flex-direction: column; gap: 4px; }
+.param-label { font-size: 11px; color: var(--dark-text-muted); font-weight: 500; }
+.param-hint { font-size: 10px; color: var(--dark-text-muted); }
+.param-hint.muted { opacity: 0.4; }
+.param-input {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
+  background: var(--dark-bg-secondary); color: var(--dark-text);
+  font-size: 14px; font-family: var(--font-sans); outline: none;
+}
+.param-input:focus { border-color: var(--dark-blue); }
+select.param-input { appearance: auto; }

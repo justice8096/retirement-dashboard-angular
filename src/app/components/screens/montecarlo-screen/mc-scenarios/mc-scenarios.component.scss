@@ -1,0 +1,84 @@
+/* .card / .card-title inherit from styles.scss "Screen Layout Utilities".
+ * The scenarios cluster carries its own param-input + timeline + death-grid
+ * styling — used only by this sub-component now. */
+
+.moves-card { display: flex; flex-direction: column; gap: 10px; }
+.moves-card .card-sub {
+  font-size: 11px; color: var(--dark-text-muted);
+  margin: -6px 0 8px; line-height: 1.55; max-width: 680px;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 100px 140px 36px;
+  gap: 10px; align-items: center;
+  padding: 8px 10px;
+  background: var(--dark-bg-secondary); border-radius: 6px;
+}
+.primary-row { background: rgba(212, 148, 58, 0.08); border: 1px solid rgba(212, 148, 58, 0.25); }
+.tl-year { font-size: 12px; font-weight: 600; color: var(--dark-text); }
+.tl-loc  { font-size: 13px; color: var(--dark-text); }
+.tl-cost { font-size: 12px; color: var(--dark-amber); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.tl-cost-col { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.tl-cost-proj {
+  font-size: 9px; color: var(--dark-text-muted); font-style: italic;
+  font-variant-numeric: tabular-nums;
+}
+.tl-spacer { }
+.tl-field { display: flex; flex-direction: column; gap: 2px; }
+.tl-field-loc { min-width: 0; } /* allow select to shrink in grid cell */
+.tl-small-label { font-size: 9px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.tl-input {
+  padding: 5px 8px; border-radius: 4px;
+  border: 1px solid var(--dark-border); background: var(--dark-bg);
+  color: var(--dark-text); font-size: 12px; outline: none;
+}
+.tl-input:focus { border-color: var(--dark-amber); }
+.tl-remove {
+  width: 28px; height: 28px; border-radius: 4px;
+  border: 1px solid var(--dark-border); background: transparent;
+  color: var(--dark-text-muted); cursor: pointer; font-size: 12px;
+}
+.tl-remove:hover { color: var(--dark-red); border-color: var(--dark-red); }
+.add-move-btn { align-self: flex-start; }
+.moves-toggle {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  font-size: 12px; color: var(--dark-text);
+}
+.moves-toggle input { accent-color: var(--dark-amber); }
+.tl-inflate { display: flex; flex-direction: row; align-items: center; gap: 4px; }
+.tl-inflate input { accent-color: var(--dark-amber); }
+
+.death-card { display: flex; flex-direction: column; gap: 12px; }
+.death-card .card-sub {
+  font-size: 11px; color: var(--dark-text-muted);
+  margin: -6px 0 4px; line-height: 1.55; max-width: 640px;
+}
+.death-toggle {
+  display: flex; flex-direction: row; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--dark-text);
+}
+.death-toggle input { accent-color: var(--dark-amber); }
+.death-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.param-range { width: 100%; accent-color: var(--dark-amber); }
+.death-preview {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px; padding: 10px 12px;
+  background: var(--dark-bg-secondary); border-radius: 6px;
+}
+.dp-label { display: block; font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.dp-value { display: block; font-size: 14px; font-weight: 600; color: var(--dark-amber); margin-top: 2px; }
+.death-sub { font-size: 13px; font-weight: 600; color: var(--dark-text); margin: 18px 0 4px; }
+
+/* Local copies of param-input styles (component-encapsulated SCSS doesn't
+ * inherit from sibling component scopes — kept identical to parent). */
+.param { display: flex; flex-direction: column; gap: 4px; }
+.param-label { font-size: 11px; color: var(--dark-text-muted); font-weight: 500; }
+.param-hint { font-size: 10px; color: var(--dark-text-muted); }
+.param-input {
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
+  background: var(--dark-bg-secondary); color: var(--dark-text);
+  font-size: 14px; font-family: var(--font-sans); outline: none;
+}
+.param-input:focus { border-color: var(--dark-blue); }
+select.param-input { appearance: auto; }
