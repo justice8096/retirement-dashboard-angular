@@ -1,9 +1,11 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
+import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
-import { HouseholdProfile } from '@models/api.model';
+import { HouseholdProfile, InheritanceTaxInfo, LocationFull } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 /* 2026 federal estate tax parameters.
  *   - Exemption: $13.61M per person (reverts to ~$7M in 2026 if not extended).
@@ -30,7 +32,7 @@ interface EstateYear {
 @Component({
   selector: 'app-estate-screen',
   standalone: true,
-  imports: [FormsModule, NumericInputDirective],
+  imports: [FormsModule, NumericInputDirective, SourceTooltipComponent],
   template: `
     <div class="estate-screen">
       <div class="screen-header">
@@ -48,6 +50,93 @@ interface EstateYear {
         <strong>2026 federal exemption: {{ fmt(ESTATE_EXEMPTION_2026) }} per person.</strong>
         Estates below this threshold owe no federal estate tax. The exemption is scheduled to sunset
         to roughly $7M in 2026 unless Congress extends it.
+      </div>
+
+      <!-- Local inheritance / estate tax — Phase 3a of the foreign-inheritance-tax data layer.
+           Reads taxes.inheritance from the API (populated by retirement-api's country-keyed map). -->
+      <div class="card location-tax-card">
+        <div class="location-tax-header">
+          <h3 class="card-title" style="margin: 0;">Local Inheritance / Estate Tax</h3>
+          <select class="location-select" [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="selectedLocationId()" (ngModelChange)="selectedLocationId.set($event)">
+            @for (l of loc.fullLocations(); track l.id) {
+              <option [value]="l.id">{{ l.name }} · {{ l.country }}</option>
+            }
+          </select>
+        </div>
+
+        @if (selectedLocationInheritance(); as inh) {
+          @if (inh.topRate === 0) {
+            <p class="tax-zero">
+              <strong>{{ selectedLocationCountry() }}: no inheritance tax.</strong>
+              {{ inh.notes }}
+            </p>
+          } @else {
+            <div class="tax-grid">
+              @if (inh.topRate != null) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Top rate</div>
+                  <div class="tax-cell-value top-rate"
+                       [class.warn]="inh.topRate >= 0.30"
+                       [class.amber]="inh.topRate < 0.30 && inh.topRate >= 0.05"
+                       [class.green]="inh.topRate < 0.05">
+                    {{ (inh.topRate * 100).toFixed(0) }}%
+                  </div>
+                </div>
+              }
+              @if (inh.spouseExemption) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Spouse</div>
+                  <div class="tax-cell-value"
+                       [class.green]="inh.spouseExemption === 'full'"
+                       [class.amber]="inh.spouseExemption === 'partial'"
+                       [class.warn]="inh.spouseExemption === 'none'">
+                    {{ spouseLabel(inh.spouseExemption) }}
+                  </div>
+                </div>
+              }
+              @if (inh.exemptionLocal != null) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Tax-free threshold</div>
+                  <div class="tax-cell-value">
+                    {{ exemptionDisplay(inh.exemptionLocal) }}
+                  </div>
+                </div>
+              }
+              @if (inh.basis) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Tax basis</div>
+                  <div class="tax-cell-value">
+                    {{ inh.basis === 'estate' ? 'Estate-level (US/UK pattern)' : 'Inheritance-level (recipient pays)' }}
+                  </div>
+                </div>
+              }
+              @if (inh.scopeWhenResident) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Scope (resident)</div>
+                  <div class="tax-cell-value">
+                    {{ inh.scopeWhenResident === 'worldwide' ? 'Worldwide assets' : 'Local-situated assets only' }}
+                  </div>
+                </div>
+              }
+            </div>
+
+            <p class="tax-notes">{{ inh.notes }}</p>
+          }
+
+          @if (inh.sources && inh.sources.length > 0) {
+            <div class="tax-sources">
+              <span class="tax-sources-label">Sources:</span>
+              <app-source-tooltip [sources]="inh.sources" label="Inheritance tax sources" />
+            </div>
+          }
+        } @else {
+          <p class="muted">
+            No inheritance-tax data available for this location. (Currently covered:
+            US, France, Portugal, Spain, Italy, Ireland, Greece, Croatia, Cyprus,
+            Malta, Mexico, Panama, Costa Rica, Colombia, Ecuador, Uruguay.)
+          </p>
+        }
       </div>
 
       <div class="card">
@@ -298,6 +387,61 @@ interface EstateYear {
     .red   { color: var(--dark-neutral); }
     .muted { color: var(--dark-text-muted); }
 
+    /* Local inheritance/estate tax card (Phase 3a) */
+    .location-tax-card {
+      border-left: 4px solid var(--dark-blue);
+    }
+    .location-tax-header {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .location-select {
+      padding: 6px 10px; border-radius: 6px;
+      border: 1px solid var(--dark-border); background: var(--dark-bg-secondary);
+      color: var(--dark-text); font-size: 13px; font-family: var(--font-sans);
+      outline: none; min-width: 240px;
+    }
+    .location-select:focus { border-color: var(--dark-blue); }
+    .tax-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px; margin-bottom: 14px;
+    }
+    .tax-cell {
+      padding: 10px 12px; background: var(--dark-bg-secondary);
+      border-radius: 6px;
+    }
+    .tax-cell-label {
+      font-size: 10px; color: var(--dark-text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .tax-cell-value {
+      font-size: 14px; font-weight: 600; color: var(--dark-text);
+      font-variant-numeric: tabular-nums;
+    }
+    .tax-cell-value.top-rate { font-size: 18px; }
+    .tax-cell-value.green { color: var(--dark-green); }
+    .tax-cell-value.amber { color: var(--dark-amber); }
+    .tax-cell-value.warn { color: var(--dark-neutral); }
+    .tax-notes {
+      font-size: 13px; color: var(--dark-text-sec);
+      line-height: var(--prose-line-height, 1.5);
+      letter-spacing: var(--prose-letter-spacing, 0);
+      word-spacing: var(--prose-word-spacing, 0);
+      margin: 0 0 10px;
+    }
+    .tax-zero {
+      font-size: 13px; color: var(--dark-text-sec);
+      line-height: var(--prose-line-height, 1.5);
+      margin: 0 0 10px;
+    }
+    .tax-zero strong { color: var(--dark-green); }
+    .tax-sources {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; color: var(--dark-text-muted);
+      padding-top: 10px; border-top: 1px solid var(--dark-border);
+    }
+    .tax-sources-label { font-style: italic; }
+
     .insights {
       background: rgba(76, 175, 80, 0.08); border-left: 4px solid var(--dark-green);
       border-radius: 8px; padding: 16px 20px;
@@ -312,10 +456,35 @@ interface EstateYear {
 })
 export class EstateScreenComponent implements OnInit {
   readonly api = inject(ApiService);
+  readonly loc = inject(LocationService);
   readonly dyscalculia = inject(DyscalculiaService);
 
   readonly ESTATE_EXEMPTION_2026 = ESTATE_EXEMPTION_2026;
   readonly QCD_LIMIT = QCD_LIMIT;
+
+  /** Selected location for the inheritance/estate-tax card (Phase 3a).
+   *  Defaults to the first full location once they load — same pattern as
+   *  the Monte Carlo screen. */
+  readonly selectedLocationId = signal<string>('');
+
+  readonly selectedLocationFull = computed<LocationFull | null>(() =>
+    this.loc.fullLocations().find(l => l.id === this.selectedLocationId()) ?? null
+  );
+
+  readonly selectedLocationCountry = computed(() =>
+    this.selectedLocationFull()?.country ?? '—'
+  );
+
+  readonly selectedLocationInheritance = computed<InheritanceTaxInfo | null>(() =>
+    this.selectedLocationFull()?.taxes?.inheritance ?? null
+  );
+
+  /** Currency symbol for the selected location — used by `exemptionDisplay`
+   *  to render local-currency thresholds (€ for EU, $ for US/Ecuador, etc.).
+   *  Falls back to the location's currency code when no symbol is registered. */
+  private readonly currencySymbols: Record<string, string> = {
+    USD: '$', EUR: '€', GBP: '£', HRK: 'kn', JPY: '¥',
+  };
 
   readonly initialPortfolio = signal(500_000);
   readonly desiredLegacy = signal(500_000);
@@ -397,7 +566,18 @@ export class EstateScreenComponent implements OnInit {
     this.projections().reduce((m, r) => Math.max(m, r.portfolioValue, r.netEstate), 1)
   );
 
+  /** Seed the inheritance-tax card's location selector once full locations
+   *  load. Mirrors the MC screen's defaultLocationEffect — auto-cleans up
+   *  on component destroy via Angular's effect lifecycle. */
+  private defaultLocationEffect = effect(() => {
+    const list = this.loc.fullLocations();
+    if (list.length && !this.selectedLocationId()) {
+      this.selectedLocationId.set(list[0].id);
+    }
+  });
+
   ngOnInit(): void {
+    this.loc.loadFull();
     this.api.getHousehold().subscribe({
       next: (h) => {
         this.household.set(h);
@@ -431,5 +611,21 @@ export class EstateScreenComponent implements OnInit {
     return this.dyscalculia.isEnabled()
       ? this.dyscalculia.formatCurrency(Math.round(amount), '')
       : '$' + Math.round(amount).toLocaleString();
+  }
+
+  /** Plain-language label for the spouseExemption enum. */
+  spouseLabel(exemption: 'full' | 'partial' | 'none'): string {
+    if (exemption === 'full') return 'Fully exempt';
+    if (exemption === 'partial') return 'Partial exemption';
+    return 'No exemption';
+  }
+
+  /** Render an exemptionLocal threshold in the location's local currency.
+   *  Phase 1 / Phase 2 store these as raw numbers in primary local currency
+   *  (e.g. 100000 EUR for France). Show with the currency symbol prefix. */
+  exemptionDisplay(amountLocal: number): string {
+    const cur = this.selectedLocationFull()?.currency ?? 'USD';
+    const symbol = this.currencySymbols[cur] ?? cur + ' ';
+    return symbol + amountLocal.toLocaleString();
   }
 }
