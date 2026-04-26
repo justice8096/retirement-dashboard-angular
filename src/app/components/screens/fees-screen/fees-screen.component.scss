@@ -1,12 +1,10 @@
     .fees-screen { display: flex; flex-direction: column; gap: 16px; }
-    .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    /* .screen-header / .header-icon / .header-title / .header-sub / .card
+     * inherit from styles.scss "Screen Layout Utilities" — see audit follow-up #4. */
     .badge-new { font-size: 10px; font-weight: 700; color: var(--dark-green); padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px; }
-    .card { background: var(--dark-bg-card); border: 1px solid var(--dark-border); border-radius: 12px; padding: 20px; }
     .card.accent { border-color: var(--dark-amber); }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 6px; }
+    /* override global card-title margin: tighter to sit closer to .card-desc below */
+    .card-title { margin: 0 0 6px; }
     .card-desc { font-size: 11px; color: var(--dark-text-muted); margin: 0 0 14px; }
     .currency-banner { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 12px 16px; margin-bottom: 14px; background: var(--dark-bg-secondary); border-radius: 8px; }
     .currency-pair { display: flex; align-items: center; gap: 8px; }
@@ -61,4 +59,4 @@
     .result-value.lg { font-size: 22px; }
     .result-explain { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
     .save-indicator { position: fixed; bottom: 40px; right: 24px; padding: 6px 14px; font-size: 12px; color: var(--dark-green); background: rgba(76, 175, 80, 0.12); border-radius: 6px; border: 1px solid rgba(76, 175, 80, 0.2); }
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    /* .status-msg inherits from styles.scss "Screen Layout Utilities". */
