@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, untracked, OnInit } from '@angular/core';
+import { Component, inject, signal, effect, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
@@ -8,49 +8,13 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
 import { MonteCarloScenarioService } from '@services/monte-carlo-scenario.service';
 import { HealthcareService } from '@services/healthcare.service';
+import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
-import {
-  FinancialSettings, WithdrawalStrategy, LocationFull,
-  HouseholdProfile, HouseholdMember,
-} from '@models/api.model';
-import {
-  runMonteCarlo,
-  weightedInflationFromLocation,
-  MonteCarloResult,
-  ReturnMode,
-  DEFAULT_REGIME,
-} from '@app/lib/monte-carlo';
-import {
-  HISTORICAL_PRESETS, HISTORICAL_RETURNS, statsForRange,
-} from '@app/data/historical-returns';
+import { FinancialSettings, LocationFull, HouseholdMember } from '@models/api.model';
+import { runMonteCarlo, weightedInflationFromLocation } from '@app/lib/monte-carlo';
+import { HISTORICAL_PRESETS, statsForRange } from '@app/data/historical-returns';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
-import {
-  SS_CUT_SOURCES, RMD_AGE_SOURCES,
-  FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026,
-} from '@app/lib/tax-sources';
-import { monthlyMedicareFor } from '@app/lib/irmaa';
 
-// Dyscalculia F-002: Removed red `#E57373` for the lowest percentile — now
-// uses the same neutral amber gradient as the rest. Anxiety-inducing red is
-// reserved for hard errors, not user outcomes.
-const PERCENTILE_COLORS: { label: string; key: keyof MonteCarloResult; color: string }[] = [
-  { label: '5th Percentile',  key: 'p5',     color: '#B0752A' },
-  { label: '25th Percentile', key: 'p25',    color: '#D4943A' },
-  { label: '50th (Median)',   key: 'median', color: '#E8B86D' },
-  { label: '75th Percentile', key: 'p75',    color: '#3AA0A0' },
-  { label: '95th Percentile', key: 'p95',    color: '#4CAF50' },
-];
-
-/**
- * Monthly SS benefit adjusted for claim age.
- *
- * ssPia is the Primary Insurance Amount at Full Retirement Age (FRA). Claiming
- * late increases it ~8% per year; claiming early reduces it ~6.67%/yr for the
- * first 3 years and ~5%/yr after. API returns ssPia as a string, so coerce.
- *
- * Must match the logic in ss-screen.component.ts:estimateBenefit so the two
- * screens agree.
- */
 /**
  * Portfolio-weighted annual drag % from per-account load + fees. Decision:
  * both load and fees are recurring — treated identically, just separate lines
@@ -68,6 +32,10 @@ function weightedAccountDragPct(f: FinancialSettings): number {
   return rows.reduce((s, [b, l, fe]) => s + (b / total) * (l + fe), 0);
 }
 
+/**
+ * Monthly SS benefit adjusted for claim age. Mirrors the same helper in
+ * ss-screen.component.ts:estimateBenefit so the two screens agree.
+ */
 function estimateBenefitAtClaim(m: HouseholdMember): number {
   const pia = Number(m.ssPia) || 0;
   if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
@@ -81,27 +49,28 @@ function estimateBenefitAtClaim(m: HouseholdMember): number {
   return Math.round(pia * (1 - reduction));
 }
 
-const PATH_CHART_W = 640;
-const PATH_CHART_H = 260;
-const HIST_CHART_W = 640;
-const HIST_CHART_H = 220;
-const HIST_BINS = 40;
-
 @Component({
   selector: 'app-montecarlo-screen',
   standalone: true,
   imports: [FormsModule, MatButtonModule, NumericInputDirective, SourceTooltipComponent],
   templateUrl: './montecarlo-screen.component.html',
   styleUrls: ['./montecarlo-screen.component.scss'],
+  // Component-scoped so each visit to the screen starts with a fresh state
+  // instance, matching the pre-extraction behavior where signals were class
+  // fields recreated on mount.
+  providers: [MonteCarloStateService],
 })
 export class MontecarloScreenComponent implements OnInit {
   private readonly api = inject(ApiService);
   readonly loc = inject(LocationService);
   readonly taxSvc = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly healthcare = inject(HealthcareService);
   private readonly currency = inject(CurrencyFormatService);
   private readonly scenarios = inject(MonteCarloScenarioService);
+  private readonly state = inject(MonteCarloStateService);
 
+  /* ─── Screen-only UX state (loading flags, save messages, calm reveal) ─── */
   readonly loading = signal(false);
   readonly running = signal(false);
 
@@ -111,387 +80,100 @@ export class MontecarloScreenComponent implements OnInit {
    *  when `dyscalculia.isCalmMc()` is true. */
   readonly calmStep = signal(1);
   readonly calmMax = 8;
-  readonly fin = signal<FinancialSettings | null>(null);
-  readonly wd = signal<WithdrawalStrategy | null>(null);
-  readonly household = signal<HouseholdProfile | null>(null);
 
-  /* ─── Inputs (all persist across the session via signals) ──────── */
-  readonly selectedLocationId = signal<string>('');
-  readonly portfolio = signal(0);
-  readonly ssMonthly = signal(0);
-  readonly monthlyIncome = signal(0);
-  readonly partTimeMonthlyIncome = signal(0);
-  readonly partTimeEndYear = signal(0);
-  readonly runs = signal(5000);
-  readonly ssCutSources = SS_CUT_SOURCES;
-  readonly rmdSources = RMD_AGE_SOURCES;
-
-  readonly years = signal(25);
-  readonly meanReturn = signal(7);
-  readonly volatility = signal(15);
-  readonly meanInflation = signal(3);
-  readonly inflVol = signal(1.5);
-  readonly currVol = signal(5);
-  readonly fxDrift = signal(0);
-  readonly incGrowth = signal(2);
-
-  /* ─── Historical / sampling-mode inputs ────────────────────────── */
-  readonly returnMode = signal<ReturnMode>('normal');
-  readonly selectedPresetId = signal<string>('');
-  /** Start year for historical-sequence backtest. Defaults to earliest data. */
-  readonly historicalStartYear = signal<number>(HISTORICAL_RETURNS[0].year);
-
-  /** Regime parameters (bull/bear Markov switching). */
-  readonly regimeBullMean = signal(DEFAULT_REGIME.bullMean * 100);
-  readonly regimeBullVol = signal(DEFAULT_REGIME.bullVol * 100);
-  readonly regimeBearMean = signal(DEFAULT_REGIME.bearMean * 100);
-  readonly regimeBearVol = signal(DEFAULT_REGIME.bearVol * 100);
-  readonly regimeBullToBear = signal(DEFAULT_REGIME.pBullToBear * 100);
-  readonly regimeBearToBull = signal(DEFAULT_REGIME.pBearToBull * 100);
-
-  readonly historicalPresets = HISTORICAL_PRESETS;
-  readonly historicalYears = HISTORICAL_RETURNS.map(r => r.year);
-
-  /* ─── Multi-location schedule (deterministic) ───────────────────
-   * Each entry is `{ fromYear, locationId, moveCostUSD }`. fromYear must be
-   * strictly increasing. First entry is always year 0. Primary location
-   * selector at the top of the screen stays in sync with moves[0].locationId.
-   */
-  readonly moves = signal<{ fromYear: number; locationId: string; moveCostUSD: number }[]>([]);
-  readonly movesEnabled = signal(false);
-
-  /** One-time future expenses (cars, roof, tuition, big trips). Each row:
-   *  year (0-based sim year), amountUSD (today's $), label, inflate (default true). */
-  readonly oneTimeExpenses = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
-  readonly oneTimeExpensesEnabled = signal(false);
-
-  /** Long-Term Care planning (#21). Two independent modes — self-insure
-   *  (per-trial probabilistic stay) and insurance (recurring premium). */
-  readonly ltcMode = signal<'off' | 'self-insure' | 'insurance' | 'both'>('off');
-  readonly ltcProbability = signal(70);     // %
-  readonly ltcCostPerYearUSD = signal(108000); // US Genworth 2024 median private nursing-home room
-  readonly ltcDurationYears = signal(2.4);  // 2.4 yr median stay
-  readonly ltcStartAgeMin = signal(78);
-  readonly ltcStartAgeMax = signal(88);
-  readonly ltcInsuranceMonthly = signal(350);  // $4.2K/yr is mid-range LTC premium for 60yo
-  readonly ltcInsuranceStartAge = signal(60);
-
-  /** FX stress test (#26). One-time shock at year Y, applied to foreign segments only. */
-  readonly fxShockEnabled = signal(false);
-  readonly fxShockYear = signal(5);
-  readonly fxShockPct = signal(10);  // % — positive = USD weakens (cost rises)
-
-
-  /* ─── Spouse-death scenario (deterministic) ────────────────────── */
-  readonly spouseDeathEnabled = signal(false);
-  readonly spouseDeathYear = signal(10);
-  readonly survivorCostRatio = signal(75); // whole-percent on the wire
-  /** Which member is assumed to die. Index into adults[]. */
-  readonly deceasedMemberIndex = signal(0);
-
-  readonly results = signal<MonteCarloResult | null>(null);
   readonly savingScenario = signal(false);
   readonly saveMsg = signal<string | null>(null);
   readonly saveErr = signal(false);
 
-  /** True when a sim input changed since the last completed run. Surfaces a
-   *  stale-results banner + button glow (FU-012) so users know they need to
-   *  rerun to refresh the chart / percentiles. Cleared on successful run. */
-  readonly simDirty = signal(false);
+  /* ─── Sim state pass-throughs ──────────────────────────────────────────
+   * Phase 1 of audit follow-up #1: state moved to MonteCarloStateService.
+   * Templates still read these as `runs()`, `moves()`, etc., so the
+   * 830-line template stays untouched. Phase 2 will introduce sub-components
+   * that inject the state service directly and these facades will retire. */
+  readonly fin = this.state.fin;
+  readonly wd = this.state.wd;
+  readonly household = this.state.household;
+  readonly selectedLocationId = this.state.selectedLocationId;
+  readonly portfolio = this.state.portfolio;
+  readonly ssMonthly = this.state.ssMonthly;
+  readonly monthlyIncome = this.state.monthlyIncome;
+  readonly partTimeMonthlyIncome = this.state.partTimeMonthlyIncome;
+  readonly partTimeEndYear = this.state.partTimeEndYear;
+  readonly runs = this.state.runs;
+  readonly ssCutSources = this.state.ssCutSources;
+  readonly rmdSources = this.state.rmdSources;
+  readonly years = this.state.years;
+  readonly meanReturn = this.state.meanReturn;
+  readonly volatility = this.state.volatility;
+  readonly meanInflation = this.state.meanInflation;
+  readonly inflVol = this.state.inflVol;
+  readonly currVol = this.state.currVol;
+  readonly fxDrift = this.state.fxDrift;
+  readonly incGrowth = this.state.incGrowth;
+  readonly returnMode = this.state.returnMode;
+  readonly selectedPresetId = this.state.selectedPresetId;
+  readonly historicalStartYear = this.state.historicalStartYear;
+  readonly regimeBullMean = this.state.regimeBullMean;
+  readonly regimeBullVol = this.state.regimeBullVol;
+  readonly regimeBearMean = this.state.regimeBearMean;
+  readonly regimeBearVol = this.state.regimeBearVol;
+  readonly regimeBullToBear = this.state.regimeBullToBear;
+  readonly regimeBearToBull = this.state.regimeBearToBull;
+  readonly historicalPresets = this.state.historicalPresets;
+  readonly historicalYears = this.state.historicalYears;
+  readonly moves = this.state.moves;
+  readonly movesEnabled = this.state.movesEnabled;
+  readonly oneTimeExpenses = this.state.oneTimeExpenses;
+  readonly oneTimeExpensesEnabled = this.state.oneTimeExpensesEnabled;
+  readonly ltcMode = this.state.ltcMode;
+  readonly ltcProbability = this.state.ltcProbability;
+  readonly ltcCostPerYearUSD = this.state.ltcCostPerYearUSD;
+  readonly ltcDurationYears = this.state.ltcDurationYears;
+  readonly ltcStartAgeMin = this.state.ltcStartAgeMin;
+  readonly ltcStartAgeMax = this.state.ltcStartAgeMax;
+  readonly ltcInsuranceMonthly = this.state.ltcInsuranceMonthly;
+  readonly ltcInsuranceStartAge = this.state.ltcInsuranceStartAge;
+  readonly fxShockEnabled = this.state.fxShockEnabled;
+  readonly fxShockYear = this.state.fxShockYear;
+  readonly fxShockPct = this.state.fxShockPct;
+  readonly spouseDeathEnabled = this.state.spouseDeathEnabled;
+  readonly spouseDeathYear = this.state.spouseDeathYear;
+  readonly survivorCostRatio = this.state.survivorCostRatio;
+  readonly deceasedMemberIndex = this.state.deceasedMemberIndex;
+  readonly survivorStepUpTaxableBalance = this.state.survivorStepUpTaxableBalance;
+  readonly survivorStepUpGainRatio = this.state.survivorStepUpGainRatio;
+  readonly survivorStepUpLtcgRate = this.state.survivorStepUpLtcgRate;
+  readonly results = this.state.results;
+  readonly simDirty = this.state.simDirty;
 
-  /* ─── Chart dimensions ─────────────────────────────────────────── */
-  readonly pathW = PATH_CHART_W;
-  readonly pathH = PATH_CHART_H;
-  readonly histW = HIST_CHART_W;
-  readonly histH = HIST_CHART_H;
+  /* Chart dimensions */
+  readonly pathW = this.state.pathW;
+  readonly pathH = this.state.pathH;
+  readonly histW = this.state.histW;
+  readonly histH = this.state.histH;
 
-  /* ─── Derived from selected location ───────────────────────────── */
-  readonly selectedLoc = computed<LocationFull | null>(() => {
-    const id = this.selectedLocationId();
-    return this.loc.fullLocations().find((l) => l.id === id) ?? null;
-  });
-
-  readonly isForeign = computed(() => {
-    const l = this.selectedLoc();
-    return !!l && l.currency !== 'USD';
-  });
-
-  readonly healthcare = inject(HealthcareService);
-
-  readonly baseCost = computed(() => {
-    const l = this.selectedLoc();
-    if (!l?.monthlyCosts) return 0;
-    return this.loc.nonHealthcareBaseMonthly(l) + this.healthcare.decide(l).monthlyCost;
-  });
-
-  /** Non-dependent adults in the household, in sort order. Used for spouse-death UI. */
-  readonly adults = computed(() =>
-    (this.household()?.members ?? []).filter(m => m.role !== 'dependent')
-  );
-
-  /**
-   * Monthly SS after one spouse dies = max of the two spouses' claim-age-
-   * adjusted benefits (the survivor keeps the higher benefit). If only one
-   * adult, survivor benefit = that person's own (survivor lives alone).
-   */
-  readonly survivorMonthlySs = computed(() => {
-    const adults = this.adults();
-    if (adults.length === 0) return 0;
-    const benefits = adults.map(m => estimateBenefitAtClaim(m));
-    return Math.max(...benefits);
-  });
-
-  /**
-   * Birth year of the surviving spouse — used by the MC kernel to gate
-   * Medicare swap on age-65 eligibility. With one adult, the survivor IS that
-   * adult. With two adults, the survivor is the one NOT at deceasedMemberIndex.
-   */
-  readonly survivorBirthYear = computed<number | null>(() => {
-    const adults = this.adults();
-    if (!adults.length) return null;
-    if (adults.length === 1) return adults[0].birthYear;
-    const deceased = this.deceasedMemberIndex();
-    const survivor = adults.find((_, i) => i !== deceased) ?? adults[0];
-    return survivor.birthYear;
-  });
-
-  /** Survivor monthly income = survivor SS + other income (pension etc. kept intact). */
-  readonly survivorMonthlyIncome = computed(() =>
-    this.survivorMonthlySs() + this.monthlyIncome()
-  );
-
-  /**
-   * Survivor monthly income tax — apply single-filer federal brackets to the
-   * survivor's taxable income. Approximates SS taxation as 85% included (the
-   * typical case for retirees with other income). Doesn't model state tax in
-   * survivor phase; the MC's per-segment `monthlyIncomeTax` carries state.
-   * Kept conservative: federal only, single stddev.
-   */
-  readonly survivorMonthlyIncomeTax = computed(() => {
-    const survivorIncomeAnnual = this.survivorMonthlyIncome() * 12;
-    if (survivorIncomeAnnual <= 0) return 0;
-    // Assume ~85% of survivor SS is federally taxable (retiree common case).
-    // The non-SS income portion is fully taxable.
-    const ssAnnual = this.survivorMonthlySs() * 12;
-    const otherAnnual = this.monthlyIncome() * 12;
-    const taxableGross = ssAnnual * 0.85 + otherAnnual;
-    const taxable = Math.max(0, taxableGross - FED_STD_DEDUCTION_2026.single);
-    let fed = 0;
-    for (const b of FED_BRACKETS_2026_SINGLE) {
-      const top = b.max ?? Number.POSITIVE_INFINITY;
-      if (taxable <= b.min) break;
-      const span = Math.min(taxable, top) - b.min;
-      if (span > 0) fed += span * b.rate;
-    }
-    return fed / 12;
-  });
-
-  /**
-   * Survivor monthly Medicare — single-filer IRMAA brackets applied to MAGI
-   * (which approximates survivor income since there's no bigger spouse to
-   * add). The MFJ threshold at 212K becomes single at 106K, so a survivor
-   * with e.g. 110K MAGI jumps from tier 0 to tier 1 even without an income
-   * change.
-   */
-  readonly survivorMonthlyMedicare = computed(() => {
-    const magi = this.survivorMonthlyIncome() * 12;
-    return monthlyMedicareFor('single', magi);
-  });
-
-  /**
-   * User-controlled stepped-up basis estimate. Default 0 — user opts in by
-   * setting a taxable-balance-at-death, unrealized-gain ratio, and LTCG rate.
-   * One-time portfolio bump applied at the death year.
-   */
-  readonly survivorStepUpTaxableBalance = signal(0);
-  readonly survivorStepUpGainRatio = signal(30); // %
-  readonly survivorStepUpLtcgRate = signal(15);   // %
-
-  readonly survivorStepUpBenefitUSD = computed(() => {
-    const bal = this.survivorStepUpTaxableBalance();
-    const gain = this.survivorStepUpGainRatio() / 100;
-    const rate = this.survivorStepUpLtcgRate() / 100;
-    return Math.max(0, bal * gain * rate);
-  });
-
-  /**
-   * Preview-only: post-death monthly cost as the kernel computes it.
-   * Lifestyle ratio applies to the non-tax / non-healthcare portion only;
-   * tax + Medicare use their survivor-specific values. This must match the
-   * lib/monte-carlo.ts segmentCostAtYear logic when survivorPhase = true.
-   */
-  readonly survivorPostDeathMonthly = computed(() => {
-    const seed = this.selectedLoc();
-    if (!seed) return 0;
-    const totalBase = this.baseCost();
-    // Best-effort decompose: subtract the seed's tax and healthcare lines so
-    // we can scale only the lifestyle remainder. Both come from the
-    // monthlyCosts seed; if missing, fall back to 0 and the ratio applies to
-    // the whole figure (legacy behaviour).
-    const taxLine = Number(seed.monthlyCosts?.taxes?.typical) || 0;
-    const hcLine = Number(seed.monthlyCosts?.healthcare?.typical) || 0;
-    const lifestyleBase = Math.max(0, totalBase - taxLine - hcLine);
-    const ratio = this.survivorCostRatio() / 100;
-    return lifestyleBase * ratio + this.survivorMonthlyIncomeTax() + this.survivorMonthlyMedicare();
-  });
-
-  /** Nominal lifetime SS with compound COLA growth. */
-  readonly ssLifetime = computed(() => {
-    const monthly = this.ssMonthly();
-    const g = this.incGrowth() / 100;
-    const yrs = this.years();
-    if (monthly <= 0 || yrs <= 0) return 0;
-    if (g === 0) return monthly * 12 * yrs;
-    return monthly * 12 * (Math.pow(1 + g, yrs) - 1) / g;
-  });
-
-  /* ─── Path chart data ──────────────────────────────────────────── */
-  readonly pathYMax = computed(() => {
-    const r = this.results();
-    if (!r) return 1;
-    let mx = 0;
-    for (const p of r.paths) for (const v of p) if (v > mx) mx = v;
-    return Math.max(mx, this.portfolio() * 2);
-  });
-
-  readonly pathYMin = computed(() => {
-    const r = this.results();
-    if (!r) return 0;
-    let mn = 0;
-    for (const p of r.paths) for (const v of p) if (v < mn) mn = v;
-    return Math.min(mn, 0);
-  });
-
-  readonly pathZeroY = computed(() => {
-    const mx = this.pathYMax();
-    const mn = this.pathYMin();
-    const range = mx - mn || 1;
-    return this.pathH - ((0 - mn) / range) * this.pathH;
-  });
-
-  readonly pathData = computed(() => {
-    const r = this.results();
-    if (!r) return [];
-    const mx = this.pathYMax();
-    const mn = this.pathYMin();
-    const range = mx - mn || 1;
-    const yrs = this.years();
-    return r.paths.map((path) => {
-      const points = path
-        .map((v, i) => {
-          const x = (i / yrs) * this.pathW;
-          const y = this.pathH - ((v - mn) / range) * this.pathH;
-          return `${x.toFixed(1)},${y.toFixed(1)}`;
-        })
-        .join(' ');
-      const endedPositive = path[path.length - 1] > 0;
-      return {
-        points,
-        color: endedPositive ? 'rgba(42,123,123,0.6)' : 'rgba(229,115,115,0.6)',
-      };
-    });
-  });
-
-  /* ─── Histogram data ───────────────────────────────────────────── */
-  readonly histMin = computed(() => {
-    const r = this.results();
-    return r ? r.results[0] ?? 0 : 0;
-  });
-
-  readonly histMax = computed(() => {
-    const r = this.results();
-    return r ? r.results[r.results.length - 1] ?? 0 : 0;
-  });
-
-  readonly histBars = computed(() => {
-    const r = this.results();
-    if (!r || !r.results.length) return [];
-    const min = this.histMin();
-    const max = this.histMax();
-    const range = max - min || 1;
-    const binWidth = range / HIST_BINS;
-    const counts = new Array<number>(HIST_BINS).fill(0);
-    for (const v of r.results) {
-      let idx = Math.floor((v - min) / binWidth);
-      if (idx >= HIST_BINS) idx = HIST_BINS - 1;
-      if (idx < 0) idx = 0;
-      counts[idx]++;
-    }
-    const maxCount = Math.max(...counts) || 1;
-    const barW = this.histW / HIST_BINS;
-    const chartH = this.histH - 20; // reserve for axis text
-    return counts.map((c, i) => {
-      const h = (c / maxCount) * chartH;
-      const binStart = min + i * binWidth;
-      const color = binStart < 0 ? 'rgba(229,115,115,0.7)' : 'rgba(74,144,226,0.7)';
-      return {
-        x: i * barW,
-        y: chartH - h,
-        w: Math.max(barW - 1, 1),
-        h,
-        color,
-      };
-    });
-  });
-
-  readonly medianX = computed(() => {
-    const r = this.results();
-    if (!r) return 0;
-    const min = this.histMin();
-    const max = this.histMax();
-    const range = max - min || 1;
-    return ((r.median - min) / range) * this.histW;
-  });
-
-  /* ─── Percentile bars (numeric list) ───────────────────────────── */
-  readonly percentileBars = computed(() => {
-    const r = this.results();
-    if (!r) return [];
-    const maxP = Math.max(r.p95, this.portfolio() * 2);
-    const minP = Math.min(0, r.p5);
-    const range = maxP - minP || 1;
-    return PERCENTILE_COLORS.map(({ label, key, color }) => {
-      const value = r[key] as number;
-      const width = Math.max(2, Math.min(100, ((value - minP) / range) * 100));
-      return { label, value, color, width };
-    });
-  });
-
-  /* ─── Lifecycle ────────────────────────────────────────────────── */
-
-  constructor() {
-    // FU-012 — mark results stale as soon as any sim input signal changes,
-    // so the template can surface a "Rerun simulation" banner. Cleared at
-    // the end of a successful run in runSimulation().
-    effect(() => {
-      // Dependency-read each input. Order doesn't matter; Angular tracks
-      // any signal read inside this effect body.
-      this.portfolio(); this.ssMonthly(); this.monthlyIncome();
-      this.partTimeMonthlyIncome(); this.partTimeEndYear();
-      this.runs(); this.years();
-      this.meanReturn(); this.volatility();
-      this.meanInflation(); this.inflVol(); this.currVol(); this.fxDrift();
-      this.incGrowth();
-      this.returnMode(); this.selectedLocationId(); this.historicalStartYear();
-      this.regimeBullMean(); this.regimeBullVol();
-      this.regimeBearMean(); this.regimeBearVol();
-      this.regimeBullToBear(); this.regimeBearToBull();
-      this.moves(); this.movesEnabled();
-      this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
-      this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
-      this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
-      this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();
-      this.fxShockEnabled(); this.fxShockYear(); this.fxShockPct();
-      this.spouseDeathEnabled(); this.spouseDeathYear();
-      this.survivorCostRatio(); this.deceasedMemberIndex();
-      this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
-      // Only mark stale when there's actually a prior result to be stale.
-      // This keeps the banner dormant on the initial page load. Read via
-      // untracked() so that runSimulation's results.set() doesn't retrigger
-      // this effect and immediately re-set simDirty back to true.
-      if (untracked(this.results)) this.simDirty.set(true);
-    });
-  }
+  /* Computeds derived from sim state */
+  readonly selectedLoc = this.state.selectedLoc;
+  readonly isForeign = this.state.isForeign;
+  readonly baseCost = this.state.baseCost;
+  readonly adults = this.state.adults;
+  readonly survivorMonthlySs = this.state.survivorMonthlySs;
+  readonly survivorBirthYear = this.state.survivorBirthYear;
+  readonly survivorMonthlyIncome = this.state.survivorMonthlyIncome;
+  readonly survivorMonthlyIncomeTax = this.state.survivorMonthlyIncomeTax;
+  readonly survivorMonthlyMedicare = this.state.survivorMonthlyMedicare;
+  readonly survivorStepUpBenefitUSD = this.state.survivorStepUpBenefitUSD;
+  readonly survivorPostDeathMonthly = this.state.survivorPostDeathMonthly;
+  readonly ssLifetime = this.state.ssLifetime;
+  readonly pathYMax = this.state.pathYMax;
+  readonly pathYMin = this.state.pathYMin;
+  readonly pathZeroY = this.state.pathZeroY;
+  readonly pathData = this.state.pathData;
+  readonly histMin = this.state.histMin;
+  readonly histMax = this.state.histMax;
+  readonly histBars = this.state.histBars;
+  readonly medianX = this.state.medianX;
+  readonly percentileBars = this.state.percentileBars;
 
   ngOnInit(): void {
     this.loading.set(true);
@@ -928,8 +610,8 @@ export class MontecarloScreenComponent implements OnInit {
     const headerH = 90;
     const gap = 24;
     const pctH = 120;
-    const totalW = PATH_CHART_W;
-    const totalH = headerH + PATH_CHART_H + gap + HIST_CHART_H + gap + pctH + 30;
+    const totalW = this.pathW;
+    const totalH = headerH + this.pathH + gap + this.histH + gap + pctH + 30;
 
     const paths = this.pathData();
     const pathZeroY = this.pathZeroY();
@@ -960,30 +642,30 @@ export class MontecarloScreenComponent implements OnInit {
     svg += `<g transform="translate(0,${pY})">`;
     svg += `<text x="16" y="16" font-family="system-ui" font-size="12" font-weight="600" fill="#333">Portfolio Paths</text>`;
     svg += `<g transform="translate(0,24)">`;
-    svg += `<line x1="0" x2="${PATH_CHART_W}" y1="${pathZeroY}" y2="${pathZeroY}" stroke="#999" stroke-dasharray="3,3" stroke-width="1"/>`;
+    svg += `<line x1="0" x2="${this.pathW}" y1="${pathZeroY}" y2="${pathZeroY}" stroke="#999" stroke-dasharray="3,3" stroke-width="1"/>`;
     for (const pd of paths) {
       svg += `<polyline points="${esc(pd.points)}" stroke="${pd.color}" stroke-width="1" fill="none" opacity="0.6"/>`;
     }
     svg += `<text x="4" y="12" font-family="system-ui" font-size="10" fill="#666">${esc(this.fmt(pathYMax, ''))}</text>`;
     svg += `<text x="4" y="${pathZeroY - 4}" font-family="system-ui" font-size="10" fill="#666">$0</text>`;
-    svg += `<text x="4" y="${PATH_CHART_H - 4}" font-family="system-ui" font-size="10" fill="#666">${esc(this.fmt(pathYMin, ''))}</text>`;
-    svg += `<text x="${PATH_CHART_W - 4}" y="${PATH_CHART_H - 4}" text-anchor="end" font-family="system-ui" font-size="10" fill="#666">Year ${this.years()}</text>`;
+    svg += `<text x="4" y="${this.pathH - 4}" font-family="system-ui" font-size="10" fill="#666">${esc(this.fmt(pathYMin, ''))}</text>`;
+    svg += `<text x="${this.pathW - 4}" y="${this.pathH - 4}" text-anchor="end" font-family="system-ui" font-size="10" fill="#666">Year ${this.years()}</text>`;
     svg += `</g></g>`;
 
-    const hY = headerH + PATH_CHART_H + 24 + gap;
+    const hY = headerH + this.pathH + 24 + gap;
     svg += `<g transform="translate(0,${hY})">`;
     svg += `<text x="16" y="16" font-family="system-ui" font-size="12" font-weight="600" fill="#333">End Balance Distribution</text>`;
     svg += `<g transform="translate(0,24)">`;
     for (const bar of histBars) {
       svg += `<rect x="${bar.x}" y="${bar.y}" width="${bar.w}" height="${bar.h}" fill="${bar.color}"/>`;
     }
-    svg += `<line x1="${medianX}" x2="${medianX}" y1="0" y2="${HIST_CHART_H - 18}" stroke="#D4943A" stroke-width="2"/>`;
+    svg += `<line x1="${medianX}" x2="${medianX}" y1="0" y2="${this.histH - 18}" stroke="#D4943A" stroke-width="2"/>`;
     svg += `<text x="${medianX}" y="12" text-anchor="middle" font-family="system-ui" font-size="10" fill="#333">Median</text>`;
-    svg += `<text x="4" y="${HIST_CHART_H - 4}" font-family="system-ui" font-size="10" fill="#666">${esc(histMinStr)}</text>`;
-    svg += `<text x="${HIST_CHART_W - 4}" y="${HIST_CHART_H - 4}" text-anchor="end" font-family="system-ui" font-size="10" fill="#666">${esc(histMaxStr)}</text>`;
+    svg += `<text x="4" y="${this.histH - 4}" font-family="system-ui" font-size="10" fill="#666">${esc(histMinStr)}</text>`;
+    svg += `<text x="${this.histW - 4}" y="${this.histH - 4}" text-anchor="end" font-family="system-ui" font-size="10" fill="#666">${esc(histMaxStr)}</text>`;
     svg += `</g></g>`;
 
-    const bY = headerH + PATH_CHART_H + 24 + gap + HIST_CHART_H + 24 + gap;
+    const bY = headerH + this.pathH + 24 + gap + this.histH + 24 + gap;
     svg += `<g transform="translate(0,${bY})">`;
     svg += `<text x="16" y="16" font-family="system-ui" font-size="12" font-weight="600" fill="#333">Percentile Breakdown</text>`;
     const rowH = 16;
