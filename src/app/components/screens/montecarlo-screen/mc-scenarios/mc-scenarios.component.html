@@ -329,6 +329,14 @@
             {{ fmt(state.survivorPostDeathMonthly(), '/mo') }}
           </span>
         </div>
+        <div title="One-time deduction at the death year. Modeled as: max(0, portfolio × 0.5 − exemption) × effective spouse rate. Baseline FX for preview; per-trial FX volatility applied in the kernel. For US (full marital deduction) and zero-tax countries, this is always 0.">
+          <span class="dp-label">Inheritance / Estate Tax (one-time)</span>
+          <span class="dp-value" [class]="dyscalculia.numberSpacingClass()"
+                [class.tax-zero]="state.survivorInheritanceTaxHit() === 0"
+                [class.tax-amber]="state.survivorInheritanceTaxHit() > 0">
+            {{ fmt(state.survivorInheritanceTaxHit(), '') }}
+          </span>
+        </div>
       </div>
 
       <!-- Stepped-up basis: one-time LTCG-free benefit in death year -->

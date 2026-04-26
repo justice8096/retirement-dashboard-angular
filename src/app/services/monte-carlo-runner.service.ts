@@ -99,6 +99,7 @@ export class MonteCarloRunnerService {
           survivorStepUpBenefitUSD: s.spouseDeathEnabled() ? s.survivorStepUpBenefitUSD() : undefined,
           partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
           partTimeEndYear: s.partTimeEndYear(),
+          inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
           regime: {
             bullMean: s.regimeBullMean() / 100,
             bullVol: s.regimeBullVol() / 100,
@@ -147,6 +148,61 @@ export class MonteCarloRunnerService {
       foreignHealthcareMonthly,
       isUS,
     };
+  }
+
+  /** Build the per-year inheritance-tax payload for the spouse-death scenario.
+   *  At each sim year, picks the active location (year-0 primary or whichever
+   *  move is in effect by that year) and pre-flattens its `taxes.inheritance`
+   *  into the kernel's `{ effectiveRate, exemptionUSDBaseline }` shape.
+   *
+   *  Phase 3b — only built when spouseDeathEnabled is true (the kernel still
+   *  tolerates the array being absent or having undefined entries).
+   *
+   *  effectiveRate flattening:
+   *    spouseExemption='full' or topRate=0 → 0 (silent zero, no hit)
+   *    spouseExemption='none'              → topRate
+   *    spouseExemption='partial' or unset  → directFamilyEffectiveRate ?? topRate
+   *
+   *  exemptionUSDBaseline = exemptionLocal / loc.exchangeRate
+   *  (loc.exchangeRate is "local-per-USD"; e.g. France ≈ 0.93 EUR/USD; USD = 1)
+   *  Per-trial FX volatility is layered on at kernel time — this is just the
+   *  baseline for that multiplier to scale. */
+  private buildInheritanceTaxByYear(years: number): ({ effectiveRate: number; exemptionUSDBaseline: number } | undefined)[] {
+    const all = this.loc.fullLocations();
+    const primary = this.state.selectedLoc();
+    if (!primary) return [];
+
+    // Determine the active location at each sim year given the move schedule.
+    const moves = this.state.movesEnabled() ? this.state.moves() : [];
+    const activeAtYear = (y: number): LocationFull => {
+      let active: LocationFull = primary;
+      for (const m of moves) {
+        if (y >= m.fromYear) {
+          const loc = all.find(l => l.id === m.locationId);
+          if (loc) active = loc;
+        }
+      }
+      return active;
+    };
+
+    const arr: ({ effectiveRate: number; exemptionUSDBaseline: number } | undefined)[] = new Array(years);
+    for (let y = 0; y < years; y++) {
+      const loc = activeAtYear(y);
+      const inh = loc.taxes?.inheritance;
+      if (!inh || !inh.topRate) {
+        arr[y] = { effectiveRate: 0, exemptionUSDBaseline: 0 };
+        continue;
+      }
+      let effectiveRate = 0;
+      if (inh.spouseExemption === 'full') effectiveRate = 0;
+      else if (inh.spouseExemption === 'none') effectiveRate = inh.topRate;
+      else effectiveRate = inh.directFamilyEffectiveRate ?? inh.topRate;
+
+      const exchangeRate = loc.exchangeRate ?? 1;
+      const exemptionUSDBaseline = (inh.exemptionLocal ?? 0) / exchangeRate;
+      arr[y] = { effectiveRate, exemptionUSDBaseline };
+    }
+    return arr;
   }
 
   /** Build the kernel schedule from the UI state — year 0 + any enabled moves. */

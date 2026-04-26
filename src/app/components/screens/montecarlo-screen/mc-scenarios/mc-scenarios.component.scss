@@ -68,6 +68,8 @@
 }
 .dp-label { display: block; font-size: 10px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .dp-value { display: block; font-size: 14px; font-weight: 600; color: var(--dark-amber); margin-top: 2px; }
+.dp-value.tax-zero { color: var(--dark-green); }
+.dp-value.tax-amber { color: var(--dark-amber); }
 .death-sub { font-size: 13px; font-weight: 600; color: var(--dark-text); margin: 18px 0 4px; }
 
 /* Local copies of param-input styles (component-encapsulated SCSS doesn't
