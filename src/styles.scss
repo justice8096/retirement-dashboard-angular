@@ -277,6 +277,56 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
   transition: all 0.15s ease;
 }
 
+/* ─── Screen Layout Utilities ─────────────────────────────────────────
+ * Hoisted from per-component SCSS during the 2026-04-25 component-styles
+ * audit (audit follow-up #4). The screen-header / card / status-msg
+ * patterns appeared verbatim in the 6 extracted-template components
+ * AND ~30 still-inline screen components. Centralising here lets all
+ * screens share the same visual language without each file repeating
+ * the same five lines, and prevents accidental drift.
+ *
+ * Components can override individual properties locally — e.g. the fees
+ * screen tightens `.card-title` margin to 6px to sit closer to its desc
+ * line, and settings adds `flex-wrap: wrap` to its header for the save
+ * button.
+ *
+ * Follow-up: the ~30 components that still inline their templates also
+ * carry duplicate copies of these definitions. Sweeping them is left
+ * for a future opportunistic pass — touching all 30 inline styles
+ * blocks is high-churn for low value (each file is small enough that
+ * the duplication is local rather than systemic), and the AI-tooling
+ * single-file argument from PR #61's audit still applies. */
+
+.screen-header { display: flex; align-items: center; gap: 12px; }
+.header-icon { font-size: 32px; }
+.header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
+.header-sub {
+  font-size: 12px;
+  color: var(--dark-text-muted);
+  margin: 2px 0 0;
+  /* prose vars already inherit via the global p/.prose/.header-sub block above */
+}
+
+.card {
+  background: var(--dark-bg-card);
+  border: 1px solid var(--dark-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dark-text-sec);
+  margin: 0 0 14px;
+}
+
+.status-msg {
+  padding: 40px;
+  text-align: center;
+  color: var(--dark-text-sec);
+  font-size: 13px;
+}
+
 /* ─── Material Component Overrides ───────────────────────────────────── */
 
 /* Slide toggles: match our compact design */

@@ -1,19 +1,14 @@
     .assumptions-screen { display: flex; flex-direction: column; gap: 16px; }
-    .screen-header { display: flex; align-items: center; gap: 12px; }
+    /* .screen-header / .header-icon / .header-title / .header-sub / .card
+     * inherit from styles.scss "Screen Layout Utilities" — see audit follow-up #4. */
     .screen-header > div:nth-child(2) { flex: 1; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
     .save-bar { display: flex; align-items: center; gap: 10px; }
     .save-msg { font-size: 12px; color: var(--dark-green); }
     .save-msg.err { color: var(--dark-red); }
 
-    .card {
-      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
-      border-radius: 12px; padding: 20px;
-    }
     .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0; }
+    /* override global card-title margin: card-head wrapper handles bottom spacing */
+    .card-title { margin: 0; }
     .add-btn { --mat-button-outlined-container-height: 30px; --mat-button-outlined-label-text-size: 11px; }
 
     .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
@@ -101,4 +96,4 @@
     .derived-row { margin-top: 10px; font-size: 12px; color: var(--dark-text-sec); }
     .derived-row strong { color: var(--dark-text); }
     .empty-hint { font-size: 12px; color: var(--dark-text-muted); padding: 8px 0; }
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    /* .status-msg inherits from styles.scss "Screen Layout Utilities". */

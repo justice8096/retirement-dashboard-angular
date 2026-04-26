@@ -1,18 +1,12 @@
     .hc-screen { display: flex; flex-direction: column; gap: 16px; }
-    .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    /* .screen-header / .header-icon / .header-title / .header-sub / .card / .card-title
+     * inherit from styles.scss "Screen Layout Utilities" — see audit follow-up #4.
+     * .header-sub picks up prose line-height from the global p/.prose/.header-sub
+     * selector in styles.scss, so no per-component override is needed. */
     .badge-new {
       font-size: 10px; font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
-
-    .card {
-      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
-      border-radius: 12px; padding: 20px;
-    }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
     .result-card {
