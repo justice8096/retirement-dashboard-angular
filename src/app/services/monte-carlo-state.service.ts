@@ -9,6 +9,7 @@ import {
   MonteCarloResult,
   ReturnMode,
   DEFAULT_REGIME,
+  weightedInflationFromLocation,
 } from '@app/lib/monte-carlo';
 import { HISTORICAL_PRESETS, HISTORICAL_RETURNS } from '@app/data/historical-returns';
 import {
@@ -352,10 +353,36 @@ export class MonteCarloStateService {
     });
   });
 
+  /** Recompute meanInflation from the current location's category-weighted
+   *  inflation. Called from the default-location effect (when location is
+   *  first seeded) and from MonteCarloRunnerService.run() (so a location
+   *  change since the last run resyncs the default before the kernel call).
+   *  No-op when no location is selected. */
+  syncInflationFromLocation(): void {
+    const l = this.selectedLoc();
+    if (!l?.monthlyCosts) return;
+    const w = weightedInflationFromLocation(
+      l.monthlyCosts as unknown as Record<string, { typical?: number; annualInflation?: number }>,
+    );
+    this.meanInflation.set(+(w * 100).toFixed(2));
+  }
+
+  /** Seeds `selectedLocationId` with the first full location as soon as
+   *  one is available, and refreshes inflation from that location. Effect
+   *  reruns when `loc.fullLocations()` changes; tears down with the
+   *  service. Replaces the prior parent-component setInterval polling. */
+  private defaultLocationEffect = effect(() => {
+    const list = this.loc.fullLocations();
+    if (list.length && !this.selectedLocationId()) {
+      this.selectedLocationId.set(list[0].id);
+      this.syncInflationFromLocation();
+    }
+  });
+
   constructor() {
     // FU-012 — mark results stale as soon as any sim input signal changes,
     // so the template can surface a "Rerun simulation" banner. Cleared at
-    // the end of a successful run by the screen component's runSimulation().
+    // the end of a successful run by MonteCarloRunnerService.run().
     effect(() => {
       // Dependency-read each input. Order doesn't matter; Angular tracks
       // any signal read inside this effect body.
