@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatChipsModule } from '@angular/material/chips';
+import { MatChipsModule, MatChipListboxChange } from '@angular/material/chips';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import {
@@ -39,7 +39,7 @@ import {
           <mat-chip-listbox
             aria-label="Number display format"
             [value]="dyscalculia.settings().numberFormat"
-            (change)="onChipChange('numberFormat', $event.value, 'Number Display')">
+            (change)="onChipChange('numberFormat', $event, 'Number Display')">
             @for (opt of numberFormatOptions; track opt.value) {
               <mat-chip-option [value]="opt.value">{{ opt.label }}</mat-chip-option>
             }
@@ -55,7 +55,7 @@ import {
           <mat-chip-listbox
             aria-label="Digit spacing"
             [value]="dyscalculia.settings().numberSpacing"
-            (change)="onChipChange('numberSpacing', $event.value, 'Digit Spacing')">
+            (change)="onChipChange('numberSpacing', $event, 'Digit Spacing')">
             @for (opt of spacingOptions; track opt.value) {
               <mat-chip-option [value]="opt.value">{{ opt.label }}</mat-chip-option>
             }
@@ -85,7 +85,7 @@ import {
           <mat-chip-listbox
             aria-label="Percentage display format"
             [value]="dyscalculia.settings().percentageDisplay"
-            (change)="onChipChange('percentageDisplay', $event.value, 'Percentage Display')">
+            (change)="onChipChange('percentageDisplay', $event, 'Percentage Display')">
             @for (opt of percentageOptions; track opt.value) {
               <mat-chip-option [value]="opt.value">{{ opt.label }}</mat-chip-option>
             }
@@ -129,7 +129,7 @@ import {
           <mat-chip-listbox
             aria-label="Chart style"
             [value]="dyscalculia.settings().chartStyle"
-            (change)="onChipChange('chartStyle', $event.value, 'Chart Style')">
+            (change)="onChipChange('chartStyle', $event, 'Chart Style')">
             @for (opt of chartOptions; track opt.value) {
               <mat-chip-option [value]="opt.value">{{ opt.label }}</mat-chip-option>
             }
@@ -146,7 +146,7 @@ import {
           <mat-chip-listbox
             aria-label="Progress indicator style"
             [value]="dyscalculia.settings().progressStyle"
-            (change)="onChipChange('progressStyle', $event.value, 'Progress Indicators')">
+            (change)="onChipChange('progressStyle', $event, 'Progress Indicators')">
             @for (opt of progressOptions; track opt.value) {
               <mat-chip-option [value]="opt.value">{{ opt.label }}</mat-chip-option>
             }
@@ -193,7 +193,7 @@ import {
           <mat-chip-listbox
             aria-label="Monte Carlo reveal pace"
             [value]="dyscalculia.settings().mcMode"
-            (change)="onChipChange('mcMode', $event.value, 'Monte Carlo Reveal Pace')">
+            (change)="onChipChange('mcMode', $event, 'Monte Carlo Reveal Pace')">
             <mat-chip-option value="full">Full (all at once)</mat-chip-option>
             <mat-chip-option value="calm">Calm (step through)</mat-chip-option>
           </mat-chip-listbox>
@@ -374,10 +374,31 @@ export class DyscalculiaSettingsComponent {
     );
   }
 
-  onChipChange(key: string, value: string, label: string): void {
+  /**
+   * Material's `mat-chip-listbox` interprets a click on the already-selected
+   * chip as a deselect — it emits `(change)` with `value: undefined` and
+   * removes the chip from its internal selection model. For these settings
+   * the chips are radio-button-style (always exactly one option active), so:
+   *
+   *  1. We don't update settings on the deselect — the user re-clicked the
+   *     option they already had. No semantic change.
+   *  2. We DO need to restore the listbox's visual selection. Without this,
+   *     the chip visually appears unselected even though the model still
+   *     says it is — Angular's `[value]` binding doesn't push back when the
+   *     bound value didn't change. We force the re-push by writing the
+   *     current model value to `event.source.value`.
+   *
+   * `[required]="true"` on the listbox doesn't fix this — it only affects
+   * form validation, not the listbox's selection behavior.
+   */
+  onChipChange(key: string, event: MatChipListboxChange, label: string): void {
+    const value = event.value;
     if (value) {
       this.dyscalculia.update({ [key]: value });
       this.announcer.announce(`${label} changed to ${value}`, 'polite');
+    } else {
+      const settings = this.dyscalculia.settings() as unknown as Record<string, unknown>;
+      event.source.value = settings[key];
     }
   }
 }
