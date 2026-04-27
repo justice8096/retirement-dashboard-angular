@@ -9,8 +9,12 @@ import { environment } from '../../environments/environment';
  * UMD bundle from its CDN — `clerk.browser.js` — which is what carries
  * the UI components used by mountSignIn().
  */
+interface ClerkLoadOptions {
+  ui?: { ClerkUI: unknown };
+}
+
 interface RuntimeClerk {
-  load(): Promise<void>;
+  load(options?: ClerkLoadOptions): Promise<void>;
   loaded: boolean;
   session: { getToken(): Promise<string | null> } | null;
   user: ClerkUser | null;
@@ -33,6 +37,12 @@ declare global {
     // time onload fires window.Clerk is already an *instance* (not the
     // constructor). Calling `new window.Clerk(...)` would fail.
     Clerk?: RuntimeClerk;
+    // The @clerk/ui bundle (loaded as a separate <script>) registers a
+    // UI constructor on this global. We pass it to clerk.load() so the
+    // Clerk instance has UI components mounted to it; without this,
+    // mountSignIn() throws "Clerk was not loaded with Ui components".
+    // See https://clerk.com/docs/getting-started/quickstart.js-frontend
+    __internal_ClerkUICtor?: unknown;
   }
 }
 
@@ -81,11 +91,21 @@ export class AuthService {
       ));
     }
 
-    this.clerkLoaded = this.loadClerkScript(key).then(async (clerk) => {
+    this.clerkLoaded = this.loadBothScripts(key).then(async (clerk) => {
       // window.Clerk is the auto-instantiated singleton (the CDN script
       // reads data-clerk-publishable-key off its own <script> tag and
-      // calls `new Clerk(pk)` for us). All we have to do is `.load()`.
-      await clerk.load();
+      // calls `new Clerk(pk)` for us). We pass the UI constructor from
+      // @clerk/ui to load() so the instance has mountable components
+      // — without this, mountSignIn() throws "not loaded with Ui
+      // components". See clerk.com/docs/getting-started/quickstart.js-frontend.
+      const uiCtor = window.__internal_ClerkUICtor;
+      if (!uiCtor) {
+        throw new Error(
+          'AuthService.init: window.__internal_ClerkUICtor is undefined — ' +
+          'the @clerk/ui CDN bundle did not load before clerk.load()',
+        );
+      }
+      await clerk.load({ ui: { ClerkUI: uiCtor } });
       this.clerk = clerk;
       this.ready.set(true);
       this.refreshSession();
@@ -110,33 +130,45 @@ export class AuthService {
     return decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
   }
 
-  private loadClerkScript(key: string): Promise<RuntimeClerk> {
-    if (window.Clerk) return Promise.resolve(window.Clerk);
+  /**
+   * Load both Clerk scripts from the per-instance CDN, in order:
+   *   1. @clerk/ui@1/dist/ui.browser.js   → registers __internal_ClerkUICtor
+   *   2. @clerk/clerk-js@6/dist/clerk.browser.js → auto-instantiates window.Clerk
+   *
+   * Both must be loaded before clerk.load() runs, otherwise the UI
+   * constructor isn't available and mountSignIn() throws. The UI bundle
+   * loads first so its global is ready by the time we call load().
+   */
+  private loadBothScripts(key: string): Promise<RuntimeClerk> {
+    if (window.Clerk && window.__internal_ClerkUICtor) {
+      return Promise.resolve(window.Clerk);
+    }
+    const host = this.clerkCdnHost(key);
 
+    return this.loadScript(`https://${host}/npm/@clerk/ui@1/dist/ui.browser.js`)
+      .then(() => this.loadScript(
+        `https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
+        // Auto-instantiates window.Clerk via this attribute. Without it,
+        // the script throws "Missing publishableKey" synchronously.
+        { 'data-clerk-publishable-key': key },
+      ))
+      .then(() => {
+        if (!window.Clerk) {
+          throw new Error('Clerk SDK loaded but window.Clerk is undefined');
+        }
+        return window.Clerk;
+      });
+  }
+
+  private loadScript(src: string, attrs: Record<string, string> = {}): Promise<void> {
     return new Promise((resolve, reject) => {
-      const host = this.clerkCdnHost(key);
-      // Pin to major version 6 so behaviour matches our @clerk/clerk-js
-      // dev-time types and lockfile. Clerk's CDN serves the UMD bundle
-      // that carries the full UI components.
-      const url = `https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;
-
       const script = document.createElement('script');
-      script.src = url;
+      script.src = src;
       script.async = true;
       script.crossOrigin = 'anonymous';
-      // Clerk's CDN bundle reads this attribute off its own <script> tag
-      // and auto-instantiates a singleton on window.Clerk before onload
-      // fires. Without the attribute, the script throws synchronously
-      // ("Missing publishableKey") and window.Clerk is never set.
-      script.dataset['clerkPublishableKey'] = key;
-      script.onload = () => {
-        if (!window.Clerk) {
-          reject(new Error('Clerk script loaded but window.Clerk is undefined'));
-          return;
-        }
-        resolve(window.Clerk);
-      };
-      script.onerror = () => reject(new Error(`Failed to load Clerk SDK from ${url}`));
+      for (const [k, v] of Object.entries(attrs)) script.setAttribute(k, v);
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
       document.head.appendChild(script);
     });
   }
