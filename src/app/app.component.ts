@@ -1,7 +1,8 @@
-import { Component, inject, OnInit, signal, HostListener } from '@angular/core';
+import { Component, inject, OnInit, signal, effect, HostListener } from '@angular/core';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { DyslexiaService } from '@services/dyslexia.service';
+import { AuthService } from '@services/auth.service';
 import { HeaderComponent } from '@components/header/header.component';
 import { IconRailComponent } from '@components/icon-rail/icon-rail.component';
 import { LabeledRailComponent } from '@components/labeled-rail/labeled-rail.component';
@@ -13,6 +14,7 @@ import { OnboardingComponent } from '@components/onboarding/onboarding.component
 import { ShortcutCheatsheetComponent } from '@components/shortcut-cheatsheet/shortcut-cheatsheet.component';
 import { ReadAloudButtonComponent } from '@components/read-aloud-button/read-aloud-button.component';
 import { HelpPanelComponent } from '@components/help-panel/help-panel.component';
+import { SignInComponent } from '@components/auth/sign-in.component';
 import { HelpService } from '@services/help.service';
 
 @Component({
@@ -30,9 +32,12 @@ import { HelpService } from '@services/help.service';
     ShortcutCheatsheetComponent,
     ReadAloudButtonComponent,
     HelpPanelComponent,
+    SignInComponent,
   ],
   template: `
-    @if (nav.phase() === 'onboarding') {
+    @if (nav.phase() === 'auth') {
+      <app-sign-in />
+    } @else if (nav.phase() === 'onboarding') {
       <app-onboarding />
     } @else {
       <div class="shell">
@@ -125,10 +130,26 @@ export class AppComponent implements OnInit {
   readonly dyslexia = inject(DyslexiaService);
   readonly help = inject(HelpService);
   private readonly dyscalculia = inject(DyscalculiaService);
+  private readonly auth = inject(AuthService);
 
   readonly showShortcuts = signal(false);
   readonly rulerY = signal(0);
   readonly scrollProgress = signal(0);
+
+  constructor() {
+    // React to auth state once Clerk has finished its initial handshake.
+    // Signed out → 'auth' phase (sign-in screen). Signed in → fall back to
+    // the previous phase, or 'onboarding' on first sign-in. We never
+    // override 'dashboard' downward to 'onboarding' on a signal flip.
+    effect(() => {
+      if (!this.auth.ready()) return;
+      if (!this.auth.isSignedIn()) {
+        this.nav.phase.set('auth');
+      } else if (this.nav.phase() === 'auth') {
+        this.nav.phase.set('onboarding');
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.dyscalculia.loadSaved();
