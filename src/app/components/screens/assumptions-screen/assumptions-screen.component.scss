@@ -97,3 +97,15 @@
     .derived-row strong { color: var(--dark-text); }
     .empty-hint { font-size: 12px; color: var(--dark-text-muted); padding: 8px 0; }
     /* .status-msg inherits from styles.scss "Screen Layout Utilities". */
+
+    .welcome-banner {
+      background: var(--dark-green-bg, rgba(76, 175, 80, 0.12));
+      border-left: 4px solid var(--dark-green);
+      color: var(--dark-text);
+      padding: 12px 16px;
+      margin: 0 0 16px;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .welcome-banner strong { color: var(--dark-green); }
+    .welcome-banner em { font-style: normal; font-weight: 600; }
