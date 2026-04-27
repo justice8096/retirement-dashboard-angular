@@ -28,7 +28,11 @@ interface ClerkUser {
 
 declare global {
   interface Window {
-    Clerk?: new (publishableKey: string) => RuntimeClerk;
+    // Clerk's CDN browser bundle auto-instantiates via the
+    // data-clerk-publishable-key attribute on the <script> tag, so by the
+    // time onload fires window.Clerk is already an *instance* (not the
+    // constructor). Calling `new window.Clerk(...)` would fail.
+    Clerk?: RuntimeClerk;
   }
 }
 
@@ -77,8 +81,10 @@ export class AuthService {
       ));
     }
 
-    this.clerkLoaded = this.loadClerkScript(key).then(async (Clerk) => {
-      const clerk = new Clerk(key);
+    this.clerkLoaded = this.loadClerkScript(key).then(async (clerk) => {
+      // window.Clerk is the auto-instantiated singleton (the CDN script
+      // reads data-clerk-publishable-key off its own <script> tag and
+      // calls `new Clerk(pk)` for us). All we have to do is `.load()`.
       await clerk.load();
       this.clerk = clerk;
       this.ready.set(true);
@@ -104,7 +110,7 @@ export class AuthService {
     return decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
   }
 
-  private loadClerkScript(key: string): Promise<NonNullable<Window['Clerk']>> {
+  private loadClerkScript(key: string): Promise<RuntimeClerk> {
     if (window.Clerk) return Promise.resolve(window.Clerk);
 
     return new Promise((resolve, reject) => {
@@ -118,6 +124,11 @@ export class AuthService {
       script.src = url;
       script.async = true;
       script.crossOrigin = 'anonymous';
+      // Clerk's CDN bundle reads this attribute off its own <script> tag
+      // and auto-instantiates a singleton on window.Clerk before onload
+      // fires. Without the attribute, the script throws synchronously
+      // ("Missing publishableKey") and window.Clerk is never set.
+      script.dataset['clerkPublishableKey'] = key;
       script.onload = () => {
         if (!window.Clerk) {
           reject(new Error('Clerk script loaded but window.Clerk is undefined'));
