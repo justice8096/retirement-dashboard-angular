@@ -77,11 +77,18 @@
         [ngModel]="state.volatility()" (ngModelChange)="state.volatility.set($event)" />
     </label>
 
-    <label class="param">
-      <span class="param-label">Mean Inflation (%)</span>
-      <input appNumeric="percent" class="param-input" step="0.5"
-        [ngModel]="state.meanInflation()" (ngModelChange)="state.meanInflation.set($event)" />
-      <span class="param-hint">Weighted avg from location</span>
+    <!-- The breakdown <details> is a sibling of the input <label>, NOT
+         nested inside it. Putting an interactive disclosure widget inside
+         a form label breaks both HTML conformance and label-click
+         semantics (clicking the breakdown would activate/focus the
+         labeled input). Codex P2 on PR #93 fix. -->
+    <div class="param">
+      <label class="param-input-group">
+        <span class="param-label">Mean Inflation (%)</span>
+        <input appNumeric="percent" class="param-input" step="0.5"
+          [ngModel]="state.meanInflation()" (ngModelChange)="state.meanInflation.set($event)" />
+        <span class="param-hint">Weighted avg from location</span>
+      </label>
       @if (state.inflationBreakdown().categories.length > 0) {
         <details class="inflation-breakdown">
           <summary>Show per-category breakdown</summary>
@@ -115,7 +122,7 @@
           </p>
         </details>
       }
-    </label>
+    </div>
 
     <label class="param">
       <span class="param-label">Inflation Vol (%)</span>

@@ -6,6 +6,11 @@
   gap: 14px;
 }
 .param { display: flex; flex-direction: column; gap: 4px; }
+/* Inner <label> wrapping the param-label span + input + hint. Used when a
+ * .param needs sibling content (e.g. the inflation breakdown <details>)
+ * that should NOT be nested inside the form label. The label keeps the
+ * input's implicit-label association; the sibling lives outside it. */
+.param-input-group { display: flex; flex-direction: column; gap: 4px; }
 .param-label { font-size: 11px; color: var(--dark-text-muted); font-weight: 500; }
 .param-hint { font-size: 10px; color: var(--dark-text-muted); }
 .param-hint.muted { opacity: 0.4; }
