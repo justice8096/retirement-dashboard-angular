@@ -322,6 +322,37 @@ export interface MonteCarloParams {
   ltcInsuranceStartAge?: number; // default 60
 
   /**
+   * Health Savings Account (HSA) — triple-tax-advantaged medical-expense
+   * fund. Tracked as a parallel accumulator to the main portfolio `bal`,
+   * so qualified medical withdrawals come out tax-free (and don't tap the
+   * regular balance for healthcare costs in the year). Triple-tax-advantage
+   * realization in this model:
+   *   - Growth: tax-free (HSA balance grows by `hsaAnnualReturnRate`,
+   *     deterministic — HSAs are typically conservatively allocated; not
+   *     stochastic like the main portfolio)
+   *   - Withdrawals for medical: tax-free (deducted from healthcare line of
+   *     `cost`, never run through the tax pipeline)
+   *   - Contributions: pre-tax (modeled via `hsaAnnualContribution` while
+   *     within the window — typical retiree case is 0 since you can't
+   *     contribute without earned income + HDHP coverage)
+   *
+   * When `hsaInitialBalance` is unset or 0 AND no contributions, behavior
+   * is identical to pre-#33 (no HSA path executes).
+   */
+  hsaInitialBalance?: number;
+  /** Deterministic annual return rate on HSA balance (decimal, e.g. 0.04). Default 0.04. */
+  hsaAnnualReturnRate?: number;
+  /** Annual HSA contribution while within the contribution window (USD/year). Default 0. */
+  hsaAnnualContribution?: number;
+  /**
+   * Sim year at which HSA contributions stop (exclusive — year
+   * `hsaContributionEndYear` is the first year at $0). Mirrors the
+   * `partTimeEndYear` pattern. When unset or ≤ 0, contributions are
+   * ignored entirely (typical for retirees with no earned income).
+   */
+  hsaContributionEndYear?: number;
+
+  /**
    * FX stress test — a one-time abrupt currency move at `fxShockYear`.
    * Distinct from `fxDrift` (ongoing per-year drift) and `currVol` (annual
    * random shock per year). This shock is deterministic: if you set
@@ -368,12 +399,22 @@ import { fpl2026 as fplMc, applicablePctCliff2026 as applicablePctCliffMc } from
  *   - If the segment has a richer breakdown (nonHealthcareBase + healthcare
  *     options), compute per-year healthcare based on ages + MAGI and add
  *     income tax on top.
- *   - Otherwise fall back to the flat `baseCost`.
+ *   - Otherwise fall back to the flat `baseCost` (healthcare component
+ *     unknown, returned as 0).
  *
- * The kernel multiplies by `cumInfl` at use time.
+ * Returns `{ total, healthcare }` so the kernel can run an HSA draw against
+ * the healthcare portion before deducting `total` from the balance. The
+ * kernel multiplies both fields by `cumInfl` at use time.
  */
-function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, survivorPhase = false): number {
-  if (m.nonHealthcareBase == null) return m.baseCost;
+interface SegmentCost {
+  /** Lumped monthly cost: nonHC * lifestyleRatio + tax + healthcare. */
+  total: number;
+  /** Healthcare-only monthly portion (subset of total). 0 when unknown. */
+  healthcare: number;
+}
+
+function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, survivorPhase = false): SegmentCost {
+  if (m.nonHealthcareBase == null) return { total: m.baseCost, healthcare: 0 };
   // Survivor-phase overrides: single-filer tax, single-IRMAA Medicare, and a
   // ratio applied to the non-tax / non-healthcare lifestyle portion.
   const lifestyleRatio = survivorPhase ? (p.survivorCostRatio ?? 0.75) : 1;
@@ -451,7 +492,10 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
   // housing, food, transport, utilities. Tax + healthcare are already
   // swapped to their survivor values above; scaling them again would
   // double-count the reduction.
-  return m.nonHealthcareBase * lifestyleRatio + tax + healthcare;
+  return {
+    total: m.nonHealthcareBase * lifestyleRatio + tax + healthcare,
+    healthcare,
+  };
 }
 
 /** Whether any adult crosses 65 exactly at calendar year (simStartYear + y). */
@@ -570,6 +614,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   const partTimeBase = Math.max(0, p.partTimeMonthlyIncome ?? 0);
   const partTimeEndYear = Math.max(0, p.partTimeEndYear ?? 0);
 
+  // HSA setup (#33 item 3). Active iff hsaInitialBalance > 0 OR contributions
+  // are configured. When inactive, the per-year HSA path is a no-op — the
+  // hsaBal accumulator stays at 0, the draw is 0, and `cost` is deducted in
+  // full from the regular balance exactly as before.
+  const hsaInitial = Math.max(0, p.hsaInitialBalance ?? 0);
+  const hsaReturn = p.hsaAnnualReturnRate ?? 0.04;
+  const hsaContribution = Math.max(0, p.hsaAnnualContribution ?? 0);
+  const hsaContribEndYear = Math.max(0, p.hsaContributionEndYear ?? 0);
+  const hsaActive = hsaInitial > 0 || hsaContribution > 0;
+
   // LTC self-insure setup. Anchor on the OLDEST adult — most likely first
   // to need LTC. simStartYear + sim-year y === calendar year; LTC start
   // year (in sim-year terms) = max(0, ltcStartAge - oldestAdultAge0).
@@ -596,14 +650,20 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
 
   for (let r = 0; r < effectiveRuns; r++) {
     let bal = portfolio;
+    // Parallel HSA accumulator. Stays at 0 when HSA is inactive; otherwise
+    // grows deterministically by `hsaReturn` and is drawn against annual
+    // healthcare cost each year (#33 item 3).
+    let hsaBal = hsaInitial;
     let income = monthlyIncome;
     // Part-time income tracked separately so it can cliff to zero at
     // `partTimeEndYear` without disturbing the base income (SS + pension)
     // stream. Inflates at the same `incGrowth` rate as income.
     let partTime = partTimeBase;
     // Initial cost uses the segment-aware calc if the breakdown is present,
-    // otherwise the legacy flat `baseCost`.
-    let cost = segmentCostAtYear(initial, 0, p, false);
+    // otherwise the legacy flat `baseCost`. `costHealthcare` tracks the
+    // healthcare-only portion of `cost` in parallel — used for HSA draw
+    // each year (#33 item 3).
+    let { total: cost, healthcare: costHealthcare } = segmentCostAtYear(initial, 0, p, false);
     let curIsForeign = initial.isForeign;
     let curDrift = initial.fxDrift ?? drift;
     let fxMult = 1;
@@ -643,7 +703,9 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // FX resets (new currency baseline). Optional one-time move cost.
       if (moveThisYear) {
         const m = movesByYear.get(y)!;
-        cost = segmentCostAtYear(m, y, p, survivorPhase) * cumInfl;
+        const sc = segmentCostAtYear(m, y, p, survivorPhase);
+        cost = sc.total * cumInfl;
+        costHealthcare = sc.healthcare * cumInfl;
         curIsForeign = m.isForeign;
         curDrift = m.fxDrift ?? curDrift;
         fxMult = 1;
@@ -652,7 +714,9 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         // Medicare crossover or any age-65 transition in a US segment —
         // recompute the segment's cost without resetting FX.
         const active = activeSegmentAt(y);
-        cost = segmentCostAtYear(active, y, p, survivorPhase) * cumInfl;
+        const sc = segmentCostAtYear(active, y, p, survivorPhase);
+        cost = sc.total * cumInfl;
+        costHealthcare = sc.healthcare * cumInfl;
       }
 
       // Spouse-death transition: income steps down, cost recomputed with
@@ -665,7 +729,9 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         const active = activeSegmentAt(y);
         // Back out cumulative inflation so segmentCostAtYear gets today's $,
         // then re-inflate for the sim's current-year dollars.
-        cost = segmentCostAtYear(active, y, p, true) * cumInfl;
+        const sc = segmentCostAtYear(active, y, p, true);
+        cost = sc.total * cumInfl;
+        costHealthcare = sc.healthcare * cumInfl;
         if (p.survivorStepUpBenefitUSD && p.survivorStepUpBenefitUSD > 0) {
           bal += p.survivorStepUpBenefitUSD;
         }
@@ -704,7 +770,27 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
 
       bal *= (1 + ret);
       const effectiveFxShock = curIsForeign ? fxShockMult : 1;
-      bal += (income + activePartTime) * 12 - cost * 12 * currShock * fxMult * effectiveFxShock;
+      const costShockMult = currShock * fxMult * effectiveFxShock;
+
+      // HSA logic (#33 item 3) — runs only when HSA is active. Order:
+      //   1. Apply deterministic growth to existing balance.
+      //   2. Add the year's contribution (within the contribution window).
+      //   3. Compute the year's annual healthcare cost with same shocks
+      //      that scale total cost (FX, currVol, fxShock).
+      //   4. Draw min(hsaBal, healthcareAnnual) — tax-free withdrawal.
+      //   5. Reduce the regular cost deduction by the HSA draw.
+      // When inactive, hsaDraw stays at 0 and the equation matches pre-#33.
+      let hsaDraw = 0;
+      if (hsaActive) {
+        hsaBal *= (1 + hsaReturn);
+        if (hsaContribEndYear > 0 && y < hsaContribEndYear) {
+          hsaBal += hsaContribution;
+        }
+        const healthcareAnnual = costHealthcare * 12 * costShockMult;
+        hsaDraw = Math.min(hsaBal, healthcareAnnual);
+        hsaBal -= hsaDraw;
+      }
+      bal += (income + activePartTime) * 12 - cost * 12 * costShockMult + hsaDraw;
 
       // One-time expenses for this year — stacked deductions, scaled by
       // accumulated inflation by default (lumpy real-world costs grow with CPI).
@@ -757,6 +843,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       }
 
       cost *= (1 + inf);
+      costHealthcare *= (1 + inf);
       cumInfl *= (1 + inf);
       income *= (1 + incGrowth);
       partTime *= (1 + incGrowth);
