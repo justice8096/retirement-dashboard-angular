@@ -804,3 +804,69 @@ export function weightedInflationFromLocation(
   }
   return weighted;
 }
+
+/**
+ * Per-category inflation breakdown for a location's monthlyCosts. Same
+ * weighting math as `weightedInflationFromLocation` but returns the full
+ * structure so a UI panel (#25) can show *which* categories drive the
+ * average.
+ *
+ * Categories are sorted by `weight` descending, so the heaviest cost
+ * lines (rent, healthcare, groceries) appear first. The `weight` field
+ * is the share of each category in the total monthly spend (0..1); the
+ * `contribution` field is `weight * annualInflation` — the share each
+ * category contributes to the weighted average. The sum of all
+ * `contribution` values equals `weightedAverage`.
+ *
+ * Falls back to an empty `categories` array + 0.025 weighted average
+ * when no data is present, matching `weightedInflationFromLocation`'s
+ * default behavior.
+ */
+export interface InflationCategoryContribution {
+  /** Category key from the location's monthlyCosts (e.g. 'rent', 'healthcare'). */
+  key: string;
+  /** Monthly cost in local currency (typical value from the seed data). */
+  typical: number;
+  /** Annual inflation rate as a decimal fraction (0.045 = 4.5%/year). */
+  annualInflation: number;
+  /** Share of total monthly spend (0..1). Higher = heavier weight in the average. */
+  weight: number;
+  /** Contribution to weighted average = weight × annualInflation. */
+  contribution: number;
+}
+
+export interface InflationBreakdown {
+  categories: InflationCategoryContribution[];
+  /** Weighted-average annual inflation, sum of all `contribution` values. */
+  weightedAverage: number;
+  /** Total monthly spend across all categories (denominator of `weight`). */
+  totalMonthly: number;
+}
+
+export function inflationBreakdownFromLocation(
+  monthlyCosts: Record<string, { typical?: number; annualInflation?: number }> | null | undefined,
+): InflationBreakdown {
+  if (!monthlyCosts) return { categories: [], weightedAverage: 0.025, totalMonthly: 0 };
+  const entries = Object.entries(monthlyCosts);
+  const totalMonthly = entries.reduce((s, [, c]) => s + (c?.typical ?? 0), 0);
+  if (totalMonthly <= 0) return { categories: [], weightedAverage: 0.025, totalMonthly: 0 };
+
+  const categories: InflationCategoryContribution[] = entries
+    .filter(([, c]) => (c?.typical ?? 0) > 0)
+    .map(([key, c]) => {
+      const typical = c?.typical ?? 0;
+      const annualInflation = c?.annualInflation ?? 0.025;
+      const weight = typical / totalMonthly;
+      return {
+        key,
+        typical,
+        annualInflation,
+        weight,
+        contribution: weight * annualInflation,
+      };
+    })
+    .sort((a, b) => b.weight - a.weight);
+
+  const weightedAverage = categories.reduce((s, c) => s + c.contribution, 0);
+  return { categories, weightedAverage, totalMonthly };
+}
