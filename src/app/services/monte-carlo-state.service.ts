@@ -10,6 +10,8 @@ import {
   ReturnMode,
   DEFAULT_REGIME,
   weightedInflationFromLocation,
+  inflationBreakdownFromLocation,
+  type InflationBreakdown,
 } from '@app/lib/monte-carlo';
 import { HISTORICAL_PRESETS, HISTORICAL_RETURNS } from '@app/data/historical-returns';
 import {
@@ -402,6 +404,18 @@ export class MonteCarloStateService {
     );
     this.meanInflation.set(+(w * 100).toFixed(2));
   }
+
+  /** Per-category inflation breakdown for the currently selected location.
+   *  Drives the "what's driving the weighted average?" UI panel (#25).
+   *  Returns an empty breakdown when no location is selected. Reactive on
+   *  `selectedLoc` so the panel updates as the user changes locations. */
+  readonly inflationBreakdown = computed<InflationBreakdown>(() => {
+    const l = this.selectedLoc();
+    if (!l?.monthlyCosts) return { categories: [], weightedAverage: 0.025, totalMonthly: 0 };
+    return inflationBreakdownFromLocation(
+      l.monthlyCosts as unknown as Record<string, { typical?: number; annualInflation?: number }>,
+    );
+  });
 
   /** Seeds `selectedLocationId` with the first full location as soon as
    *  one is available, and refreshes inflation from that location. Effect

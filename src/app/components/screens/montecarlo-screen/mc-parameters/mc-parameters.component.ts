@@ -40,4 +40,16 @@ export class McParametersComponent {
     if (unit === '/mo') return this.currency.currencyMonthly(amount);
     return this.currency.currency(amount);
   }
+
+  /** Format monthlyCosts category keys for display in the inflation
+   *  breakdown panel. Splits camelCase into spaced words and title-cases:
+   *    'rent'                  -> 'Rent'
+   *    'healthcarePreMedicare' -> 'Healthcare Pre Medicare'
+   *    'utilitiesAndInternet'  -> 'Utilities And Internet'
+   */
+  protected humanizeCategory(key: string): string {
+    return key
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/^./, (c) => c.toUpperCase());
+  }
 }

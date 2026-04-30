@@ -6,6 +6,11 @@
   gap: 14px;
 }
 .param { display: flex; flex-direction: column; gap: 4px; }
+/* Inner <label> wrapping the param-label span + input + hint. Used when a
+ * .param needs sibling content (e.g. the inflation breakdown <details>)
+ * that should NOT be nested inside the form label. The label keeps the
+ * input's implicit-label association; the sibling lives outside it. */
+.param-input-group { display: flex; flex-direction: column; gap: 4px; }
 .param-label { font-size: 11px; color: var(--dark-text-muted); font-weight: 500; }
 .param-hint { font-size: 10px; color: var(--dark-text-muted); }
 .param-hint.muted { opacity: 0.4; }
@@ -16,3 +21,58 @@
 }
 .param-input:focus { border-color: var(--dark-blue); }
 select.param-input { appearance: auto; }
+
+/* #25 — per-category inflation breakdown panel under the Mean Inflation
+ * input. Collapsed by default to keep the param card compact; expands on
+ * <summary> click. Lives inside the .param flex column, so width is
+ * naturally constrained to the input column. */
+.inflation-breakdown {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--dark-text-muted);
+
+  & > summary {
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 0;
+    color: var(--dark-blue);
+    font-weight: 500;
+    list-style-position: inside;
+    &:hover { text-decoration: underline; }
+  }
+
+  .breakdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 6px 0 4px;
+    font-size: 11px;
+
+    th, td {
+      padding: 3px 6px;
+      text-align: left;
+      border-bottom: 1px solid var(--dark-border);
+    }
+    th {
+      font-weight: 500;
+      color: var(--dark-text-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .weighted-avg-row td {
+      border-bottom: none;
+      border-top: 1px solid var(--dark-border);
+      font-weight: 500;
+      color: var(--dark-text);
+      padding-top: 5px;
+    }
+  }
+
+  .breakdown-note {
+    margin: 4px 0 0;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--dark-text-muted);
+  }
+}
