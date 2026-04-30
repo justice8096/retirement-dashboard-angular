@@ -1,4 +1,5 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
@@ -43,14 +44,44 @@ export class AssumptionsScreenComponent implements OnInit {
     this.draft()?.members.filter(m => m.role !== 'dependent').length ?? 0
   );
 
+  /** True when we're in the new-user creation path (no profile existed
+   *  on the server). Drives the welcome banner and the save-button label. */
+  readonly isNew = signal(false);
+
   ngOnInit(): void {
     this.loading.set(true);
     this.api.getHousehold().subscribe({
       next: (h) => { this.draft.set(h); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      error: (err: HttpErrorResponse) => {
+        // 404 = first-time user. Populate a default draft so the form
+        // renders and Save creates the profile on the server.
+        // Anything else (500, network) leaves draft null and surfaces the
+        // generic loading-failed state.
+        if (err.status === 404) {
+          this.draft.set(this.emptyProfile());
+          this.isNew.set(true);
+          this.dirty.set(true);
+        }
+        this.loading.set(false);
+      },
     });
     this.loc.loadFull();
     this.healthcare.load();
+  }
+
+  private emptyProfile(): HouseholdProfile {
+    return {
+      id: '',
+      adultsCount: 1,
+      targetAnnualIncome: 0,
+      planningStartYear: new Date().getFullYear(),
+      planningYears: 30,
+      requirements: [],
+      members: [],
+      pets: [],
+      createdAt: '',
+      updatedAt: '',
+    };
   }
 
   /** Healthcare decision against the first selected location (or first full location). */
@@ -201,7 +232,11 @@ export class AssumptionsScreenComponent implements OnInit {
         this.draft.set(h);
         this.dirty.set(false);
         this.saving.set(false);
-        this.saveMsg.set('Saved.');
+        // First successful PUT created the profile — flip out of new-user mode
+        // so the welcome banner disappears and the button label reverts.
+        const wasNew = this.isNew();
+        this.isNew.set(false);
+        this.saveMsg.set(wasNew ? 'Profile created.' : 'Saved.');
         setTimeout(() => this.saveMsg.set(null), 3000);
       },
       error: (err) => {

@@ -8,7 +8,7 @@
         <div class="save-bar">
           @if (saveMsg()) { <span class="save-msg" [class.err]="saveErr()">{{ saveMsg() }}</span> }
           <button mat-flat-button color="primary" [disabled]="saving() || !dirty()" (click)="save()">
-            {{ saving() ? 'Saving…' : 'Save Changes' }}
+            {{ saving() ? 'Saving…' : (isNew() ? 'Create Profile' : 'Save Changes') }}
           </button>
         </div>
       </div>
@@ -16,8 +16,13 @@
       @if (loading()) {
         <div class="status-msg">Loading household data…</div>
       } @else if (!draft()) {
-        <div class="status-msg">No household profile found. Create one to get started.</div>
+        <div class="status-msg">Couldn't load household profile — check your connection and try again.</div>
       } @else {
+        @if (isNew()) {
+          <div class="welcome-banner">
+            <strong>Welcome!</strong> Fill in the fields below and click <em>Create Profile</em> to get started. You can edit anything later.
+          </div>
+        }
         <!-- Planning parameters -->
         <div class="card">
           <h3 class="card-title">Planning Parameters</h3>
