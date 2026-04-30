@@ -1117,7 +1117,7 @@ export function compileLifeEvents(p: MonteCarloParams): LifeEvent[] {
 
   // One-time expenses.
   for (const e of p.oneTimeExpenses ?? []) {
-    if (!e || !(e.amountUSD > 0) || e.year < 0) continue;
+    if (!e || !(e.amountUSD > 0)) continue;
     events.push({
       kind: 'oneTimeExpense',
       year: e.year,
@@ -1130,10 +1130,20 @@ export function compileLifeEvents(p: MonteCarloParams): LifeEvent[] {
   // Caller-supplied events appended verbatim.
   if (p.lifeEvents) events.push(...p.lifeEvents);
 
+  // Filter to the kernel's actually-executed year range [0, p.years).
+  // The kernel's expense pipeline (line ~682) already drops `e.year < 0
+  // || e.year >= years`; the move / spouseDeath / stepUpBasis paths
+  // implicitly drop out-of-horizon entries because the inner loop only
+  // iterates `y < years`. Without this filter, the adapter would report
+  // events the kernel will never execute, breaking parity for downstream
+  // consumers (UI timeline, future step-2 dispatcher). Codex P2 on
+  // PR #95 fix.
+  const inHorizon = events.filter((e) => e.year >= 0 && e.year < p.years);
+
   // Sort by year ascending. Stable across equal years so deterministic
   // dispatch order matches the legacy kernel's order (moves before death
   // before expenses) when sources happen to coincide. JS Array.sort is
   // stable since ES2019 — relied on here.
-  events.sort((a, b) => a.year - b.year);
-  return events;
+  inHorizon.sort((a, b) => a.year - b.year);
+  return inHorizon;
 }
