@@ -41,8 +41,14 @@ export const FPL_SOURCES_2026: Source[] = [
 // Alaska + Hawaii carry higher FPLs and are not modeled separately.
 // If/when AK/HI coverage is added, branch on state and use the AK/HI
 // HHS tables.
+//
+// Per-additional-person increment: $5,680. The 2026-04-20 algorithm
+// review inferred $5,600 from a wrong 2-person value of $21,560; the
+// actual 2-person guideline is $21,640 → $5,680/addl. Verified against
+// HHS ASPE detailed-guidelines-2026.pdf (Column 5 "Average difference")
+// and the Federal Register notice 2026-00755 (2026-01-15).
 export const FPL_2026_BASE = 15_960;        // household of 1
-export const FPL_2026_PER_ADDL = 5_600;     // each additional person
+export const FPL_2026_PER_ADDL = 5_680;     // each additional person
 
 /** 2026 HHS Federal Poverty Level for a continental-US household. */
 export function fpl2026(size: number): number {
