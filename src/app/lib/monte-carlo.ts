@@ -777,16 +777,28 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       //   2. Add the year's contribution (within the contribution window).
       //   3. Compute the year's annual healthcare cost with same shocks
       //      that scale total cost (FX, currVol, fxShock).
-      //   4. Draw min(hsaBal, healthcareAnnual) — tax-free withdrawal.
+      //   4. Draw min(hsaBal, healthcareAnnual), clamped at 0 — tax-free
+      //      withdrawal cannot be negative, even when costShockMult goes
+      //      below 0 in degenerate trials. (Codex P2 on PR #92.)
       //   5. Reduce the regular cost deduction by the HSA draw.
       // When inactive, hsaDraw stays at 0 and the equation matches pre-#33.
+      //
+      // Why the Math.max floor: `costShockMult = currShock * fxMult *
+      // effectiveFxShock` where `currShock = 1 + currVol * normalRandom()`
+      // is unbounded below 0 in foreign segments. With high `currVol`
+      // (e.g. 50%), a -2σ Gaussian draw makes currShock < 0, flipping
+      // healthcareAnnual negative. Without the clamp, hsaDraw would also
+      // go negative, then `hsaBal -= hsaDraw` would ADD to HSA and
+      // `bal += hsaDraw` would SUBTRACT from portfolio — the opposite
+      // of "withdraw up to healthcare cost." Floor at 0 to match the
+      // documented "tax-free withdrawal" semantics in either edge case.
       let hsaDraw = 0;
       if (hsaActive) {
         hsaBal *= (1 + hsaReturn);
         if (hsaContribEndYear > 0 && y < hsaContribEndYear) {
           hsaBal += hsaContribution;
         }
-        const healthcareAnnual = costHealthcare * 12 * costShockMult;
+        const healthcareAnnual = Math.max(0, costHealthcare * 12 * costShockMult);
         hsaDraw = Math.min(hsaBal, healthcareAnnual);
         hsaBal -= hsaDraw;
       }
