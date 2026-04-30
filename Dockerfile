@@ -34,7 +34,13 @@ COPY --from=builder /app/dist/retirement-dashboard/browser /usr/share/nginx/html
 
 EXPOSE 8080
 
+# Use 127.0.0.1 explicitly: nginx:alpine's /etc/hosts maps `localhost` to
+# ::1, but nginx listens on IPv4 only by default. wget against `localhost`
+# tries IPv6 first, gets connection refused, and the container is marked
+# unhealthy even when nginx is serving fine. Compose may override this
+# probe at runtime (see retirement-api/docker-compose.yml dashboard
+# service); the in-image HEALTHCHECK is kept consistent for parity.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -q --spider http://localhost:8080/healthz || exit 1
+  CMD wget -q --spider http://127.0.0.1:8080/healthz || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

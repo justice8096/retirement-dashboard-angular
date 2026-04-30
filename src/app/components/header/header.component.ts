@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { AuthService } from '@services/auth.service';
 
 @Component({
   selector: 'app-header',
@@ -41,7 +42,18 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
           ♿
         </button>
 
-        <div class="avatar">JC</div>
+        @if (auth.isSignedIn()) {
+          <span class="who" [matTooltip]="'Signed in as ' + (auth.displayName() || 'user')">
+            {{ auth.displayName() }}
+          </span>
+          <button mat-stroked-button
+            (click)="signOut()"
+            aria-label="Sign out"
+            matTooltip="Sign out"
+            class="ctrl-btn">
+            Sign out
+          </button>
+        }
       </div>
     </header>
   `,
@@ -93,21 +105,24 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
         color: #fff;
       }
     }
-    .avatar {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: var(--dark-purple);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-weight: 700;
-      color: #fff;
+    .who {
+      font-size: 12px;
+      color: var(--dark-text-sec);
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   `],
 })
 export class HeaderComponent {
   readonly nav = inject(NavigationService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly auth = inject(AuthService);
+
+  signOut(): void {
+    this.auth.signOut().catch((err: unknown) => {
+      console.error('Sign out failed', err);
+    });
+  }
 }

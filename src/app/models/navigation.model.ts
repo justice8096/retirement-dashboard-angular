@@ -1,6 +1,6 @@
 export type NavMode = 'compact' | 'expanded';
 export type FontSize = 'normal' | 'large' | 'xlarge';
-export type AppPhase = 'onboarding' | 'dashboard';
+export type AppPhase = 'auth' | 'onboarding' | 'dashboard';
 
 export interface Screen {
   id: string;
