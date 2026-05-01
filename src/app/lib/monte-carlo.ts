@@ -97,34 +97,18 @@ export const DEFAULT_REGIME: RegimeConfig = {
   pBearToBull: 0.45,
 };
 
-/* ─── Life Events framework (#31, step 1) ──────────────────────────────────
- *
- * Discriminated union for "something happens at year N that perturbs income,
- * expenses, portfolio balance, or segment." Today the kernel handles moves,
- * spouse death, stepped-up basis, and one-time expenses via separate fields
- * on `MonteCarloParams`. This data model unifies all of those into a single
- * timeline so future event kinds (inheritance, inherited-IRA drain, career
- * change, home sale) can be added as new `case` branches in a dispatcher
- * loop instead of new bespoke code paths.
- *
- * Step 1 (this PR) — type definition + adapter only. The kernel still reads
- * the legacy fields directly. `compileLifeEvents()` is exported for UI
- * consumption (timeline visualization) and as the staging input for step 2,
- * which will refactor the inner loop to iterate this list. Behavior is
- * unchanged for every existing caller.
- *
- * Step 2 (future PR) — replace the bespoke move-then-death-then-expense
- * branches in the inner loop with `for (const ev of eventsForYear[y]) { ... }`
- * that dispatches by `ev.kind`. Must be byte-identical to current behavior
- * for legacy callers.
- *
- * Steps 3+ (future PRs) — add the genuinely-new kinds (`oneTimeIncome`,
- * `incomeChange`, `inheritedIRA`, `careerChange`, etc.) as additional
- * dispatcher branches.
- */
+// ─── Life Events framework (#31) ────────────────────────────────────────
+//
+// Discriminated union for events that perturb income, expenses, portfolio
+// balance, or segment at a specific sim year. Unified timeline so adding
+// a new kind is a `case` branch rather than a new top-level param + new
+// kernel code path. Kernel currently reads legacy fields (moveSchedule,
+// spouseDeathYear, etc.) directly; `compileLifeEvents` projects those +
+// the optional `lifeEvents` input into the unified shape.
 
-/** Spouse-death overrides bundled as a single event payload. Caller-provided;
- *  the kernel applies them at deathYear and persists into survivorPhase. */
+/** Bundled at `LifeEvent.spouseDeath.survivorOverrides`. Short field names
+ *  inside the namespace; the existing flat `MonteCarloParams.survivor*`
+ *  fields use the long-form prefix. */
 export interface SurvivorOverrides {
   /** Monthly income after death (typically max PIA × 12 of surviving adult). */
   monthlyIncome?: number;
@@ -138,30 +122,20 @@ export interface SurvivorOverrides {
   birthYear?: number;
 }
 
+/** `label` (not `description`) on every variant — matches the existing
+ *  `OneTimeExpense.label` field used by the runner / state / UI. */
 export type LifeEvent =
   | { kind: 'move'; year: number; segment: LocationMove }
   | { kind: 'spouseDeath'; year: number; deceasedIndex?: number; survivorOverrides?: SurvivorOverrides }
-  /** One-time portfolio bump representing the stepped-up cost basis on
-   *  jointly-held taxable accounts at death (or any other tax-free
-   *  realization of unrealized gains). Currently fires at deathYear; in
-   *  general can fire any year. */
   | { kind: 'stepUpBasis'; year: number; benefitUSD: number }
-  | { kind: 'oneTimeExpense'; year: number; amountUSD: number; description?: string; inflate?: boolean }
-  /** Reserved for step 3 — caller can populate via `lifeEvents` already, but
-   *  the kernel doesn't yet handle this kind. Will become a `+bal` deduction
-   *  with optional inflation-scaling. Use cases: home-sale proceeds,
-   *  one-time inheritance, severance lump sum. */
-  | { kind: 'oneTimeIncome'; year: number; amountUSD: number; description?: string; inflate?: boolean }
-  /** Reserved for step 3 — permanent income step-change at a specific year.
-   *  Use cases: pension starts, SS claim, annuity payouts switching. */
-  | { kind: 'incomeChange'; year: number; monthlyDelta: number; description?: string }
-  /** Reserved for step 5 — SECURE Act forced 10-year drawdown of an
-   *  inherited traditional IRA. Spikes MAGI for 10 years which ripples into
-   *  IRMAA tiers; complex to model correctly. */
-  | { kind: 'inheritedIRA'; year: number; balanceUSD: number; drainOverYears?: number; description?: string }
-  /** Reserved for step 3 — one-shot replacement of monthlyIncome (forced
-   *  retirement, career switch). */
-  | { kind: 'careerChange'; year: number; newMonthlyIncome: number; description?: string };
+  | { kind: 'oneTimeExpense'; year: number; amountUSD: number; label?: string; inflate?: boolean }
+  | { kind: 'oneTimeIncome'; year: number; amountUSD: number; label?: string; inflate?: boolean }
+  | { kind: 'incomeChange'; year: number; monthlyDelta: number; label?: string }
+  /** SECURE Act forced 10-year drawdown of an inherited traditional IRA.
+   *  Spikes MAGI for `drainOverYears` years (default 10), which ripples
+   *  into IRMAA tiers — complex; not yet handled by the kernel. */
+  | { kind: 'inheritedIRA'; year: number; balanceUSD: number; drainOverYears?: number; label?: string }
+  | { kind: 'careerChange'; year: number; newMonthlyIncome: number; label?: string };
 
 export interface MonteCarloParams {
   /** Starting portfolio balance in USD */
@@ -438,20 +412,11 @@ export interface MonteCarloParams {
   fxShockPct?: number; // decimal, e.g. 0.10 for +10% USD-weakens / cost-rises
 
   /**
-   * Life Events timeline (#31, step 1). Optional unified event list that
-   * coexists with the legacy `moveSchedule` / `spouseDeathYear` /
-   * `survivorStepUpBenefitUSD` / `oneTimeExpenses` fields. Step 1 of the
-   * #31 refactor only accepts this field; the kernel still reads the
-   * legacy fields directly. `compileLifeEvents()` (exported below) merges
-   * legacy params + this field into a single year-sorted list — useful
-   * for UI timeline visualization today, and the staging input for step
-   * 2's kernel-loop refactor.
-   *
-   * When omitted, behavior is unchanged. When provided, the kernel
-   * passes events through (currently a no-op until step 2 wires them
-   * into the dispatcher). Caller is responsible for deduping events
-   * that overlap with legacy fields — `compileLifeEvents` does NOT
-   * cross-validate; it just concatenates and sorts.
+   * Optional unified event list, projected via `compileLifeEvents` together
+   * with the legacy fields (`moveSchedule`, `spouseDeathYear`,
+   * `survivorStepUpBenefitUSD`, `oneTimeExpenses`). Caller-supplied entries
+   * are NOT deduped against legacy fields — supply one or the other for a
+   * given event, not both.
    */
   lifeEvents?: LifeEvent[];
 }
@@ -1054,96 +1019,62 @@ export function inflationBreakdownFromLocation(
   return { categories, weightedAverage, totalMonthly };
 }
 
-/* ─── Life Events compilation (#31 step 1) ─────────────────────────────────
- *
- * Adapter that merges legacy `MonteCarloParams` fields and any caller-
- * supplied `lifeEvents` into a single year-sorted `LifeEvent[]`.
- *
- * Today the kernel still reads legacy fields directly; this helper exists
- * for two consumers:
- *   1. UI timeline visualization — render the events on a horizontal
- *      time axis on the MC screen.
- *   2. Step 2 of #31 — the kernel loop will eventually call this function
- *      and dispatch on `ev.kind` instead of the current bespoke branches.
- *
- * Conversion rules (1:1 with the existing kernel semantics):
- *   - Each `moveSchedule[i]` → `{ kind: 'move', year: m.fromYear, segment: m }`
- *   - `spouseDeathYear` → `{ kind: 'spouseDeath', year, ... }` carrying the
- *     survivor overrides bundled into a `SurvivorOverrides` payload
- *   - `survivorStepUpBenefitUSD > 0` AND `spouseDeathYear` set →
- *     `{ kind: 'stepUpBasis', year: deathYear, benefitUSD }` (matches
- *     current kernel behavior of applying the bump at the death year)
- *   - Each `oneTimeExpenses[i]` → `{ kind: 'oneTimeExpense', ... }`
- *   - `lifeEvents` (new field) appended verbatim
- *
- * Caller-provided `lifeEvents` are NOT deduped against legacy fields —
- * if the caller passes both `spouseDeathYear: 10` and a `lifeEvents`
- * entry for the same death, both will appear in the result. This is
- * intentional: step 2 will need to detect and resolve such overlaps
- * with explicit precedence rules; this step just produces the merged
- * timeline.
+/**
+ * Project legacy `MonteCarloParams` fields + any caller-supplied
+ * `lifeEvents` into a unified, year-sorted `LifeEvent[]`. The output is
+ * filtered to `[0, p.years)` so it matches the kernel's actual execution
+ * horizon — events outside that range are silently dropped, mirroring
+ * the kernel's own expense filter at the inner loop.
  */
 export function compileLifeEvents(p: MonteCarloParams): LifeEvent[] {
   const events: LifeEvent[] = [];
+  const inHorizon = (year: number) => year >= 0 && year < p.years;
 
-  // Moves (LocationMove[] → 'move' events).
   for (const m of p.moveSchedule ?? []) {
-    events.push({ kind: 'move', year: m.fromYear, segment: m });
+    if (inHorizon(m.fromYear)) events.push({ kind: 'move', year: m.fromYear, segment: m });
   }
 
-  // Spouse death + bundled survivor overrides.
-  if (p.spouseDeathYear != null && p.spouseDeathYear >= 0) {
-    const survivorOverrides: SurvivorOverrides = {};
-    if (p.survivorMonthlyIncome != null) survivorOverrides.monthlyIncome = p.survivorMonthlyIncome;
-    if (p.survivorCostRatio != null) survivorOverrides.costRatio = p.survivorCostRatio;
-    if (p.survivorMonthlyIncomeTax != null) survivorOverrides.monthlyIncomeTax = p.survivorMonthlyIncomeTax;
-    if (p.survivorMedicareMonthly != null) survivorOverrides.medicareMonthly = p.survivorMedicareMonthly;
-    if (p.survivorBirthYear != null) survivorOverrides.birthYear = p.survivorBirthYear;
+  if (p.spouseDeathYear != null && inHorizon(p.spouseDeathYear)) {
+    const survivorOverrides = pickDefined({
+      monthlyIncome: p.survivorMonthlyIncome,
+      costRatio: p.survivorCostRatio,
+      monthlyIncomeTax: p.survivorMonthlyIncomeTax,
+      medicareMonthly: p.survivorMedicareMonthly,
+      birthYear: p.survivorBirthYear,
+    });
     events.push({
       kind: 'spouseDeath',
       year: p.spouseDeathYear,
       survivorOverrides: Object.keys(survivorOverrides).length > 0 ? survivorOverrides : undefined,
     });
 
-    // Stepped-up basis bump fires at deathYear, not separately schedulable today.
     if (p.survivorStepUpBenefitUSD != null && p.survivorStepUpBenefitUSD > 0) {
-      events.push({
-        kind: 'stepUpBasis',
-        year: p.spouseDeathYear,
-        benefitUSD: p.survivorStepUpBenefitUSD,
-      });
+      events.push({ kind: 'stepUpBasis', year: p.spouseDeathYear, benefitUSD: p.survivorStepUpBenefitUSD });
     }
   }
 
-  // One-time expenses.
   for (const e of p.oneTimeExpenses ?? []) {
-    if (!e || !(e.amountUSD > 0)) continue;
+    if (!e || !(e.amountUSD > 0) || !inHorizon(e.year)) continue;
     events.push({
       kind: 'oneTimeExpense',
       year: e.year,
       amountUSD: e.amountUSD,
-      description: e.label,
+      label: e.label,
       inflate: e.inflate,
     });
   }
 
-  // Caller-supplied events appended verbatim.
-  if (p.lifeEvents) events.push(...p.lifeEvents);
+  for (const e of p.lifeEvents ?? []) {
+    if (inHorizon(e.year)) events.push(e);
+  }
 
-  // Filter to the kernel's actually-executed year range [0, p.years).
-  // The kernel's expense pipeline (line ~682) already drops `e.year < 0
-  // || e.year >= years`; the move / spouseDeath / stepUpBasis paths
-  // implicitly drop out-of-horizon entries because the inner loop only
-  // iterates `y < years`. Without this filter, the adapter would report
-  // events the kernel will never execute, breaking parity for downstream
-  // consumers (UI timeline, future step-2 dispatcher). Codex P2 on
-  // PR #95 fix.
-  const inHorizon = events.filter((e) => e.year >= 0 && e.year < p.years);
+  events.sort((a, b) => a.year - b.year);
+  return events;
+}
 
-  // Sort by year ascending. Stable across equal years so deterministic
-  // dispatch order matches the legacy kernel's order (moves before death
-  // before expenses) when sources happen to coincide. JS Array.sort is
-  // stable since ES2019 — relied on here.
-  inHorizon.sort((a, b) => a.year - b.year);
-  return inHorizon;
+/** Drop keys whose value is null/undefined, preserving the input shape. */
+function pickDefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Partial<T> = {};
+  for (const k in obj) if (obj[k] != null) out[k] = obj[k];
+  return out;
 }
