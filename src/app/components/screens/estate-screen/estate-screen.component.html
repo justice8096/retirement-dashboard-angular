@@ -1,0 +1,249 @@
+    <div class="estate-screen">
+      <div class="screen-header">
+        <span class="header-icon">🏛️</span>
+        <div>
+          <h2 class="header-title">Estate Planning</h2>
+          <p class="header-sub">
+            Portfolio depletion, charitable giving, and estate-tax impact through to your projection age.
+          </p>
+        </div>
+        <span class="badge-new">NEW</span>
+      </div>
+
+      <div class="card exemption-note">
+        <strong>2026 federal exemption: {{ fmt(ESTATE_EXEMPTION_2026) }} per person.</strong>
+        Estates below this threshold owe no federal estate tax. The exemption is scheduled to sunset
+        to roughly $7M in 2026 unless Congress extends it.
+      </div>
+
+      <!-- Local inheritance / estate tax — Phase 3a of the foreign-inheritance-tax data layer.
+           Reads taxes.inheritance from the API (populated by retirement-api's country-keyed map). -->
+      <div class="card location-tax-card">
+        <div class="location-tax-header">
+          <h3 class="card-title" style="margin: 0;">Local Inheritance / Estate Tax</h3>
+          <select class="location-select" [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="selectedLocationId()" (ngModelChange)="selectedLocationId.set($event)">
+            @for (l of loc.fullLocations(); track l.id) {
+              <option [value]="l.id">{{ l.name }} · {{ l.country }}</option>
+            }
+          </select>
+        </div>
+
+        @if (selectedLocationInheritance(); as inh) {
+          @if (inh.topRate === 0) {
+            <p class="tax-zero">
+              <strong>{{ selectedLocationCountry() }}: no inheritance tax.</strong>
+              {{ inh.notes }}
+            </p>
+          } @else {
+            <div class="tax-grid">
+              @if (inh.topRate != null) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Top rate</div>
+                  <div class="tax-cell-value top-rate"
+                       [class.warn]="inh.topRate >= 0.30"
+                       [class.amber]="inh.topRate < 0.30 && inh.topRate >= 0.05"
+                       [class.green]="inh.topRate < 0.05">
+                    {{ (inh.topRate * 100).toFixed(0) }}%
+                  </div>
+                </div>
+              }
+              @if (inh.spouseExemption) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Spouse</div>
+                  <div class="tax-cell-value"
+                       [class.green]="inh.spouseExemption === 'full'"
+                       [class.amber]="inh.spouseExemption === 'partial'"
+                       [class.warn]="inh.spouseExemption === 'none'">
+                    {{ spouseLabel(inh.spouseExemption) }}
+                  </div>
+                </div>
+              }
+              @if (inh.exemptionLocal != null) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Tax-free threshold</div>
+                  <div class="tax-cell-value">
+                    {{ exemptionDisplay(inh.exemptionLocal) }}
+                  </div>
+                </div>
+              }
+              @if (inh.basis) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Tax basis</div>
+                  <div class="tax-cell-value">
+                    {{ inh.basis === 'estate' ? 'Estate-level (US/UK pattern)' : 'Inheritance-level (recipient pays)' }}
+                  </div>
+                </div>
+              }
+              @if (inh.scopeWhenResident) {
+                <div class="tax-cell">
+                  <div class="tax-cell-label">Scope (resident)</div>
+                  <div class="tax-cell-value">
+                    {{ inh.scopeWhenResident === 'worldwide' ? 'Worldwide assets' : 'Local-situated assets only' }}
+                  </div>
+                </div>
+              }
+            </div>
+
+            <p class="tax-notes">{{ inh.notes }}</p>
+          }
+
+          @if (inh.sources && inh.sources.length > 0) {
+            <div class="tax-sources">
+              <span class="tax-sources-label">Sources:</span>
+              <app-source-tooltip [sources]="inh.sources" label="Inheritance tax sources" />
+            </div>
+          }
+        } @else {
+          <p class="muted">
+            No inheritance-tax data available for this location. (Currently covered:
+            US, France, Portugal, Spain, Italy, Ireland, Greece, Croatia, Cyprus,
+            Malta, Mexico, Panama, Costa Rica, Colombia, Ecuador, Uruguay.)
+          </p>
+        }
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Your Inputs</h3>
+        <div class="param-grid">
+          <label class="param">
+            <span class="param-label">Initial Portfolio</span>
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="initialPortfolio()" (ngModelChange)="initialPortfolio.set($event)" />
+            @if (dyscalculia.isEnabled() && initialPortfolio() > 0) {
+              <span class="param-hint">{{ portfolioAnchor() }}</span>
+            }
+          </label>
+          <label class="param">
+            <span class="param-label">Desired Legacy</span>
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="desiredLegacy()" (ngModelChange)="desiredLegacy.set($event)" />
+            <span class="param-hint">Used to trigger a charity boost when the portfolio grows past 130% of this amount.</span>
+          </label>
+          <label class="param">
+            <span class="param-label">Annual Expenses</span>
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="annualExpenses()" (ngModelChange)="annualExpenses.set($event)" />
+          </label>
+          <label class="param">
+            <span class="param-label">Charity per Year (QCD)</span>
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="charityPerYear()" (ngModelChange)="charityPerYear.set($event)" />
+            <span class="param-hint"
+              [class.warn]="charityPerYear() > QCD_LIMIT">
+              {{ charityPerYear() > QCD_LIMIT ? 'Exceeds annual QCD limit of ' + fmt(QCD_LIMIT) : 'Max QCD: ' + fmt(QCD_LIMIT) + '/yr' }}
+            </span>
+          </label>
+          <label class="param">
+            <span class="param-label">Project to Age</span>
+            <input type="range" min="80" max="105" class="range-input"
+              [ngModel]="projectionAge()" (ngModelChange)="projectionAge.set(+$event)" />
+            <span class="param-hint">Age {{ projectionAge() }}</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Key milestones -->
+      <div class="results">
+        @for (age of [90, 95, 100]; track age) {
+          <div class="result-card" [class.highlight]="age === projectionAge()">
+            <div class="result-label">Projected at {{ age }}</div>
+            @if (atAge(age); as row) {
+              <div class="result-value">{{ fmt(row.netEstate) }}</div>
+              <div class="result-explain">Taxes: {{ fmt(row.estateTax) }}</div>
+            } @else {
+              <div class="result-value muted">—</div>
+              <div class="result-explain">Beyond projection</div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Portfolio + net estate over time (CSS bar chart) -->
+      <div class="card">
+        <h3 class="card-title">Net Legacy Over Time</h3>
+        <div class="chart">
+          @for (row of projections(); track row.year) {
+            <div class="chart-bar" [title]="'Age ' + row.age + ' — portfolio ' + fmt(row.portfolioValue) + ', net ' + fmt(row.netEstate)">
+              <div class="bar-portfolio" [style.height.%]="pctOfMax(row.portfolioValue)"></div>
+              <div class="bar-net" [style.height.%]="pctOfMax(row.netEstate)"></div>
+            </div>
+          }
+        </div>
+        <div class="chart-legend">
+          <span><span class="swatch sw-portfolio"></span> Portfolio</span>
+          <span><span class="swatch sw-net"></span> Net Estate (after taxes)</span>
+        </div>
+      </div>
+
+      <!-- Final composition -->
+      <div class="card">
+        <h3 class="card-title">Final Estate Composition — Age {{ projectionAge() }}</h3>
+        @if (finalRow(); as fr) {
+          <div class="composition">
+            <div class="comp-bar">
+              <div class="comp-seg charity" [style.flex-grow]="totalCharityGiven()"></div>
+              <div class="comp-seg tax"     [style.flex-grow]="fr.estateTax"></div>
+              <div class="comp-seg heirs"   [style.flex-grow]="fr.netEstate"></div>
+            </div>
+            <div class="comp-legend">
+              <div><span class="swatch sw-charity"></span> Charity (lifetime): <strong>{{ fmt(totalCharityGiven()) }}</strong></div>
+              <div><span class="swatch sw-tax"></span> Estate tax: <strong>{{ fmt(fr.estateTax) }}</strong></div>
+              <div><span class="swatch sw-heirs"></span> Net to heirs: <strong>{{ fmt(fr.netEstate) }}</strong></div>
+            </div>
+          </div>
+        } @else {
+          <p class="muted">Set household birth years on Assumptions to see a projection.</p>
+        }
+      </div>
+
+      <!-- Year-by-year table -->
+      <div class="card">
+        <h3 class="card-title">Year-by-Year Projection</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Age</th>
+                <th>Year</th>
+                <th class="right">Portfolio</th>
+                <th class="right">Expenses</th>
+                <th class="right">Charity (QCD)</th>
+                <th class="right">Withdrawal</th>
+                <th class="right">Estate Tax</th>
+                <th class="right">Net Legacy</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of projections(); track row.year) {
+                <tr>
+                  <td>{{ row.age }}</td>
+                  <td>{{ row.year }}</td>
+                  <td class="right">{{ fmt(row.portfolioValue) }}</td>
+                  <td class="right">{{ fmt(row.annualExpenses) }}</td>
+                  <td class="right green">{{ fmt(row.charityGiving) }}</td>
+                  <td class="right">{{ fmt(row.withdrawal) }}</td>
+                  <td class="right red">{{ fmt(row.estateTax) }}</td>
+                  <td class="right strong">{{ fmt(row.netEstate) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="insights">
+        <h3 class="card-title">Estate Planning Strategies</h3>
+        <ul>
+          <li><strong>QCD:</strong> IRA → charity distributions (up to {{ fmt(QCD_LIMIT) }}/yr) reduce MAGI and sidestep IRMAA.</li>
+          <li><strong>Annual exclusion gifts:</strong> $18,000/person/yr (2024) tax-free, doesn't chip at lifetime exemption.</li>
+          <li><strong>Roth conversion:</strong> Convert pre-death to shrink the taxable estate (taxes paid now, heirs inherit tax-free).</li>
+          <li><strong>CRT:</strong> Charitable Remainder Trust gives income to you/heirs with remainder to charity.</li>
+          <li><strong>Portability:</strong> Surviving spouse can claim the deceased spouse's unused exemption on timely filing.</li>
+        </ul>
+      </div>
+    </div>
