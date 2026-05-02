@@ -1,0 +1,60 @@
+    <div class="report-screen">
+      <div class="screen-header">
+        <span class="header-icon">📜</span>
+        <div>
+          <h2 class="header-title">Narrative Report</h2>
+          <p class="header-sub">
+            Generates a Markdown-formatted walkthrough of your current plan and all selected locations.
+            Designed to feed back into video / voiceover generation — not for spreadsheet export.
+          </p>
+        </div>
+        <span class="badge-new">NEW</span>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">What's in the report</h3>
+        <ul class="scope-list">
+          <li><strong>Household:</strong> members, ages, retirement horizon, target income.</li>
+          <li><strong>Financial state:</strong> portfolio, allocation, expected return, savings rate.</li>
+          <li><strong>FIRE math:</strong> FIRE number, progress, years remaining at current pace.</li>
+          <li><strong>Cash flow:</strong> Social Security projection, portfolio withdrawal, expected taxes.</li>
+          <li><strong>Guardrails bands:</strong> floor / base / ceiling withdrawal ranges.</li>
+          <li><strong>Per-location chapters</strong> (one per selected location) — costs, climate, healthcare, visa, inclusion, neighborhoods, community &amp; services, local info &amp; resources.</li>
+          <li><strong>Front-matter</strong> with machine-readable numbers so the narrative can be verified against structured data.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Selection</h3>
+        @if (selectedCount() === 0) {
+          <div class="warn-block">
+            <strong>No locations selected.</strong>
+            Go to <em>Locations → Overview</em> and check at least one location.
+            The report covers only locations you've picked — intentionally, so the narrative stays focused.
+          </div>
+        } @else {
+          <div class="ok-block">
+            <strong>{{ selectedCount() }} {{ selectedCount() === 1 ? 'location' : 'locations' }} selected:</strong>
+            {{ selectedNamesPreview() }}
+          </div>
+        }
+      </div>
+
+      <div class="card">
+        <button class="generate-btn" [disabled]="selectedCount() === 0 || loading()" (click)="generateAndDownload()">
+          @if (loading()) { Building report… }
+          @else { ⬇ Generate & Download report.md }
+        </button>
+        @if (error()) {
+          <div class="error-block">
+            <strong>Couldn't build the report:</strong> {{ error() }}
+          </div>
+        }
+        @if (lastDownloaded(); as last) {
+          <div class="ok-block small">
+            Downloaded <code>{{ last.filename }}</code> — {{ last.bytes.toLocaleString() }} bytes,
+            {{ last.sections }} sections, {{ last.locations }} location chapters.
+          </div>
+        }
+      </div>
+    </div>
