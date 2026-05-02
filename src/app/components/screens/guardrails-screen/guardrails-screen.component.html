@@ -66,8 +66,20 @@
         <div class="corridor">
           <div class="corridor-bar">
             <div class="corr-seg s-floor">
-              <div class="corr-label">Floor (3%)</div>
+              <div class="corr-label">
+                Floor
+                @if (guardrails().floorBinding === 'essential') {
+                  (essential)
+                } @else {
+                  (3%)
+                }
+              </div>
               <div class="corr-val">{{ fmt(guardrails().floor) }}</div>
+              @if (guardrails().floorBinding === 'essential') {
+                <div class="result-explain">
+                  Essential floor exceeds 3% — binding constraint is livelihood, not portfolio %.
+                </div>
+              }
             </div>
             <div class="corr-seg s-base">
               <div class="corr-label">Base (4%)</div>
@@ -168,6 +180,7 @@
           <li><strong>Prosperity rule:</strong> if your rate drops below 80% of initial AND portfolio exceeded initial, raise withdrawal by 10%.</li>
           <li><strong>Preservation rule:</strong> if your rate exceeds 120% of initial, cut by 10%.</li>
           <li><strong>Floor / ceiling:</strong> never outside the 3% – 5.5% band (inflation-adjusted).</li>
+          <li><strong>Essential floor (#24):</strong> when the sum of essential monthly costs (rent, food, healthcare, insurance, utilities, transportation, taxes) exceeds 3% of your portfolio, it becomes the binding floor — the dollar amount you genuinely cannot cut, regardless of portfolio size.</li>
         </ul>
       </div>
     </div>

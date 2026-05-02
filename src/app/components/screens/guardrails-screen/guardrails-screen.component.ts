@@ -80,21 +80,38 @@ export class GuardrailsScreenComponent implements OnInit {
     this.dyscalculia.getAnchor(this.portfolio(), 'portfolio', this.annualSpending() || undefined)
   );
 
-  /** Current-year bands. `baseRate` etc. are DOLLAR values (portfolio × rate). */
+  /** Current-year bands. `baseRate` etc. are DOLLAR values (portfolio × rate).
+   *
+   *  Floor semantics (#24): two floors, take the larger.
+   *    - Static Guyton-Klinger floor: portfolio × FLOOR_RATE (3%) — purchasing
+   *      power preservation; protects against over-cutting in real terms.
+   *    - Dynamic essential-spending floor: essentialAnnual — livelihood
+   *      preservation; the dollar amount the household genuinely cannot
+   *      cut without hitting rent/food/healthcare/insurance/utilities.
+   *  When essential > 3% of portfolio, the dynamic floor binds and the
+   *  household has a tighter floor than the rule-of-thumb implies. */
   readonly guardrails = computed(() => {
     const p = this.portfolio();
     if (p <= 0) {
-      return { baseRate: 0, floor: 0, ceiling: 0, safeWithdrawal: 0, status: 'red' as Status };
+      return {
+        baseRate: 0, floor: 0, ceiling: 0, safeWithdrawal: 0,
+        staticFloor: 0, essentialFloor: 0, floorBinding: 'static' as 'static' | 'essential',
+        status: 'red' as Status,
+      };
     }
     const baseRate = p * BASE_RATE;
-    const floor    = p * FLOOR_RATE;
+    const staticFloor = p * FLOOR_RATE;
+    const essentialFloor = this.essentialMonthly() * 12;
+    const floor    = Math.max(staticFloor, essentialFloor);
+    const floorBinding: 'static' | 'essential' =
+      essentialFloor > staticFloor ? 'essential' : 'static';
     const ceiling  = p * CEILING_RATE;
     const safeWithdrawal = Math.max(floor, Math.min(ceiling, baseRate));
     const spending = this.annualSpending();
     const status: Status =
       spending < floor ? 'green' :
       spending <= ceiling ? 'yellow' : 'red';
-    return { baseRate, floor, ceiling, safeWithdrawal, status };
+    return { baseRate, floor, ceiling, safeWithdrawal, staticFloor, essentialFloor, floorBinding, status };
   });
 
   readonly monthlyHeadroom = computed(() =>
@@ -160,7 +177,13 @@ export class GuardrailsScreenComponent implements OnInit {
     const primaryBirth = this.primary()?.birthYear ?? null;
     const spend0 = this.annualSpending();
     const baseDollars = p * BASE_RATE;
-    const floor0 = p * FLOOR_RATE;
+    // Same dual-floor semantics as `guardrails()`: take the larger of the
+    // 3% static floor and the essential-spending dollar floor (#24).
+    // Both inflate at the same rate, so taking max() at year 0 and
+    // multiplying by inflMult preserves the binding floor across years.
+    const staticFloor0 = p * FLOOR_RATE;
+    const essentialFloor0 = this.essentialMonthly() * 12;
+    const floor0 = Math.max(staticFloor0, essentialFloor0);
     const ceiling0 = p * CEILING_RATE;
 
     let projPortfolio = p;
