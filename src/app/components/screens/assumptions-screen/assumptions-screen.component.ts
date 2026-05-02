@@ -7,11 +7,13 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { LocationService } from '@services/location.service';
+import { RentalIncomeService } from '@services/rental-income.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
   HouseholdProfile, HouseholdMember, HouseholdPet,
   MemberRole, DependentType, PetType,
 } from '@models/api.model';
+import type { RentalProperty } from '@app/lib/rental-income';
 
 type MemberDraft = Partial<HouseholdMember> & { birthYear: number; role: MemberRole };
 type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
@@ -29,6 +31,7 @@ export class AssumptionsScreenComponent implements OnInit {
   private readonly currency = inject(CurrencyFormatService);
   readonly healthcare = inject(HealthcareService);
   readonly loc = inject(LocationService);
+  readonly rental = inject(RentalIncomeService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -190,6 +193,22 @@ export class AssumptionsScreenComponent implements OnInit {
   removePet(idx: number): void {
     this.draft.update(d => d ? { ...d, pets: d.pets.filter((_, i) => i !== idx) } : d);
     this.dirty.set(true);
+  }
+
+  // ─── Rental properties (session-only, see RentalIncomeService) ───────
+  // No `dirty` flag: rental state isn't persisted to the household
+  // endpoint in v1. The Save button stays disabled-or-saved purely from
+  // household-profile changes.
+
+  addRental(): void { this.rental.add(); }
+  removeRental(id: string): void { this.rental.remove(id); }
+  patchRental(id: string, partial: Partial<RentalProperty>): void {
+    this.rental.patch(id, partial);
+  }
+  /** Convert empty-string / NaN to undefined for the optional ownedThroughYear input. */
+  setOwnedThrough(id: string, raw: number | string): void {
+    const n = typeof raw === 'number' ? raw : Number(raw);
+    this.rental.patch(id, { ownedThroughYear: Number.isFinite(n) && n > 0 ? n : undefined });
   }
 
   save(): void {

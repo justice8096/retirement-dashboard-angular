@@ -619,3 +619,334 @@ test('runMonteCarlo: foreign segment ignores medicareMonthlyByYear override', ()
   });
   assert.deepEqual(a.results, b.results, 'foreign segment must be inert to override');
 });
+
+// ─── rental-income helpers (Todo #29 Stage 1) ───────────────────────────
+
+import rental from '../src/app/lib/rental-income';
+import taxSources from '../src/app/lib/tax-sources';
+import type { RentalProperty, ScheduleEBreakdown, RentalAggregate } from '../src/app/lib/rental-income';
+
+const {
+  straightLineDepreciation,
+  scheduleENetAnnual,
+  aggregateRentalIncome,
+  defaultRentalProperty,
+} = rental as unknown as {
+  straightLineDepreciation: (basis: number, simYear: number, startYear: number, life?: number) => number;
+  scheduleENetAnnual: (p: RentalProperty, simYear: number) => ScheduleEBreakdown;
+  aggregateRentalIncome: (props: readonly RentalProperty[], simYear: number) => RentalAggregate;
+  defaultRentalProperty: () => RentalProperty;
+};
+
+const { RENTAL_RESIDENTIAL_DEPRECIATION_LIFE_YEARS } = taxSources as unknown as {
+  RENTAL_RESIDENTIAL_DEPRECIATION_LIFE_YEARS: number;
+};
+
+/** Builder for a fully-specified RentalProperty under test. */
+function makeRental(overrides: Partial<RentalProperty> = {}): RentalProperty {
+  return {
+    id: 'r1',
+    label: 'Test rental',
+    monthlyGrossRent: 2000,
+    vacancyRatePct: 0,
+    propertyTaxAnnual: 0,
+    otherOpExAnnual: 0,
+    mortgageInterestAnnual: 0,
+    depreciableBasis: 0,
+    depreciationStartYear: 0,
+    ownedFromYear: 0,
+    ownedThroughYear: undefined,
+    ...overrides,
+  };
+}
+
+// straightLineDepreciation -----------------------------------------------
+
+test('straightLineDepreciation: zero basis returns 0', () => {
+  assert.equal(straightLineDepreciation(0, 5, 0), 0);
+  assert.equal(straightLineDepreciation(-1000, 5, 0), 0);
+});
+
+test('straightLineDepreciation: zero/negative life returns 0', () => {
+  assert.equal(straightLineDepreciation(275000, 5, 0, 0), 0);
+  assert.equal(straightLineDepreciation(275000, 5, 0, -10), 0);
+});
+
+test('straightLineDepreciation: not-yet-started returns 0', () => {
+  // depreciation begins at sim-year 5; year 4 is before that
+  assert.equal(straightLineDepreciation(275000, 4, 5), 0);
+});
+
+test('straightLineDepreciation: fully depreciated returns 0', () => {
+  // basis 275000 / life 27.5 = 10000/yr; year 28 (elapsed 28) past life
+  assert.equal(straightLineDepreciation(275000, 28, 0), 0);
+});
+
+test('straightLineDepreciation: in-window returns basis/life', () => {
+  // 275000 / 27.5 = 10000
+  assert.equal(straightLineDepreciation(275000, 5, 0), 10000);
+  assert.equal(straightLineDepreciation(275000, 0, 0), 10000);
+});
+
+test('straightLineDepreciation: negative startYear (pre-sim depreciation)', () => {
+  // Property bought 10 years before sim start; in sim year 0 we're 10 years in.
+  // 17.5 years remain before fully depreciated.
+  assert.equal(straightLineDepreciation(275000, 0, -10), 10000);
+  // Year 17 still in window (elapsed 27 < 27.5).
+  assert.equal(straightLineDepreciation(275000, 17, -10), 10000);
+  // Year 18 past life (elapsed 28 ≥ 27.5).
+  assert.equal(straightLineDepreciation(275000, 18, -10), 0);
+});
+
+test('straightLineDepreciation: residential life constant matches IRC § 168', () => {
+  assert.equal(RENTAL_RESIDENTIAL_DEPRECIATION_LIFE_YEARS, 27.5);
+});
+
+// scheduleENetAnnual -----------------------------------------------------
+
+test('scheduleENetAnnual: inactive (before ownedFromYear) returns zero breakdown', () => {
+  const r = makeRental({ ownedFromYear: 5, monthlyGrossRent: 5000 });
+  const b = scheduleENetAnnual(r, 4);
+  assert.equal(b.active, false);
+  assert.equal(b.grossRent, 0);
+  assert.equal(b.taxableNet, 0);
+  assert.equal(b.cashFlow, 0);
+});
+
+test('scheduleENetAnnual: inactive (past ownedThroughYear) returns zero breakdown', () => {
+  const r = makeRental({ ownedFromYear: 0, ownedThroughYear: 10 });
+  // year 10 is exclusive — must be inactive
+  const b = scheduleENetAnnual(r, 10);
+  assert.equal(b.active, false);
+  // year 9 is the last active year
+  assert.equal(scheduleENetAnnual(r, 9).active, true);
+});
+
+test('scheduleENetAnnual: gross + vacancy + opex + interest math', () => {
+  const r = makeRental({
+    monthlyGrossRent: 2500,    // 30,000 gross
+    vacancyRatePct: 8,          //  -2,400 vacancy
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    mortgageInterestAnnual: 6000,
+    depreciableBasis: 0,        // skip depreciation in this test
+  });
+  const b = scheduleENetAnnual(r, 0);
+  assert.equal(b.active, true);
+  assert.equal(b.grossRent, 30000);
+  assert.equal(b.vacancyAdj, -2400);
+  assert.equal(b.effectiveRent, 27600);
+  assert.equal(b.propertyTax, 4000);
+  assert.equal(b.otherOpEx, 3000);
+  assert.equal(b.mortgageInterest, 6000);
+  assert.equal(b.depreciation, 0);
+  // 27600 - 4000 - 3000 - 6000 = 14600 cash flow
+  assert.equal(b.cashFlow, 14600);
+  // depreciation = 0 → taxableNet = cashFlow
+  assert.equal(b.taxableNet, 14600);
+});
+
+test('scheduleENetAnnual: depreciation creates paper loss while cash positive', () => {
+  // The whole point of Schedule E modeling — depreciation can produce
+  // a taxable loss while the property generates positive cash flow.
+  const r = makeRental({
+    monthlyGrossRent: 2000,    // 24,000 gross
+    vacancyRatePct: 0,
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    mortgageInterestAnnual: 8000,
+    depreciableBasis: 275000,  // 10,000/yr
+    depreciationStartYear: 0,
+  });
+  const b = scheduleENetAnnual(r, 0);
+  // cash: 24000 - 4000 - 3000 - 8000 = 9000
+  assert.equal(b.cashFlow, 9000);
+  // taxable: 9000 - 10000 = -1000 (paper loss = depreciation shield)
+  assert.equal(b.taxableNet, -1000);
+  assert.equal(b.depreciation, 10000);
+});
+
+test('scheduleENetAnnual: vacancy rate clamps to 0..100', () => {
+  // vacancyRatePct beyond range should not produce negative gross or
+  // wraparound — clamp at the boundaries.
+  const high = makeRental({ monthlyGrossRent: 1000, vacancyRatePct: 250 });
+  const b1 = scheduleENetAnnual(high, 0);
+  assert.equal(b1.effectiveRent, 0);
+  assert.equal(b1.vacancyAdj, -12000);
+
+  const neg = makeRental({ monthlyGrossRent: 1000, vacancyRatePct: -50 });
+  const b2 = scheduleENetAnnual(neg, 0);
+  assert.equal(b2.effectiveRent, 12000);
+  assert.equal(b2.vacancyAdj, 0);
+});
+
+test('scheduleENetAnnual: depreciation rolls off at year 27.5', () => {
+  const r = makeRental({
+    monthlyGrossRent: 2000,
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    depreciableBasis: 275000,
+    depreciationStartYear: 0,
+  });
+  // years 0..27 — depreciation active (27 < 27.5)
+  assert.equal(scheduleENetAnnual(r, 27).depreciation, 10000);
+  // year 28 — past life (28 ≥ 27.5)
+  assert.equal(scheduleENetAnnual(r, 28).depreciation, 0);
+  // cash flow stays the same when depreciation rolls off — the
+  // taxable net jumps up by exactly the prior depreciation amount
+  const before = scheduleENetAnnual(r, 27);
+  const after = scheduleENetAnnual(r, 28);
+  assert.equal(after.cashFlow, before.cashFlow);
+  assert.equal(after.taxableNet - before.taxableNet, 10000);
+});
+
+test('scheduleENetAnnual: negative input fields clamped to 0', () => {
+  // Defensive clamps — UI inputs may briefly hold negatives during typing.
+  const r = makeRental({
+    monthlyGrossRent: -100,
+    propertyTaxAnnual: -500,
+    otherOpExAnnual: -200,
+    mortgageInterestAnnual: -1000,
+  });
+  const b = scheduleENetAnnual(r, 0);
+  assert.equal(b.grossRent, 0);
+  assert.equal(b.propertyTax, 0);
+  assert.equal(b.otherOpEx, 0);
+  assert.equal(b.mortgageInterest, 0);
+  assert.equal(b.cashFlow, 0);
+  assert.equal(b.taxableNet, 0);
+});
+
+// aggregateRentalIncome --------------------------------------------------
+
+test('aggregateRentalIncome: empty portfolio returns zeros', () => {
+  const a = aggregateRentalIncome([], 0);
+  assert.equal(a.totalCashFlow, 0);
+  assert.equal(a.totalTaxableNet, 0);
+  assert.equal(a.totalDepreciation, 0);
+  assert.equal(a.totalEffectiveRent, 0);
+  assert.equal(a.perProperty.length, 0);
+});
+
+test('aggregateRentalIncome: sums active properties only', () => {
+  const props: RentalProperty[] = [
+    makeRental({
+      id: 'a',
+      label: 'A',
+      monthlyGrossRent: 2000,           // 24000 gross
+      propertyTaxAnnual: 4000,
+      depreciableBasis: 275000,         // 10000 dep
+      ownedFromYear: 0,
+      ownedThroughYear: 10,
+    }),
+    makeRental({
+      id: 'b',
+      label: 'B',
+      monthlyGrossRent: 3000,           // 36000 gross — but inactive at year 0
+      propertyTaxAnnual: 6000,
+      depreciableBasis: 200000,
+      ownedFromYear: 5,
+    }),
+  ];
+  const yr0 = aggregateRentalIncome(props, 0);
+  // Only A is active; cash = 24000 - 4000 = 20000; taxable = 20000 - 10000 = 10000
+  assert.equal(yr0.totalCashFlow, 20000);
+  assert.equal(yr0.totalTaxableNet, 10000);
+  assert.equal(yr0.totalDepreciation, 10000);
+  assert.equal(yr0.totalEffectiveRent, 24000);
+  // perProperty includes BOTH (B as inactive zero-row)
+  assert.equal(yr0.perProperty.length, 2);
+  assert.equal(yr0.perProperty[0].breakdown.active, true);
+  assert.equal(yr0.perProperty[1].breakdown.active, false);
+
+  // year 5: both active
+  const yr5 = aggregateRentalIncome(props, 5);
+  // A: 24000 - 4000 = 20000 cash, 20000 - 10000 = 10000 taxable
+  // B: 36000 - 6000 = 30000 cash, 30000 - (200000/27.5 = 7272.727...) = 22727.272...
+  const bDep = 200000 / 27.5;
+  assert.equal(yr5.totalCashFlow, 50000);
+  assert.ok(Math.abs(yr5.totalTaxableNet - (10000 + 30000 - bDep)) < 1e-6);
+
+  // year 10: A's ownership window ended (exclusive); only B
+  const yr10 = aggregateRentalIncome(props, 10);
+  assert.equal(yr10.perProperty[0].breakdown.active, false);
+  assert.equal(yr10.perProperty[1].breakdown.active, true);
+  assert.equal(yr10.totalCashFlow, 30000);
+});
+
+test('aggregateRentalIncome: portfolio paper loss adds when properties lose', () => {
+  // Two properties, both at depreciation paper loss.
+  const props: RentalProperty[] = [
+    makeRental({ id: 'a', monthlyGrossRent: 1000, depreciableBasis: 275000 }), // 12k - 10k dep = 2k loss
+    makeRental({ id: 'b', monthlyGrossRent: 1000, depreciableBasis: 275000 }), // 12k - 10k dep = 2k loss
+  ];
+  const a = aggregateRentalIncome(props, 0);
+  // (12000 - 10000) + (12000 - 10000) = 4000 taxable; cash = 24000
+  assert.equal(a.totalCashFlow, 24000);
+  assert.equal(a.totalTaxableNet, 4000);
+  assert.equal(a.totalDepreciation, 20000);
+});
+
+test('aggregateRentalIncome: negative cashFlow sums correctly (heavy mortgage)', () => {
+  // Property is cash-negative when mortgage interest dominates.
+  // Two properties, one cash-positive, one cash-negative — totals should
+  // reflect the algebraic sum (Sankey lane logic depends on this sign).
+  const props: RentalProperty[] = [
+    makeRental({
+      id: 'a',
+      monthlyGrossRent: 1000,           // 12000 gross
+      propertyTaxAnnual: 0,
+      otherOpExAnnual: 0,
+      mortgageInterestAnnual: 0,
+    }),                                  // cash = 12000
+    makeRental({
+      id: 'b',
+      monthlyGrossRent: 1000,           // 12000 gross
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 8000,     // 12000 - 4000 - 3000 - 8000 = -3000
+    }),                                  // cash = -3000
+  ];
+  const a = aggregateRentalIncome(props, 0);
+  // 12000 + (-3000) = 9000 net; depreciation 0; taxable = 9000
+  assert.equal(a.totalCashFlow, 9000);
+  assert.equal(a.totalTaxableNet, 9000);
+  assert.equal(a.perProperty[0].breakdown.cashFlow, 12000);
+  assert.equal(a.perProperty[1].breakdown.cashFlow, -3000);
+});
+
+test('aggregateRentalIncome: portfolio cashFlow can be negative overall', () => {
+  // Single deeply-cash-negative property — Sankey must handle this case.
+  const props: RentalProperty[] = [
+    makeRental({
+      id: 'a',
+      monthlyGrossRent: 500,            // 6000 gross
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 5000,     // 6000 - 4000 - 3000 - 5000 = -6000
+      depreciableBasis: 275000,         // 10000 dep
+    }),
+  ];
+  const a = aggregateRentalIncome(props, 0);
+  assert.equal(a.totalCashFlow, -6000);
+  // taxable = cash - depreciation = -6000 - 10000 = -16000 (Schedule E loss)
+  assert.equal(a.totalTaxableNet, -16000);
+});
+
+// defaultRentalProperty --------------------------------------------------
+
+test('defaultRentalProperty: produces a valid, active row', () => {
+  const r = defaultRentalProperty();
+  assert.ok(r.id.startsWith('rental-'));
+  assert.equal(typeof r.label, 'string');
+  assert.ok(r.monthlyGrossRent > 0);
+  assert.ok(r.depreciableBasis > 0);
+  assert.equal(r.ownedFromYear, 0);
+  // Sanity-check it produces a sensible breakdown at year 0
+  const b = scheduleENetAnnual(r, 0);
+  assert.equal(b.active, true);
+  assert.ok(b.cashFlow > 0); // the default should be cash-positive
+  // Two consecutive ids should not collide in normal use
+  const r2 = defaultRentalProperty();
+  assert.notEqual(r.id, r2.id);
+});

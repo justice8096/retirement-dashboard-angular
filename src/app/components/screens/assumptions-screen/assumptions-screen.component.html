@@ -191,6 +191,148 @@
           }
         </div>
 
+        <!-- Rental properties (Schedule E) -->
+        <div class="card">
+          <div class="card-head">
+            <h3 class="card-title">Rental Properties (Schedule E)</h3>
+            <button mat-stroked-button class="add-btn" (click)="addRental()">+ Add Property</button>
+          </div>
+          <p class="hc-help">
+            Rental income is taxed differently from pensions or wages — gross rent minus
+            operating expenses, mortgage interest, and depreciation flows to Schedule E.
+            Depreciation is a paper expense that reduces taxable income while cash flow
+            stays positive (residential straight-line over 27.5 years per IRS Pub 527).
+            Year fields are <em>sim-year offsets</em>: <strong>0</strong> = retirement-start
+            year. Negative depreciation start years mean the property was placed in
+            service before the sim window begins.
+          </p>
+          @for (prop of rental.properties(); track prop.id; let i = $index) {
+            <div class="editor-row">
+              <div class="row-fields">
+                <label class="field compact">
+                  <span class="field-label">Label</span>
+                  <input type="text" class="field-input"
+                    [ngModel]="prop.label"
+                    (ngModelChange)="patchRental(prop.id, { label: $event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Gross Rent ($/mo)</span>
+                  <input appNumeric="currency" class="field-input" step="50"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [ngModel]="prop.monthlyGrossRent"
+                    (ngModelChange)="patchRental(prop.id, { monthlyGrossRent: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Vacancy (%)</span>
+                  <input appNumeric="age" class="field-input" min="0" max="100" step="1"
+                    [ngModel]="prop.vacancyRatePct"
+                    (ngModelChange)="patchRental(prop.id, { vacancyRatePct: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Property Tax ($/yr)</span>
+                  <input appNumeric="currency" class="field-input" step="100"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [ngModel]="prop.propertyTaxAnnual"
+                    (ngModelChange)="patchRental(prop.id, { propertyTaxAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Other Op Ex ($/yr)</span>
+                  <input appNumeric="currency" class="field-input" step="100"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [ngModel]="prop.otherOpExAnnual"
+                    (ngModelChange)="patchRental(prop.id, { otherOpExAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Mortgage Interest ($/yr)</span>
+                  <input appNumeric="currency" class="field-input" step="100"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [ngModel]="prop.mortgageInterestAnnual"
+                    (ngModelChange)="patchRental(prop.id, { mortgageInterestAnnual: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Depreciable Basis ($)</span>
+                  <input appNumeric="currency" class="field-input" step="1000"
+                    [class]="dyscalculia.numberSpacingClass()"
+                    [ngModel]="prop.depreciableBasis"
+                    (ngModelChange)="patchRental(prop.id, { depreciableBasis: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Depreciation Start (sim-yr)</span>
+                  <!-- Explicit min overrides appNumeric="age"'s default min=0,
+                       which would otherwise block the negative values that
+                       represent depreciation that started before the sim
+                       window (a property held for years before retirement). -->
+                  <input appNumeric="age" class="field-input" step="1" min="-50" max="100"
+                    [ngModel]="prop.depreciationStartYear"
+                    (ngModelChange)="patchRental(prop.id, { depreciationStartYear: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Owned From (sim-yr)</span>
+                  <input appNumeric="age" class="field-input" min="0" step="1"
+                    [ngModel]="prop.ownedFromYear"
+                    (ngModelChange)="patchRental(prop.id, { ownedFromYear: +$event })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">Owned Through (sim-yr, optional)</span>
+                  <input appNumeric="age" class="field-input" min="0" step="1"
+                    [ngModel]="prop.ownedThroughYear ?? ''"
+                    (ngModelChange)="setOwnedThrough(prop.id, $event)" />
+                </label>
+              </div>
+              <button class="remove-btn" (click)="removeRental(prop.id)" aria-label="Remove">×</button>
+            </div>
+
+            @if (rental.referenceAggregate().perProperty[i]; as agg) {
+              @if (agg.breakdown.active) {
+                <div class="hc-hint" [class]="dyscalculia.numberSpacingClass()">
+                  <strong>{{ prop.label }}</strong> at sim-year {{ rental.referenceYear() }}:
+                  cash flow <strong>{{ fmtYearly(agg.breakdown.cashFlow) }}</strong> ·
+                  Schedule E taxable <strong>{{ fmtYearly(agg.breakdown.taxableNet) }}</strong>
+                  (depreciation shield {{ fmtYearly(agg.breakdown.depreciation) }})
+                </div>
+              } @else {
+                <div class="hc-hint">
+                  <strong>{{ prop.label }}</strong> not active at sim-year {{ rental.referenceYear() }}
+                  (owned {{ prop.ownedFromYear }}…{{ prop.ownedThroughYear ?? '∞' }}).
+                </div>
+              }
+            }
+          } @empty {
+            <div class="empty-hint">No rental properties — click “Add Property” to model one.</div>
+          }
+
+          @if (rental.properties().length > 0) {
+            <div class="hc-grid">
+              <div class="hc-stat">
+                <span class="hc-label">Portfolio cash flow (yr {{ rental.referenceYear() }})</span>
+                <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmtYearly(rental.referenceAggregate().totalCashFlow) }}
+                </span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">Schedule E taxable net</span>
+                <span class="hc-value hc-cost" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmtYearly(rental.referenceAggregate().totalTaxableNet) }}
+                </span>
+                <span class="hc-sub">flows into AGI / MAGI</span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">Depreciation shield</span>
+                <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmtYearly(rental.referenceAggregate().totalDepreciation) }}
+                </span>
+                <span class="hc-sub">paper-only deduction</span>
+              </div>
+            </div>
+            <label class="field compact">
+              <span class="field-label">Reference sim-year (for the figures above)</span>
+              <input appNumeric="age" class="field-input" min="0" step="1"
+                [ngModel]="rental.referenceYear()"
+                (ngModelChange)="rental.referenceYear.set(+$event)" />
+            </label>
+          }
+        </div>
+
         <!-- Healthcare regime + MAGI composition -->
         @if (healthcareDecision(); as hc) {
           <div class="card hc-card">

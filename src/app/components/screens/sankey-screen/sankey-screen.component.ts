@@ -5,6 +5,8 @@ import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { RentalIncomeService } from '@services/rental-income.service';
+import { aggregateRentalIncome } from '@app/lib/rental-income';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
   FinancialSettings, HouseholdProfile, HouseholdMember, LocationFull,
@@ -83,6 +85,7 @@ export class SankeyScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
   readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly rental = inject(RentalIncomeService);
   readonly Math = Math;
 
   readonly CHART_W = CHART_W;
@@ -113,8 +116,21 @@ export class SankeyScreenComponent implements OnInit {
     const iraWithdrawal = portfolio * (this.withdrawalPct() / 100);
     const otherAnnual = this.otherMonthlyIncome() * 12;
 
-    const totalIncome =
-      ss.reduce((s, m) => s + m.annual, 0) + iraWithdrawal + otherAnnual;
+    // Rental portfolio at year-1 (sim-year 0). Cash flow CAN be negative
+    // (mortgage-heavy years; high vacancy). Split the sign so the diagram
+    // can route inflows and outflows separately:
+    //   - rentalCashIn  → green income lane (only when > 0)
+    //   - rentalCashOut → expense lane "Rental Operating Loss" (only when < 0)
+    // The full signed cash flow still feeds the tax base — a Schedule E
+    // loss reduces AGI before the depreciation shield is applied.
+    const rentalAgg = aggregateRentalIncome(this.rental.properties(), 0);
+    const rentalCashFlow = rentalAgg.totalCashFlow;
+    const rentalDepreciation = rentalAgg.totalDepreciation;
+    const rentalCashIn = Math.max(0, rentalCashFlow);
+    const rentalCashOut = Math.max(0, -rentalCashFlow);
+
+    const otherIncome = ss.reduce((s, m) => s + m.annual, 0) + iraWithdrawal + otherAnnual;
+    const totalIncome = otherIncome + rentalCashIn;
 
     // Expense breakdown — sum monthlyCosts excluding 'taxes' (we compute that),
     // split into 7 named categories + "Other Expenses" catch-all.
@@ -129,10 +145,20 @@ export class SankeyScreenComponent implements OnInit {
       else otherExpenses += annual;
     }
     if (otherExpenses > 0) expenses['Other Expenses'] = otherExpenses;
+    // Rental operating loss enters the diagram as an expense category —
+    // it drains After-Tax Income alongside the location-cost categories.
+    // Routes through the existing drawdown logic if total expenses
+    // exceed after-tax income.
+    if (rentalCashOut > 0) {
+      expenses['Rental Operating Loss'] = (expenses['Rental Operating Loss'] ?? 0) + rentalCashOut;
+    }
     const annualExpenses = Object.values(expenses).reduce((s, v) => s + v, 0);
 
-    // Income tax using the bracket-aware service (total-income as base).
-    const taxResult = this.tax.computeIncomeTax(l, totalIncome);
+    // Tax base — Schedule E full impact: signed cash flow (loss reduces
+    // AGI) minus depreciation shield (paper expense, further reduction).
+    // The clamp at 0 prevents negative-tax (refunds aren't modeled here).
+    const taxableBase = Math.max(0, otherIncome + rentalCashFlow - rentalDepreciation);
+    const taxResult = this.tax.computeIncomeTax(l, taxableBase);
     const taxes = taxResult.monthlyTax * 12;
     const afterTax = Math.max(0, totalIncome - taxes);
 
@@ -149,6 +175,7 @@ export class SankeyScreenComponent implements OnInit {
       if (m.annual > 0) add(`SS — ${m.name}`, m.annual, 'income');
     }
     if (otherAnnual > 0) add('Other Income', otherAnnual, 'income');
+    if (rentalCashIn > 0) add('Rental Income', rentalCashIn, 'income');
     if (iraWithdrawal > 0) add('Portfolio Withdrawal', iraWithdrawal, 'income');
 
     // Pool
