@@ -640,14 +640,24 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   for (const m of schedule) movesByYear.set(m.fromYear, m);
   const initial = schedule[0];
 
-  // One-time expenses indexed by year for O(1) lookup. Multiple expenses
-  // in the same year stack via array. Skipped silently when amount <= 0.
-  const expensesByYear = new Map<number, OneTimeExpense[]>();
-  for (const e of (p.oneTimeExpenses ?? [])) {
-    if (!e || !(e.amountUSD > 0) || e.year < 0 || e.year >= years) continue;
-    const list = expensesByYear.get(e.year) ?? [];
-    list.push(e);
-    expensesByYear.set(e.year, list);
+  // Unified Life Events timeline (#31 step 2a). `compileLifeEvents` projects
+  // legacy fields (oneTimeExpenses, spouseDeathYear + survivorStepUpBenefitUSD,
+  // moveSchedule) plus any caller-supplied `lifeEvents` into a single
+  // year-sorted list, already filtered to the kernel's [0, years) horizon.
+  // Indexed by year for O(1) per-year dispatch lookup. Multiple events in
+  // the same year stack via array.
+  //
+  // Step 2a dispatches the trivial event kinds (`oneTimeExpense`, `stepUpBasis`)
+  // from this map. Move (`move`) and spouse-death (`spouseDeath`) events are
+  // present in the map but NOT yet dispatched — those branches still read
+  // legacy `moveSchedule` / `spouseDeathYear` directly because they have
+  // tightly-coupled FX-state / survivorPhase mutations that need separate
+  // refactor passes (steps 2b + 2c).
+  const eventsByYear = new Map<number, LifeEvent[]>();
+  for (const ev of compileLifeEvents(p)) {
+    const list = eventsByYear.get(ev.year) ?? [];
+    list.push(ev);
+    eventsByYear.set(ev.year, list);
   }
 
   // Per-year active-segment lookup (schedule is sorted ascending by fromYear).
@@ -781,8 +791,30 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         const sc = segmentCostAtYear(active, y, p, true);
         cost = sc.total * cumInfl;
         costHealthcare = sc.healthcare * cumInfl;
-        if (p.survivorStepUpBenefitUSD && p.survivorStepUpBenefitUSD > 0) {
-          bal += p.survivorStepUpBenefitUSD;
+        // NOTE: stepped-up basis bump used to live here as an inline
+        // `bal += p.survivorStepUpBenefitUSD`. Moved to the early dispatch
+        // pass below so it's driven by the unified Life Events timeline
+        // (#31 step 2a). Behavior is byte-identical: dispatch fires before
+        // sampleYear() / random sampling, same as the inline used to.
+      }
+
+      // Early-pass dispatch (#31 step 2a) — handles event kinds whose
+      // effect is a simple balance mutation BEFORE the year's random
+      // return / inflation sampling. Currently only `stepUpBasis`.
+      // Other kinds (move, spouseDeath, oneTimeIncome, careerChange,
+      // incomeChange, inheritedIRA) live in this map for future
+      // dispatcher passes (#31 steps 2b/2c) but are no-ops in this loop
+      // for now — `move` is still consumed via the legacy moveSchedule
+      // branch above, `spouseDeath` via the legacy death branch above,
+      // and the remaining new kinds have no kernel implementation yet
+      // (caller can populate `p.lifeEvents` with them but they're
+      // silently ignored until later steps wire them up).
+      const eventsThisYear = eventsByYear.get(y);
+      if (eventsThisYear) {
+        for (const ev of eventsThisYear) {
+          if (ev.kind === 'stepUpBasis') {
+            bal += ev.benefitUSD;
+          }
         }
       }
 
@@ -853,13 +885,24 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       }
       bal += (income + activePartTime) * 12 - cost * 12 * costShockMult + hsaDraw;
 
-      // One-time expenses for this year — stacked deductions, scaled by
-      // accumulated inflation by default (lumpy real-world costs grow with CPI).
-      const lumpsThisYear = expensesByYear.get(y);
-      if (lumpsThisYear) {
-        for (const e of lumpsThisYear) {
-          const inflated = (e.inflate ?? true) ? e.amountUSD * cumInfl : e.amountUSD;
-          bal -= inflated;
+      // Late-pass dispatch (#31 step 2a) — handles event kinds whose
+      // effect is a balance mutation AFTER the year's income / cost
+      // mutation. Currently only `oneTimeExpense`. Same `eventsThisYear`
+      // array as the early-pass dispatch above; we iterate it twice with
+      // different kind filters because the legacy ordering put stepUpBasis
+      // BEFORE the random sample and oneTimeExpense AFTER the cost
+      // deduction. Preserving that ordering keeps results byte-identical
+      // for legacy callers.
+      //
+      // Inflation scaling: `e.inflate ?? true` matches the legacy default —
+      // omitted means inflate-by-CPI. Set false for nominal-dollar fixed
+      // payments (annuity payouts, mortgage payoff).
+      if (eventsThisYear) {
+        for (const ev of eventsThisYear) {
+          if (ev.kind === 'oneTimeExpense') {
+            const inflated = (ev.inflate ?? true) ? ev.amountUSD * cumInfl : ev.amountUSD;
+            bal -= inflated;
+          }
         }
       }
 
