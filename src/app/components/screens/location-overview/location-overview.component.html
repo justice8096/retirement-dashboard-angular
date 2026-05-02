@@ -1,0 +1,167 @@
+    <div class="overview">
+
+      <!-- Filter bar with dropdowns -->
+      <div class="filter-bar">
+        <select class="filter-select"
+          [value]="loc.countryFilter() ?? ''"
+          (change)="loc.countryFilter.set($any($event.target).value || null)"
+          aria-label="Filter by country">
+          <option value="">All Countries</option>
+          @for (c of loc.countries(); track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+
+        <select class="filter-select"
+          [value]="loc.regionFilter() ?? ''"
+          (change)="loc.regionFilter.set($any($event.target).value || null)"
+          aria-label="Filter by region">
+          <option value="">All Regions</option>
+          @for (r of filteredRegions(); track r) {
+            <option [value]="r">{{ r }}</option>
+          }
+        </select>
+
+        <select class="filter-select"
+          [value]="loc.sortBy()"
+          (change)="loc.sortBy.set($any($event.target).value)"
+          aria-label="Sort by">
+          <option value="monthlyCostTotal">Sort by Cost</option>
+          <option value="name">Sort by Name</option>
+          <option value="country">Sort by Country</option>
+        </select>
+
+        <button mat-stroked-button
+          (click)="loc.sortDir.set(loc.sortDir() === 'asc' ? 'desc' : 'asc')"
+          class="sort-btn"
+          [attr.aria-label]="'Sort ' + (loc.sortDir() === 'asc' ? 'descending' : 'ascending')">
+          {{ loc.sortDir() === 'asc' ? '↑ Low–High' : '↓ High–Low' }}
+        </button>
+
+        <input type="text"
+          class="search-input"
+          placeholder="Search..."
+          [value]="loc.searchTerm()"
+          (input)="loc.searchTerm.set($any($event.target).value)"
+          aria-label="Search locations" />
+
+        @if (loc.searchTerm() || loc.countryFilter() || loc.regionFilter()) {
+          <button mat-button (click)="clearAll()" class="clear-btn">
+            Clear
+          </button>
+        }
+      </div>
+
+      <!-- Selection controls + summary -->
+      <div class="selection-bar">
+        <div class="selection-controls">
+          <label class="select-all-label">
+            <input type="checkbox"
+              [checked]="allVisibleSelected()"
+              [indeterminate]="someVisibleSelected() && !allVisibleSelected()"
+              (change)="toggleSelectAll()"
+              aria-label="Select all visible locations" />
+            <span>Select All</span>
+          </label>
+          @if (loc.selectedIds().size > 0) {
+            <span class="selection-count">
+              {{ loc.selectedIds().size }} selected
+            </span>
+            <button mat-button class="clear-btn" (click)="loc.deselectAll()">
+              Clear selection
+            </button>
+          }
+        </div>
+
+        <div class="stats-row">
+          <span class="stat-pill">
+            {{ loc.locationCount() }}
+            <span class="stat-label">
+              {{ loc.locationCount() === loc.totalCount() ? 'locations' : 'of ' + loc.totalCount() }}
+            </span>
+          </span>
+          @if (loc.cheapest(); as cheap) {
+            <span class="stat-pill cheapest">
+              {{ dyscalculia.isEnabled()
+                ? dyscalculia.formatCurrency(cheap.monthlyCostTotal)
+                : '$' + cheap.monthlyCostTotal.toLocaleString() + '/mo' }}
+              <span class="stat-label">cheapest</span>
+            </span>
+          }
+        </div>
+      </div>
+
+      <!-- Loading / Error -->
+      @if (loc.loading()) {
+        <div class="status-msg">Loading locations...</div>
+      }
+      @if (loc.error(); as err) {
+        <div class="status-msg error">{{ err }}</div>
+      }
+
+      <!-- Location list with checkboxes -->
+      <div class="location-list" role="list">
+        @for (location of loc.filteredLocations(); track location.id) {
+          <label class="location-row" role="listitem"
+            [class.checked]="loc.selectedIds().has(location.id)">
+            <input type="checkbox"
+              [checked]="loc.selectedIds().has(location.id)"
+              (change)="loc.toggleLocation(location.id)"
+              [attr.aria-label]="'Select ' + location.name" />
+            <span class="row-name">{{ location.name }}</span>
+            <span class="row-meta">{{ location.country }} · {{ location.region }}@if (location.subregion) { · {{ location.subregion }} }</span>
+            <span class="row-cost"
+              [class]="dyscalculia.numberSpacingClass()">
+              {{ dyscalculia.isEnabled()
+                ? dyscalculia.formatCurrency(location.monthlyCostTotal)
+                : '$' + location.monthlyCostTotal.toLocaleString() + '/mo' }}
+            </span>
+            <button class="row-detail-btn" mat-button
+              (click)="viewDetail($event, location.id)"
+              aria-label="View details">
+              →
+            </button>
+          </label>
+        } @empty {
+          @if (!loc.loading()) {
+            <div class="empty-state">
+              No locations match your filters.
+              <button mat-button (click)="clearAll()">Clear filters</button>
+            </div>
+          }
+        }
+      </div>
+
+      @if (dyscalculia.isEnabled() && dyscalculia.settings().magnitudeAnchors && loc.cheapest(); as cheap) {
+        <div class="anchor-note">
+          {{ dyscalculia.getMagnitudeAnchor(cheap.monthlyCostTotal) }}
+        </div>
+      }
+
+      <!-- Converged totals (VAT on taxable categories + bracket-based income tax) -->
+      @if (tax.convergedTotals().length) {
+        <div class="converged-card">
+          <div class="converged-head">
+            <h3 class="converged-title">💰 Converged Monthly Totals (tax-adjusted)</h3>
+            <span class="converged-sub">
+              VAT + social charges on taxable categories; federal + state income tax when brackets available.
+            </span>
+          </div>
+          <div class="converged-rows">
+            @for (r of tax.convergedTotals(); track r.id) {
+              <div class="converged-row">
+                <span class="cr-name">{{ r.name }}</span>
+                <span class="cr-country">{{ r.country }}</span>
+                <span class="cr-total" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmtCost(r.total) }}
+                </span>
+                <span class="cr-tax" [class]="dyscalculia.numberSpacingClass()"
+                      [title]="'Tax source: ' + r.incomeTaxSource">
+                  tax {{ fmtTaxCents(r.tax) }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
