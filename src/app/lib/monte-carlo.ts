@@ -505,6 +505,25 @@ export interface MonteCarloParams {
    * given event, not both.
    */
   lifeEvents?: LifeEvent[];
+
+  /**
+   * Optional deterministic-seed RNG. When provided, all kernel-internal
+   * random draws (Gaussian return/inflation samples, regime-switch coin
+   * flips, currency shocks, LTC start-age + occurrence rolls) consume
+   * this function instead of `Math.random`. Defaults to `Math.random`
+   * for production use.
+   *
+   * Use `mulberry32(seed)` to construct a seeded function:
+   *   const params = { ..., seededRandom: mulberry32(42) };
+   *
+   * Two `runMonteCarlo` calls with the same seed and otherwise-identical
+   * params produce byte-identical results / paths arrays — which is
+   * exactly what kernel-refactor PRs need to prove "no behavior change"
+   * without relying on algebraic reduction proofs in commit bodies.
+   * Pre-existing legacy callers that don't supply this field continue
+   * to use Math.random and remain bit-for-bit identical to pre-PR runs.
+   */
+  seededRandom?: () => number;
 }
 
 export interface MonteCarloResult {
@@ -646,12 +665,38 @@ function ageTransitionAtYear(y: number, p: MonteCarloParams): boolean {
   return adults.some(by => calYear === by + 65);
 }
 
-/** Box-Muller transform: standard normal sample. */
-function normalRandom(): number {
+/**
+ * Mulberry32 seeded PRNG factory. Returns a function that produces a
+ * deterministic stream of `Math.random()`-compatible values in `[0, 1)`
+ * from the supplied 32-bit integer seed.
+ *
+ * Reference: https://github.com/bryc/code/blob/master/jshash/PRNGs.md#mulberry32
+ * Quality: passes most BigCrush statistical tests; ~2-3x faster than
+ * `Math.random` in modern V8; fine for simulation use, NOT for crypto.
+ *
+ * Pair with `MonteCarloParams.seededRandom` to make trial trajectories
+ * deterministic across runs:
+ *   runMonteCarlo({ ..., seededRandom: mulberry32(42) })
+ * Same seed → byte-identical `results[]` and `paths[][]`.
+ */
+export function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Box-Muller transform: standard normal sample, threading a caller-supplied
+ *  RNG so the same seed produces a reproducible Gaussian stream. */
+function normalRandom(rand: () => number): number {
   let u = 0;
   let v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
+  while (u === 0) u = rand();
+  while (v === 0) v = rand();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
@@ -665,6 +710,7 @@ function sampleYear(
   y: number,
   p: MonteCarloParams,
   regimeState: { inBear: boolean },
+  rand: () => number,
 ): { ret: number; inf: number } {
   switch (mode) {
     case 'bootstrap': {
@@ -674,14 +720,14 @@ function sampleYear(
     case 'regime': {
       const cfg = p.regime ?? DEFAULT_REGIME;
       if (regimeState.inBear) {
-        if (Math.random() < cfg.pBearToBull) regimeState.inBear = false;
+        if (rand() < cfg.pBearToBull) regimeState.inBear = false;
       } else {
-        if (Math.random() < cfg.pBullToBear) regimeState.inBear = true;
+        if (rand() < cfg.pBullToBear) regimeState.inBear = true;
       }
       const mean = regimeState.inBear ? cfg.bearMean : cfg.bullMean;
       const vol  = regimeState.inBear ? cfg.bearVol  : cfg.bullVol;
-      const ret = mean + vol * normalRandom();
-      const inf = Math.max(0, p.meanInflation + p.volInflation * normalRandom());
+      const ret = mean + vol * normalRandom(rand);
+      const inf = Math.max(0, p.meanInflation + p.volInflation * normalRandom(rand));
       return { ret, inf };
     }
 
@@ -695,8 +741,8 @@ function sampleYear(
 
     case 'normal':
     default: {
-      const ret = p.meanReturn + p.volReturn * normalRandom();
-      const inf = Math.max(0, p.meanInflation + p.volInflation * normalRandom());
+      const ret = p.meanReturn + p.volReturn * normalRandom(rand);
+      const inf = Math.max(0, p.meanInflation + p.volInflation * normalRandom(rand));
       return { ret, inf };
     }
   }
@@ -708,6 +754,14 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     runs, years, currVol, incGrowth,
   } = p;
   const mode: ReturnMode = p.returnMode ?? 'normal';
+
+  // RNG resolution. When `p.seededRandom` is unset (the default — every
+  // production caller today), `rand` is `Math.random` and trial trajectories
+  // are non-deterministic across runs as before. When set (test harnesses
+  // and any caller wanting reproducibility), every kernel-internal random
+  // draw routes through the supplied function — same seed → byte-identical
+  // results / paths arrays. Pair with `mulberry32(seed)` for tests.
+  const rand = p.seededRandom ?? Math.random;
 
   // Historical-sequence is deterministic per start year, so a single "run"
   // is the only meaningful output. Clamp runs to 1 to avoid identical dupes.
@@ -895,8 +949,8 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     let ltcStartSimYear = -1;
     let ltcEndSimYear = -1;
     if (ltcSelfInsure && oldestAge0 != null && !ltcUseExpectedValue
-        && Math.random() < ltcProbability) {
-      const ltcStartAge = ltcStartAgeMin + Math.random() * (ltcStartAgeMax - ltcStartAgeMin);
+        && rand() < ltcProbability) {
+      const ltcStartAge = ltcStartAgeMin + rand() * (ltcStartAgeMax - ltcStartAgeMin);
       ltcStartSimYear = Math.max(0, Math.floor(ltcStartAge - oldestAge0));
       ltcEndSimYear = ltcStartSimYear + Math.max(1, Math.round(ltcDurationY));
     }
@@ -1060,8 +1114,8 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         }
       }
 
-      const { ret, inf } = sampleYear(mode, y, p, regimeState);
-      const currShock = curIsForeign ? 1 + currVol * normalRandom() : 1;
+      const { ret, inf } = sampleYear(mode, y, p, regimeState, rand);
+      const currShock = curIsForeign ? 1 + currVol * normalRandom(rand) : 1;
       if (curIsForeign && curDrift) fxMult *= (1 + curDrift);
       // FX stress test: deterministic one-time shock at fxShockYear. Fires
       // regardless of current segment (a USD repricing happens whether or not
@@ -1125,7 +1179,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         hsaDraw = Math.min(hsaBal, healthcareAnnual);
         hsaBal -= hsaDraw;
       }
-      bal += (income + activePartTime) * 12 - cost * 12 * costShockMult + hsaDraw;
+      // Phantom-income clamp — mirror of the HSA `healthcareAnnual` floor
+      // a few lines above. `costShockMult = currShock * fxMult * effectiveFxShock`
+      // where `currShock = 1 + currVol * normalRandom()` is unbounded below 0
+      // in foreign segments under high currVol + a deep-negative Gaussian draw.
+      // Without this floor, `bal -= cost * 12 * costShockMult` would flip into
+      // a positive bal addition — fictitious income from no source. Expenses
+      // can be reduced (favorable FX, costShockMult between 0 and 1) but cannot
+      // fund the portfolio.
+      const costAnnualWithShock = Math.max(0, cost * 12 * costShockMult);
+      bal += (income + activePartTime) * 12 - costAnnualWithShock + hsaDraw;
 
       // Late-pass dispatch (#31 step 2a + priority 2) — handles event
       // kinds whose effect is a balance mutation AFTER the year's

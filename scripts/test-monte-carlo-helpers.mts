@@ -21,6 +21,8 @@ const {
   weightedInflationFromLocation,
   inflationBreakdownFromLocation,
   compileLifeEvents,
+  mulberry32,
+  runMonteCarlo,
 } = mc as unknown as {
   weightedInflationFromLocation: (
     monthlyCosts: Record<string, { typical?: number; annualInflation?: number }> | null | undefined,
@@ -33,6 +35,15 @@ const {
     totalMonthly: number;
   };
   compileLifeEvents: (p: Record<string, unknown>) => { kind: string; year: number; [k: string]: unknown }[];
+  mulberry32: (seed: number) => () => number;
+  runMonteCarlo: (p: Record<string, unknown>) => {
+    successRate: number;
+    median: number;
+    p5: number;
+    p95: number;
+    results: number[];
+    paths: number[][];
+  };
 };
 
 // ─── weightedInflationFromLocation ──────────────────────────────────────
@@ -334,3 +345,139 @@ test('compileLifeEvents: result is sorted by year ascending', () => {
     assert.ok(years[i] >= years[i - 1], `events out of order at index ${i}: ${years.join(', ')}`);
   }
 });
+
+// ─── mulberry32 ─────────────────────────────────────────────────────────
+
+test('mulberry32: same seed produces identical sequence', () => {
+  const a = mulberry32(42);
+  const b = mulberry32(42);
+  for (let i = 0; i < 100; i++) {
+    assert.equal(a(), b(), `divergence at index ${i}`);
+  }
+});
+
+test('mulberry32: different seeds produce different sequences', () => {
+  const a = mulberry32(42);
+  const b = mulberry32(43);
+  let anyDiff = false;
+  for (let i = 0; i < 100; i++) {
+    if (a() !== b()) { anyDiff = true; break; }
+  }
+  assert.ok(anyDiff, 'expected at least one differing draw across seeds 42 vs 43');
+});
+
+test('mulberry32: outputs in [0, 1) — never 1, never < 0', () => {
+  const r = mulberry32(12345);
+  for (let i = 0; i < 1000; i++) {
+    const x = r();
+    assert.ok(x >= 0 && x < 1, `out of range at index ${i}: ${x}`);
+  }
+});
+
+test('mulberry32: known stable sequence for seed 42 (regression guard)', () => {
+  // Pinning the first 3 outputs locks the algorithm — accidental changes
+  // to the bitwise math would break this test before they break callers.
+  const r = mulberry32(42);
+  const got = [r(), r(), r()];
+  // Computed once from the implementation as it stands at PR-merge time.
+  // If you intentionally change the PRNG, regenerate these values and
+  // call out the seed-stability break in the commit body.
+  assert.ok(Math.abs(got[0] - 0.6011037519201636) < 1e-12, `seed 42 draw 0: got ${got[0]}`);
+  assert.ok(Math.abs(got[1] - 0.44829055899754167) < 1e-12, `seed 42 draw 1: got ${got[1]}`);
+  assert.ok(Math.abs(got[2] - 0.8524657934904099) < 1e-12, `seed 42 draw 2: got ${got[2]}`);
+});
+
+// ─── runMonteCarlo byte-equality ───────────────────────────────────────
+
+/**
+ * Minimal smoke-shaped MC params that exercise the inner trial loop
+ * (Gaussian return / inflation draws, currency shocks for foreign
+ * segments) but not the more elaborate event-driven branches. Keeps
+ * the test fast (<100ms) while still routing through every Math.random
+ * site that was rewired to consume the seeded function.
+ */
+function smokeParams(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    portfolio: 1_000_000,
+    monthlyIncome: 4_000,
+    baseCost: 5_000,
+    isForeign: true, // ensures currShock path is exercised
+    fxDrift: 0.01,
+    runs: 50,
+    years: 20,
+    meanReturn: 0.07,
+    volReturn: 0.15,
+    meanInflation: 0.025,
+    volInflation: 0.01,
+    currVol: 0.05,
+    incGrowth: 0.02,
+    returnMode: 'normal',
+    ...extra,
+  };
+}
+
+test('runMonteCarlo: same seed → byte-identical results array', () => {
+  const a = runMonteCarlo(smokeParams({ seededRandom: mulberry32(2026) }));
+  const b = runMonteCarlo(smokeParams({ seededRandom: mulberry32(2026) }));
+  assert.deepEqual(a.results, b.results, 'results diverged across same-seed runs');
+  assert.equal(a.successRate, b.successRate);
+  assert.equal(a.median, b.median);
+  assert.equal(a.p5, b.p5);
+  assert.equal(a.p95, b.p95);
+});
+
+test('runMonteCarlo: same seed → byte-identical paths array', () => {
+  const a = runMonteCarlo(smokeParams({ seededRandom: mulberry32(2026) }));
+  const b = runMonteCarlo(smokeParams({ seededRandom: mulberry32(2026) }));
+  assert.deepEqual(a.paths, b.paths, 'paths diverged across same-seed runs');
+});
+
+test('runMonteCarlo: different seeds → different results', () => {
+  const a = runMonteCarlo(smokeParams({ seededRandom: mulberry32(1) }));
+  const b = runMonteCarlo(smokeParams({ seededRandom: mulberry32(2) }));
+  // Sorted results arrays differ when the underlying trial trajectories differ.
+  // Allow the rare collision via OR over multiple summary stats.
+  const anyDiff =
+    a.median !== b.median ||
+    a.successRate !== b.successRate ||
+    a.p5 !== b.p5 ||
+    a.p95 !== b.p95;
+  assert.ok(anyDiff, 'seeds 1 vs 2 produced suspiciously identical summary stats');
+});
+
+test('runMonteCarlo: regime mode also reproducible under same seed', () => {
+  // Regime mode adds two extra rand() coin flips per year for state
+  // transitions on top of the Gaussian draws — covers the second-most
+  // randomness-heavy code path.
+  const a = runMonteCarlo(smokeParams({ returnMode: 'regime', seededRandom: mulberry32(7) }));
+  const b = runMonteCarlo(smokeParams({ returnMode: 'regime', seededRandom: mulberry32(7) }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});
+
+test('runMonteCarlo: LTC self-insure roll consumes seeded RNG', () => {
+  // ltcSelfInsure + non-EV mode triggers the per-trial Math.random ltc
+  // start-age roll. With the seeded RNG, identical inputs must produce
+  // identical results across runs.
+  const params = smokeParams({
+    ltcSelfInsure: true,
+    ltcUseExpectedValue: false,
+    ltcProbability: 0.7,
+    ltcStartAgeMin: 78,
+    ltcStartAgeMax: 88,
+    ltcDurationYears: 2.4,
+    ltcCostPerYearUSD: 108_000,
+    adultBirthYears: [1960],
+    simStartYear: 2026,
+  });
+  const a = runMonteCarlo({ ...params, seededRandom: mulberry32(99) });
+  const b = runMonteCarlo({ ...params, seededRandom: mulberry32(99) });
+  assert.deepEqual(a.results, b.results);
+});
+
+// NOTE: A cross-PR regression test for the `Math.max(0, cost*12*costShockMult)`
+// phantom-income clamp (PR #111) lives in a follow-up commit, not here. The
+// seeded RNG made the test possible (deterministic seed + extreme currVol +
+// zero-return params reproducibly trips the bug) but it's coupled to the
+// clamp's behavior, not the RNG mechanism this PR introduces. Filed for the
+// follow-up commit that lands after #111 merges.
