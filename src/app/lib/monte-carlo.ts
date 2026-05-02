@@ -41,6 +41,40 @@ export interface OneTimeExpense {
   inflate?: boolean;
 }
 
+/**
+ * One-time discrete income at a specific sim year — modelled as a balance
+ * addition in the year it hits. Use cases: inheritance, home-sale proceeds,
+ * deferred-comp payout, lawsuit settlement, lottery, severance, late-life
+ * gift to the children's children.
+ *
+ * Symmetric to `OneTimeExpense` (#31 priority 2): same shape, opposite sign
+ * — kernel adds to balance instead of subtracting. Default `inflate: true`
+ * matches `OneTimeExpense` semantics: amount is in today's USD, scaled by
+ * accumulated inflation at the year it hits unless caller explicitly opts
+ * out (e.g., a fixed-dollar life-insurance payout that doesn't grow with
+ * CPI). Multiple incomes in the same year stack. Negative or zero amounts
+ * are silently skipped, mirroring the expense filter.
+ *
+ * Tax treatment caveat: this is a pure balance add — does NOT flow into
+ * MAGI or any tax pathway. For inheritance-of-IRA scenarios where the
+ * heir owes ordinary income tax on distributions, use the (future)
+ * `inheritedIRA` LifeEvent kind instead, which models the SECURE Act
+ * 10-year forced drawdown with MAGI ripples to IRMAA. Use this kind only
+ * for inflows that don't trigger tax (cash inheritance under the federal
+ * estate-tax exemption, step-up-basis taxable-account inheritance, home
+ * sale proceeds within IRC § 121 exclusion, life insurance, etc.).
+ */
+export interface OneTimeIncome {
+  /** Sim year (0-based from start). 0 = today. */
+  year: number;
+  /** Amount in today's USD. Positive number; kernel adds to balance. */
+  amountUSD: number;
+  /** Optional human-readable label (rendered in scenario passthrough only). */
+  label?: string;
+  /** Whether to inflate by accumulated inflation at the year. Default true. */
+  inflate?: boolean;
+}
+
 export interface LocationMove {
   /** Year from simulation start when this segment begins (0 = start). */
   fromYear: number;
@@ -216,6 +250,20 @@ export interface MonteCarloParams {
    * cost line can't represent.
    */
   oneTimeExpenses?: OneTimeExpense[];
+
+  /**
+   * One-time discrete income / portfolio additions at specific sim years.
+   * Symmetric to `oneTimeExpenses` (#31 priority 2): same shape, opposite
+   * sign — kernel adds to balance. Use cases: inheritance, home-sale
+   * proceeds, deferred-comp payout, life-insurance payout, severance.
+   *
+   * Tax-pathway caveat: this is a pure balance add — does NOT flow into
+   * MAGI / income tax / IRMAA. For inflows that DO trigger ordinary
+   * income tax (e.g. inherited traditional IRA distributions under the
+   * SECURE Act 10-year drain), use a future `inheritedIRA` LifeEvent
+   * instead. Use this field only for tax-free or already-taxed inflows.
+   */
+  oneTimeIncomes?: OneTimeIncome[];
 
   /**
    * Deterministic spouse-death scenario. When set, at year `spouseDeathYear`
@@ -652,16 +700,18 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   // year for O(1) per-year dispatch lookup. Multiple events in the same
   // year stack via array.
   //
-  // The kernel now dispatches all four legacy-projected event kinds
-  // (`move`, `spouseDeath`, `stepUpBasis`, `oneTimeExpense`) from this
-  // map. The `spouseDeath` dispatcher (step 2c) only triggers the
-  // survivor-phase transition; the per-year survivor-specific reads of
-  // `p.survivor*` fields elsewhere (segmentCostAtYear, the inheritance
-  // tax branch) still run as before, preserving byte-identity. The
-  // remaining LifeEvent kinds (oneTimeIncome, careerChange, incomeChange,
-  // inheritedIRA) have no kernel implementation yet — caller-supplied
-  // events of those kinds pass through `compileLifeEvents` and into
-  // `eventsByYear` but are silently no-op'd in the year loop.
+  // The kernel now dispatches five event kinds from this map: the four
+  // legacy-projected (`move`, `spouseDeath`, `stepUpBasis`,
+  // `oneTimeExpense`) plus `oneTimeIncome` (#31 priority 2 —
+  // inheritance / home-sale proceeds / payouts). The `spouseDeath`
+  // dispatcher (step 2c) only triggers the survivor-phase transition;
+  // the per-year survivor-specific reads of `p.survivor*` fields
+  // elsewhere (segmentCostAtYear, the inheritance-tax branch) still
+  // run as before, preserving byte-identity. The remaining LifeEvent
+  // kinds (`careerChange`, `incomeChange`, `inheritedIRA`) have no
+  // kernel implementation yet — caller-supplied events of those kinds
+  // pass through `compileLifeEvents` into `eventsByYear` but are
+  // silently no-op'd in the year loop.
   const eventsByYear = new Map<number, LifeEvent[]>();
   for (const ev of compileLifeEvents(p)) {
     const list = eventsByYear.get(ev.year) ?? [];
@@ -867,11 +917,12 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // `move` events are consumed by the move-dispatch block at the
       // top of the year loop (#31 step 2b). `spouseDeath` events are
       // consumed by the spouse-death-dispatch block above (#31 step 2c).
-      // The remaining new kinds (oneTimeIncome, careerChange,
-      // incomeChange, inheritedIRA) live in this map but have no kernel
-      // implementation yet — caller can populate `p.lifeEvents` with
-      // them but they're silently ignored until later steps wire them
-      // up.
+      // `oneTimeIncome` events are consumed by the late-pass dispatch
+      // below (#31 priority 2). The remaining new kinds (`careerChange`,
+      // `incomeChange`, `inheritedIRA`) live in this map but have no
+      // kernel implementation yet — caller can populate `p.lifeEvents`
+      // with them but they're silently ignored until later steps wire
+      // them up.
       //
       // Reuses `eventsThisYear` already looked up at the top of the loop.
       if (eventsThisYear) {
@@ -949,23 +1000,34 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       }
       bal += (income + activePartTime) * 12 - cost * 12 * costShockMult + hsaDraw;
 
-      // Late-pass dispatch (#31 step 2a) — handles event kinds whose
-      // effect is a balance mutation AFTER the year's income / cost
-      // mutation. Currently only `oneTimeExpense`. Same `eventsThisYear`
-      // array as the early-pass dispatch above; we iterate it twice with
-      // different kind filters because the legacy ordering put stepUpBasis
-      // BEFORE the random sample and oneTimeExpense AFTER the cost
-      // deduction. Preserving that ordering keeps results byte-identical
-      // for legacy callers.
+      // Late-pass dispatch (#31 step 2a + priority 2) — handles event
+      // kinds whose effect is a balance mutation AFTER the year's
+      // income / cost mutation. Two kinds today: `oneTimeExpense`
+      // (`bal -=`) and `oneTimeIncome` (`bal +=`). Same `eventsThisYear`
+      // array as the early-pass dispatch above; we iterate it twice
+      // with different kind filters because the legacy ordering put
+      // stepUpBasis BEFORE the random sample and one-time lumps AFTER
+      // the cost deduction. Preserving that ordering keeps results
+      // byte-identical for legacy callers.
       //
-      // Inflation scaling: `e.inflate ?? true` matches the legacy default —
-      // omitted means inflate-by-CPI. Set false for nominal-dollar fixed
-      // payments (annuity payouts, mortgage payoff).
+      // Inflation scaling: `e.inflate ?? true` matches the legacy
+      // default — omitted means inflate-by-CPI. Set false for
+      // nominal-dollar fixed payments (annuity payouts, mortgage
+      // payoff, fixed-amount life insurance, court-ordered settlement
+      // amounts in nominal dollars).
+      //
+      // Symmetry: oneTimeIncome and oneTimeExpense use identical
+      // inflate-default semantics. An inheritance amount expressed in
+      // today's dollars grows with CPI by the year it actually arrives,
+      // matching how the user's expense estimates do the same.
       if (eventsThisYear) {
         for (const ev of eventsThisYear) {
           if (ev.kind === 'oneTimeExpense') {
             const inflated = (ev.inflate ?? true) ? ev.amountUSD * cumInfl : ev.amountUSD;
             bal -= inflated;
+          } else if (ev.kind === 'oneTimeIncome') {
+            const inflated = (ev.inflate ?? true) ? ev.amountUSD * cumInfl : ev.amountUSD;
+            bal += inflated;
           }
         }
       }
@@ -1164,6 +1226,17 @@ export function compileLifeEvents(p: MonteCarloParams): LifeEvent[] {
     if (!e || !(e.amountUSD > 0) || !inHorizon(e.year)) continue;
     events.push({
       kind: 'oneTimeExpense',
+      year: e.year,
+      amountUSD: e.amountUSD,
+      label: e.label,
+      inflate: e.inflate,
+    });
+  }
+
+  for (const e of p.oneTimeIncomes ?? []) {
+    if (!e || !(e.amountUSD > 0) || !inHorizon(e.year)) continue;
+    events.push({
+      kind: 'oneTimeIncome',
       year: e.year,
       amountUSD: e.amountUSD,
       label: e.label,

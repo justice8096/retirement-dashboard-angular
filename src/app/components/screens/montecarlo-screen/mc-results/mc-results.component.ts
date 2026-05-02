@@ -128,6 +128,8 @@ export class McResultsComponent {
       moves: s.moves(),
       oneTimeExpensesEnabled: s.oneTimeExpensesEnabled(),
       oneTimeExpenses: s.oneTimeExpenses(),
+      oneTimeIncomesEnabled: s.oneTimeIncomesEnabled(),
+      oneTimeIncomes: s.oneTimeIncomes(),
       ltcMode: s.ltcMode(),
       ltcProbability: s.ltcProbability(),
       ltcCostPerYearUSD: s.ltcCostPerYearUSD(),

@@ -114,6 +114,11 @@ export class MonteCarloStateService {
   readonly oneTimeExpenses = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
   readonly oneTimeExpensesEnabled = signal(false);
 
+  /** One-time future income / portfolio additions (inheritance, home-sale
+   *  proceeds, deferred-comp payouts, life insurance). #31 priority 2. */
+  readonly oneTimeIncomes = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
+  readonly oneTimeIncomesEnabled = signal(false);
+
   /** Long-Term Care planning (#21). */
   readonly ltcMode = signal<'off' | 'self-insure' | 'insurance' | 'both'>('off');
   readonly ltcProbability = signal(70);
@@ -448,6 +453,7 @@ export class MonteCarloStateService {
       this.regimeBullToBear(); this.regimeBearToBull();
       this.moves(); this.movesEnabled();
       this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
+      this.oneTimeIncomes(); this.oneTimeIncomesEnabled();
       this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
       this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
       this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();

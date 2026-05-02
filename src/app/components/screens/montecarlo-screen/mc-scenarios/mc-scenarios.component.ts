@@ -108,4 +108,34 @@ export class McScenariosComponent {
       list.map((e, i) => i === idx ? { ...e, ...partial } : e),
     );
   }
+
+  /* ─── One-time incomes (#31 priority 2 — inheritance / payouts) ── */
+
+  /** Add a one-time income row — defaults to year 10, $100K, "Inheritance",
+   *  inflate=true. The default scenario most users have in mind is "expected
+   *  inheritance from a parent in ~10 years"; the inflate flag matches
+   *  expenses (today's-$ semantics, scaled by CPI when it actually arrives). */
+  protected addOneTimeIncome(): void {
+    const current = this.state.oneTimeIncomes();
+    const lastYear = current.length ? current[current.length - 1].year : 0;
+    const newYear = Math.min(this.state.years() - 1, Math.max(lastYear + 3, 10));
+    this.state.oneTimeIncomes.set([
+      ...current,
+      { year: newYear, amountUSD: 100000, label: 'Inheritance', inflate: true },
+    ]);
+    this.state.oneTimeIncomesEnabled.set(true);
+  }
+
+  protected removeOneTimeIncome(idx: number): void {
+    this.state.oneTimeIncomes.update(list => list.filter((_, i) => i !== idx));
+  }
+
+  protected patchOneTimeIncome(
+    idx: number,
+    partial: Partial<{ year: number; amountUSD: number; label: string; inflate: boolean }>,
+  ): void {
+    this.state.oneTimeIncomes.update(list =>
+      list.map((e, i) => i === idx ? { ...e, ...partial } : e),
+    );
+  }
 }

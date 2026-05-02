@@ -128,6 +128,64 @@
   }
 </div>
 
+<!-- One-time future income / portfolio additions (#31 priority 2) -->
+<div class="card moves-card">
+  <h3 class="card-title">One-Time Future Income</h3>
+  <p class="card-sub">
+    Lumpy inflows the recurring monthly income line can't represent —
+    inheritance, home-sale proceeds (downsizing), deferred-comp payout,
+    life-insurance payout, severance. Each row adds to the portfolio at
+    year Y, scaled by accumulated inflation by default. Multiple rows in
+    the same year stack. Tax caveat: this is a pure balance add; for
+    inheritance of a traditional IRA (taxable distributions over 10 years
+    under the SECURE Act), use a future inherited-IRA event instead.
+  </p>
+
+  @for (e of state.oneTimeIncomes(); track $index; let i = $index) {
+    <div class="timeline-row">
+      <label class="tl-field">
+        <span class="tl-small-label">Year</span>
+        <input appNumeric="age" class="tl-input" min="0" [max]="state.years() - 1"
+          [ngModel]="e.year"
+          (ngModelChange)="patchOneTimeIncome(i, { year: +$event })" />
+      </label>
+      <label class="tl-field tl-field-loc">
+        <span class="tl-small-label">Label</span>
+        <input class="tl-input" type="text"
+          [ngModel]="e.label"
+          (ngModelChange)="patchOneTimeIncome(i, { label: $event })" />
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Amount ($)</span>
+        <input appNumeric="currency" class="tl-input" step="1000"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="e.amountUSD"
+          (ngModelChange)="patchOneTimeIncome(i, { amountUSD: +$event })" />
+      </label>
+      <label class="tl-field tl-inflate">
+        <input type="checkbox"
+          [checked]="e.inflate"
+          (change)="patchOneTimeIncome(i, { inflate: !e.inflate })" />
+        <span class="tl-small-label">Inflate</span>
+      </label>
+      <button class="tl-remove" (click)="removeOneTimeIncome(i)" aria-label="Remove income">✕</button>
+    </div>
+  }
+
+  <button mat-stroked-button class="add-move-btn" (click)="addOneTimeIncome()">
+    + Add One-Time Income
+  </button>
+
+  @if (state.oneTimeIncomes().length > 0) {
+    <label class="moves-toggle">
+      <input type="checkbox"
+        [checked]="state.oneTimeIncomesEnabled()"
+        (change)="state.oneTimeIncomesEnabled.set(!state.oneTimeIncomesEnabled())" />
+      <span>Apply incomes to next simulation run</span>
+    </label>
+  }
+</div>
+
 <!-- Long-Term Care planning -->
 <div class="card death-card">
   <h3 class="card-title">Long-Term Care</h3>

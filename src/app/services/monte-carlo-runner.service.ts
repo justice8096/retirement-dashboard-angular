@@ -72,6 +72,14 @@ export class MonteCarloRunnerService {
                 inflate: e.inflate,
               }))
             : undefined,
+          oneTimeIncomes: s.oneTimeIncomesEnabled()
+            ? s.oneTimeIncomes().map(e => ({
+                year: e.year,
+                amountUSD: e.amountUSD,
+                label: e.label || undefined,
+                inflate: e.inflate,
+              }))
+            : undefined,
           ltcSelfInsureEnabled: s.ltcMode() === 'self-insure' || s.ltcMode() === 'both',
           ltcProbability: s.ltcProbability() / 100,
           ltcCostPerYearUSD: s.ltcCostPerYearUSD(),
