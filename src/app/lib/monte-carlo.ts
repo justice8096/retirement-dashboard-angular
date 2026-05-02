@@ -507,6 +507,27 @@ export interface MonteCarloParams {
   lifeEvents?: LifeEvent[];
 
   /**
+   * Optional per-year override of the household-wide Medicare monthly cost.
+   * Sparse array: index `y` may be `undefined`, which falls through to the
+   * active segment's `m.medicareMonthly`. Set entries are used instead of
+   * `m.medicareMonthly` when the active segment is US + non-survivor phase.
+   *
+   * Use case (#31 priority 5 follow-up): inherited-IRA SECURE Act 10-year
+   * drain spikes MAGI for the drain years. Pre-65 effects ripple through
+   * the ACA-subsidy branch of `segmentCostAtYear` already (via
+   * `magiAugmentByYear`). Post-65 effects didn't ripple because Medicare
+   * + IRMAA premium was a fixed `m.medicareMonthly` scalar. The runner
+   * now pre-computes this override using the IRMAA bracket table for
+   * years where MAGI is augmented past a tier boundary.
+   *
+   * Survivor phase bypasses this override entirely — `p.survivorMedicareMonthly`
+   * is the survivor-specific single-IRMAA premium and is read directly.
+   * Foreign segments don't read `m.medicareMonthly` at all, so the
+   * override is naturally inert when the heir is abroad.
+   */
+  medicareMonthlyByYear?: (number | undefined)[];
+
+  /**
    * Optional deterministic-seed RNG. When provided, all kernel-internal
    * random draws (Gaussian return/inflation samples, regime-switch coin
    * flips, currency shocks, LTC start-age + occurrence rolls) consume
@@ -590,13 +611,21 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
   if (m.isUS) {
     const adults = p.adultBirthYears ?? [];
     const nAdults = Math.max(1, adults.length || 2);
+    // Per-year IRMAA override (#31 priority 5 follow-up). When the runner
+    // pre-computed `p.medicareMonthlyByYear[y]` (e.g. for an inherited-IRA
+    // drain year that pushes MAGI past an IRMAA tier boundary), use that
+    // value instead of the segment's flat `m.medicareMonthly`. Survivor
+    // phase bypasses the override (`survivorMedicareMonthly` branch above
+    // already returned), so the override only applies to non-survivor +
+    // US + age-aware household paths below.
+    const medicareTotal = p.medicareMonthlyByYear?.[y] ?? m.medicareMonthly ?? 0;
     if (survivorMedicareEligible) {
       // Survivor phase + age 65+ + US: use the IRMAA-adjusted single-filer
       // premium from the caller (pre-computed for 1 adult, so use as-is).
       healthcare = p.survivorMedicareMonthly!;
     } else if (!adults.length) {
       // Unknown ages → assume all Medicare-eligible (conservative lower bound).
-      healthcare = m.medicareMonthly ?? 0;
+      healthcare = medicareTotal;
     } else {
       // Standard age-aware mix. In survivor phase but pre-65, this still runs
       // and naturally treats the survivor as 1 adult on ACA — except
@@ -607,7 +636,7 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
       // from `adults` once survivorPhase is true.
       const medicareCount = adults.filter(by => (calYear - by) >= 65).length;
       const acaCount = nAdults - medicareCount;
-      const medicarePerAdult = (m.medicareMonthly ?? 0) / nAdults;
+      const medicarePerAdult = medicareTotal / nAdults;
       const acaFullPerAdult = (m.acaUnsubsidizedMonthly ?? 0) / nAdults;
       // Year-aware MAGI: transition value in year 0, steady state thereafter.
       // Plus optional caller-supplied augmentation for inherited-IRA drain
@@ -812,15 +841,15 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   // `compileLifeEvents` into `eventsByYear` but are silently no-op'd
   // in the year loop.
   //
-  // Known limitation (#31 priority 5 follow-up): post-65 IRMAA tier
-  // jump from inheritedIRA drain is NOT modeled. The kernel uses a
-  // pre-baked `m.medicareMonthly` set by the runner from the heir's
-  // baseline MAGI; the per-year MAGI augmentation only ripples through
-  // segmentCostAtYear's pre-65 ACA-subsidy branch. To capture the
-  // post-65 ripple, the runner would need to encode
-  // `medicareMonthlyByYear[]` per IRMAA tier crossing, OR the kernel
-  // would need an IRMAA tier table to recompute Medicare premium per
-  // year based on effective MAGI.
+  // Post-65 IRMAA tier ripple (#31 priority 5 follow-up — closed): the
+  // runner now pre-computes `p.medicareMonthlyByYear[]` for years where
+  // the inherited-IRA drain pushes MAGI past an IRMAA tier boundary.
+  // `segmentCostAtYear` reads the override (when set) instead of the
+  // flat `m.medicareMonthly`, so the post-65 IRMAA jump materialises in
+  // both the household-Medicare branch and the mixed-age ACA + Medicare
+  // branch. Survivor phase still bypasses the override; foreign segments
+  // never read `m.medicareMonthly` so the override is naturally inert
+  // when the heir is abroad.
   const eventsByYear = new Map<number, LifeEvent[]>();
   // Pre-extracted inheritedIRA events for the per-year drain dispatcher
   // (#31 priority 5). Stored separately because their effect spans
