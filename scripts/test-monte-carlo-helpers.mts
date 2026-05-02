@@ -475,12 +475,46 @@ test('runMonteCarlo: LTC self-insure roll consumes seeded RNG', () => {
   assert.deepEqual(a.results, b.results);
 });
 
-// NOTE: A cross-PR regression test for the `Math.max(0, cost*12*costShockMult)`
-// phantom-income clamp (PR #111) lives in a follow-up commit, not here. The
-// seeded RNG made the test possible (deterministic seed + extreme currVol +
-// zero-return params reproducibly trips the bug) but it's coupled to the
-// clamp's behavior, not the RNG mechanism this PR introduces. Filed for the
-// follow-up commit that lands after #111 merges.
+// ─── phantom-income clamp regression (PR #111 + PR #112) ──────────────
+
+test('runMonteCarlo: phantom-income clamp prevents windfall under extreme currVol', () => {
+  // Cross-PR regression test (#111 clamp + #112 seeded RNG). With zero
+  // growth (zero return / zero inflation / income < cost) and a foreign
+  // segment under extreme currVol=5.0, every legitimate trial must END
+  // the simulation BELOW the starting $1M portfolio. Pre-clamp, seed=14
+  // produces a max trial balance ~$29.4M — pure phantom income from the
+  // `bal -= cost*12*costShockMult` flip when costShockMult < 0.
+  //
+  // The clamp `Math.max(0, cost*12*costShockMult)` ensures expenses can
+  // be reduced (favorable FX) but cannot fund the portfolio. Threshold
+  // 1.5e6 (1.5x the starting portfolio) is a generous ceiling: zero
+  // growth means no legitimate trial can exceed $1M, but income still
+  // accumulates against the cost, so a small over-1M result is not
+  // necessarily phantom. 1.5x catches the bug (~29x over) without
+  // flaking on legitimate residual income.
+  const result = runMonteCarlo({
+    portfolio: 1_000_000,
+    monthlyIncome: 4_000,
+    baseCost: 20_000,
+    isForeign: true,
+    fxDrift: 0,
+    runs: 2_000,
+    years: 50,
+    meanReturn: 0,
+    volReturn: 0,
+    meanInflation: 0,
+    volInflation: 0,
+    currVol: 5.0,
+    incGrowth: 0,
+    returnMode: 'normal',
+    seededRandom: mulberry32(14),
+  });
+  const maxResult = Math.max(...result.results);
+  assert.ok(
+    maxResult < 1.5e6,
+    `phantom income detected: max trial balance ${maxResult.toExponential(2)} exceeds 1.5x starting portfolio ($1.5M ceiling). Without #111's clamp, seed 14 produces ~$29.4M.`,
+  );
+});
 
 // ─── medicareMonthlyByYear override (#31 priority 5 follow-up) ──────────
 
