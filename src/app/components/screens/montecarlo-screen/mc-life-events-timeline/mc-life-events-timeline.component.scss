@@ -1,0 +1,39 @@
+/* ─── Life Events Timeline ──────────────────────────────────────────────
+ * Read-only chart at the top of the MC scenarios screen (#31 priority 6).
+ * Pulls from MonteCarloStateService signals; no kernel dependency.
+ *
+ * Layout: card wraps an SVG that scales fluidly via width:100%. The
+ * viewBox aspect is 800×220 (~3.6:1) — comfortable on desktop, still
+ * readable on mobile when the card stack collapses to single-column.
+ */
+.timeline-card {
+  /* Inherit all .card spacing/border/shadow from the global .card class.
+   * No additional padding — the SVG already has internal margins for
+   * lane labels and the year axis. */
+}
+
+.timeline-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: var(--font-sans);
+}
+
+.lane-label {
+  font-size: 11px;
+  fill: var(--dark-text-sec);
+}
+
+.axis-label {
+  font-size: 9px;
+  fill: var(--dark-text-muted);
+  letter-spacing: 0.3px;
+}
+
+.empty-state {
+  font-size: 12px;
+  color: var(--dark-text-muted);
+  font-style: italic;
+  text-align: center;
+  margin: 8px 0 0;
+}

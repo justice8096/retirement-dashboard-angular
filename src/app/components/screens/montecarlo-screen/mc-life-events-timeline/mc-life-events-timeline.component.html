@@ -1,0 +1,99 @@
+<div class="card timeline-card">
+  <h3 class="card-title">Life Events Timeline</h3>
+  <p class="card-sub">
+    All configured events that perturb the simulation, on a single year axis.
+    Hover any marker for the per-event detail. Empty lanes mean that event
+    type isn't enabled or has no rows.
+  </p>
+
+  <svg [attr.viewBox]="'0 0 ' + W + ' ' + H" class="timeline-svg">
+    <!-- Lane backgrounds + labels -->
+    @for (lane of lanes; track lane.label) {
+      <line [attr.x1]="LEFT" [attr.x2]="W - RIGHT"
+            [attr.y1]="lane.y" [attr.y2]="lane.y"
+            stroke="var(--dark-border)" stroke-width="1" />
+      <text [attr.x]="LEFT - 6" [attr.y]="lane.y + 3"
+            text-anchor="end" class="lane-label">{{ lane.label }}</text>
+    }
+
+    <!-- Year-axis ticks (vertical guides + labels under bottom lane) -->
+    @for (t of yearTicks(); track t.year) {
+      <line [attr.x1]="t.x" [attr.x2]="t.x"
+            [attr.y1]="TOP" [attr.y2]="H - BOTTOM"
+            stroke="var(--dark-border)" stroke-width="1"
+            stroke-dasharray="2,3" opacity="0.4" />
+      <text [attr.x]="t.x" [attr.y]="H - 6"
+            text-anchor="middle" class="axis-label">y{{ t.year }}</text>
+    }
+
+    <!-- Lane 0: Moves (down-arrow markers) -->
+    @for (m of moveMarks(); track $index) {
+      <circle [attr.cx]="m.x" [attr.cy]="lanes[0].y"
+              [attr.r]="m.r"
+              [attr.fill]="lanes[0].color"
+              stroke="var(--dark-bg)" stroke-width="1.5">
+        <title>{{ m.title }}</title>
+      </circle>
+    }
+
+    <!-- Lane 1: Spouse death (X marker) -->
+    @for (m of deathMarks(); track $index) {
+      <g [attr.transform]="'translate(' + m.x + ',' + lanes[1].y + ')'">
+        <line x1="-6" y1="-6" x2="6" y2="6"
+              [attr.stroke]="lanes[1].color" stroke-width="2.5" stroke-linecap="round" />
+        <line x1="-6" y1="6" x2="6" y2="-6"
+              [attr.stroke]="lanes[1].color" stroke-width="2.5" stroke-linecap="round" />
+        <title>{{ m.title }}</title>
+      </g>
+    }
+
+    <!-- Lane 2: Survivor relocation (sticky span — bar from death year to horizon) -->
+    @for (s of survivorRelocSpan(); track $index) {
+      <rect [attr.x]="s.x" [attr.y]="lanes[2].y - 6"
+            [attr.width]="s.w" [attr.height]="12"
+            [attr.fill]="lanes[2].color"
+            opacity="0.5"
+            rx="3">
+        <title>{{ s.title }}</title>
+      </rect>
+    }
+
+    <!-- Lane 3: One-time expenses (variable-radius dots) -->
+    @for (m of expenseMarks(); track $index) {
+      <circle [attr.cx]="m.x" [attr.cy]="lanes[3].y"
+              [attr.r]="m.r"
+              [attr.fill]="lanes[3].color"
+              stroke="var(--dark-bg)" stroke-width="1.5">
+        <title>{{ m.title }}</title>
+      </circle>
+    }
+
+    <!-- Lane 4: One-time incomes (variable-radius dots) -->
+    @for (m of incomeMarks(); track $index) {
+      <circle [attr.cx]="m.x" [attr.cy]="lanes[4].y"
+              [attr.r]="m.r"
+              [attr.fill]="lanes[4].color"
+              stroke="var(--dark-bg)" stroke-width="1.5">
+        <title>{{ m.title }}</title>
+      </circle>
+    }
+
+    <!-- Lane 5: Inherited-IRA drain spans -->
+    @for (s of iraSpans(); track $index) {
+      <rect [attr.x]="s.x" [attr.y]="lanes[5].y - 6"
+            [attr.width]="s.w" [attr.height]="12"
+            [attr.fill]="lanes[5].color"
+            opacity="0.6"
+            rx="3">
+        <title>{{ s.title }}</title>
+      </rect>
+    }
+  </svg>
+
+  @if (!hasAnyEvents()) {
+    <p class="empty-state">
+      No Life Events configured yet. Add moves, expenses, incomes, a spouse-death
+      scenario, or an inherited IRA in the panels below — they'll appear here.
+    </p>
+  }
+</div>
