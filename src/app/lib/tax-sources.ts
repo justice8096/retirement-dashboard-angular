@@ -88,6 +88,99 @@ export const SS_CUT_SOURCES: Source[] = [
   },
 ];
 
+/**
+ * 2026 LTCG / qualified-dividend bracket thresholds. Mirrors
+ * `LTCG_BRACKETS_2026` in retirement-api/shared/taxes.js. The 0%
+ * bracket is the harvesting opportunity surfaced by the panel
+ * on the Roth screen — early retirees in the Roth-conversion
+ * phase often leave $10–30k of headroom on the table each year.
+ */
+export const LTCG_BRACKETS_2026 = {
+  single: { zeroTop: 49_450,  fifteenTop: 545_500 },
+  mfj:    { zeroTop: 98_900,  fifteenTop: 613_700 },
+  mfs:    { zeroTop: 49_450,  fifteenTop: 306_850 },
+  hoh:    { zeroTop: 66_200,  fifteenTop: 579_600 },
+} as const;
+
+export type LtcgFilingStatus = keyof typeof LTCG_BRACKETS_2026;
+
+export const LTCG_BRACKETS_2026_SOURCES: Source[] = [
+  {
+    title: 'IRS Rev. Proc. 2025-32 § 3.03 (2026 LTCG bracket thresholds)',
+    url: 'https://www.irs.gov/pub/irs-drop/rp-25-32.pdf',
+    accessed: '2026-04-30',
+  },
+  {
+    title: 'IRC § 1(h) — Maximum capital gains rate (statutory bracket structure)',
+    url: 'https://www.law.cornell.edu/uscode/text/26/1',
+    accessed: '2026-04-30',
+  },
+];
+
+export interface LtcgHarvestingSummary {
+  filingStatus: LtcgFilingStatus;
+  zeroTop: number;
+  fifteenTop: number;
+  alreadyPreferential: number;
+  zeroBracketHeadroom: number;
+  fifteenBracketHeadroom: number;
+  currentMarginalRate: 0 | 0.15 | 0.20;
+}
+
+/**
+ * Dollars of LTCG/QDI realizable at 0% federal tax this year, given
+ * the household's ordinary taxable income and any preferential
+ * income already realized. Returns 0 when ordinary alone already
+ * exceeds the 0% bracket top.
+ *
+ * Mirrors `ltcgZeroBracketHeadroom` in retirement-api/shared/taxes.js.
+ */
+export function ltcgZeroBracketHeadroom(
+  ordinaryTaxableIncome: number,
+  filingStatus: LtcgFilingStatus,
+  alreadyPreferential = 0,
+): number {
+  const brackets = LTCG_BRACKETS_2026[filingStatus];
+  const O = Math.max(0, ordinaryTaxableIncome);
+  const P = Math.max(0, alreadyPreferential);
+  return Math.max(0, brackets.zeroTop - O - P);
+}
+
+/**
+ * Structured snapshot for the harvesting advisor: how much room
+ * remains in each LTCG bracket and what rate applies to the next $1.
+ *
+ * Mirrors `ltcgHarvestingSummary` in retirement-api/shared/taxes.js.
+ */
+export function ltcgHarvestingSummary(
+  ordinaryTaxableIncome: number,
+  filingStatus: LtcgFilingStatus,
+  alreadyPreferential = 0,
+): LtcgHarvestingSummary {
+  const brackets = LTCG_BRACKETS_2026[filingStatus];
+  const O = Math.max(0, ordinaryTaxableIncome);
+  const P = Math.max(0, alreadyPreferential);
+  const stackBase = O + P;
+  const zeroBracketHeadroom = Math.max(0, brackets.zeroTop - stackBase);
+  // 15%-bracket headroom is what's left between max(0%-top, stackBase)
+  // and the 15%-top — independent of the 0% headroom.
+  const fifteenStart = Math.max(brackets.zeroTop, stackBase);
+  const fifteenBracketHeadroom = Math.max(0, brackets.fifteenTop - fifteenStart);
+  let currentMarginalRate: 0 | 0.15 | 0.20;
+  if (stackBase < brackets.zeroTop)         currentMarginalRate = 0;
+  else if (stackBase < brackets.fifteenTop) currentMarginalRate = 0.15;
+  else                                      currentMarginalRate = 0.20;
+  return {
+    filingStatus,
+    zeroTop: brackets.zeroTop,
+    fifteenTop: brackets.fifteenTop,
+    alreadyPreferential: P,
+    zeroBracketHeadroom,
+    fifteenBracketHeadroom,
+    currentMarginalRate,
+  };
+}
+
 /** SECURE 2.0 RMD start ages. */
 export const RMD_AGE_SOURCES: Source[] = [
   {

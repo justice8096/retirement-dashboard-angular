@@ -5,11 +5,17 @@ import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { FinancialSettings } from '@models/api.model';
+import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
+import {
+  ltcgHarvestingSummary,
+  LTCG_BRACKETS_2026_SOURCES,
+  type LtcgFilingStatus,
+} from '../../../lib/tax-sources';
 
 @Component({
   selector: 'app-roth-screen',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, NumericInputDirective],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective, SourceTooltipComponent],
   template: `
     <div class="roth-screen">
       <div class="screen-header">
@@ -84,6 +90,91 @@ import { FinancialSettings } from '@models/api.model';
           </div>
         </div>
 
+        <!-- LTCG harvesting advisor (#27) — sibling tax-bracket optimization
+             to Roth conversions. Surfaces "realize LTCG at 0%" headroom for
+             early retirees in the taxable-drawdown phase. Pure helper math
+             from lib/tax-sources.ts; no API call. -->
+        <div class="planner-card">
+          <h3 class="card-title">
+            Tax-Free LTCG Harvesting (0% bracket)
+            <app-source-tooltip
+              [sources]="ltcgSources"
+              label="2026 LTCG bracket sources" />
+          </h3>
+          <p class="card-sub">
+            Long-term capital gains and qualified dividends fall in the 0%
+            federal bracket up to a taxable-income ceiling. If you're below
+            it, you can sell appreciated taxable-account positions and
+            realize gains tax-free — sibling to the Roth-conversion lever
+            above. Combined caps still apply: harvested gains stack on
+            ordinary income, and the next $1 over the ceiling jumps to 15%.
+          </p>
+          <div class="param-grid">
+            <label class="param">
+              <span class="param-label">Filing Status</span>
+              <select class="param-input"
+                [ngModel]="ltcgFilingStatus()"
+                (ngModelChange)="ltcgFilingStatus.set($event)">
+                <option value="mfj">Married filing jointly</option>
+                <option value="single">Single</option>
+                <option value="hoh">Head of household</option>
+                <option value="mfs">Married filing separately</option>
+              </select>
+            </label>
+            <label class="param">
+              <span class="param-label">Ordinary Taxable Income</span>
+              <input appNumeric="currency" class="param-input" step="1000"
+                [class]="dyscalculia.numberSpacingClass()"
+                [ngModel]="ltcgOrdinaryIncome()"
+                (ngModelChange)="ltcgOrdinaryIncome.set($event)" />
+              <span class="param-hint">After standard / itemized deduction.</span>
+            </label>
+            <label class="param">
+              <span class="param-label">Already Realized Preferential</span>
+              <input appNumeric="currency" class="param-input" step="1000"
+                [class]="dyscalculia.numberSpacingClass()"
+                [ngModel]="ltcgAlreadyPreferential()"
+                (ngModelChange)="ltcgAlreadyPreferential.set($event)" />
+              <span class="param-hint">LTCG + qualified dividends taken so far this year.</span>
+            </label>
+          </div>
+          <div class="result-grid harvest-results">
+            <div class="result">
+              <span class="result-label">0% Bracket Headroom</span>
+              <span class="result-value harvest-zero" [class]="dyscalculia.numberSpacingClass()">
+                {{ fmt(ltcgSummary().zeroBracketHeadroom) }}
+              </span>
+              <span class="param-hint">
+                Realizable at 0% federal tax. Ceiling: {{ fmt(ltcgSummary().zeroTop) }}.
+              </span>
+            </div>
+            <div class="result">
+              <span class="result-label">15% Bracket Headroom</span>
+              <span class="result-value" [class]="dyscalculia.numberSpacingClass()">
+                {{ fmt(ltcgSummary().fifteenBracketHeadroom) }}
+              </span>
+              <span class="param-hint">
+                After 0% is exhausted; 20% kicks in above {{ fmt(ltcgSummary().fifteenTop) }}.
+              </span>
+            </div>
+            <div class="result">
+              <span class="result-label">Marginal Rate (next $1)</span>
+              <span class="result-value">
+                {{ (ltcgSummary().currentMarginalRate * 100).toFixed(0) }}%
+              </span>
+              <span class="param-hint">
+                @if (ltcgSummary().currentMarginalRate === 0) {
+                  Harvest aggressively up to the ceiling.
+                } @else if (ltcgSummary().currentMarginalRate === 0.15) {
+                  Above the 0% top; harvesting now costs 15%.
+                } @else {
+                  In the 20% bracket; defer harvesting if possible.
+                }
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Results -->
         <div class="results-card">
           <h3 class="card-title">Conversion Summary</h3>
@@ -155,6 +246,13 @@ import { FinancialSettings } from '@models/api.model';
     .result-label { font-size: 11px; color: var(--dark-text-muted); }
     .result-value { font-size: 18px; font-weight: 700; color: var(--dark-amber); }
     .result-value.tax { color: var(--dark-amber); }
+    .result-value.harvest-zero { color: var(--dark-green, #4ade80); }
+    .card-sub {
+      font-size: 12px; color: var(--dark-text-muted); line-height: 1.5;
+      margin: 0 0 14px;
+    }
+    .harvest-results { margin-top: 14px; }
+    select.param-input { cursor: pointer; }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
   `],
@@ -172,6 +270,17 @@ export class RothScreenComponent implements OnInit {
 
   readonly totalConverted = computed(() => this.conversionAmount() * this.yearsToConvert());
   readonly taxesPaid = computed(() => Math.round(this.totalConverted() * (this.taxRate() / 100)));
+
+  // ── LTCG harvesting advisor state (#27) ──
+  readonly ltcgFilingStatus = signal<LtcgFilingStatus>('mfj');
+  readonly ltcgOrdinaryIncome = signal(60_000);
+  readonly ltcgAlreadyPreferential = signal(0);
+  readonly ltcgSummary = computed(() => ltcgHarvestingSummary(
+    this.ltcgOrdinaryIncome(),
+    this.ltcgFilingStatus(),
+    this.ltcgAlreadyPreferential(),
+  ));
+  readonly ltcgSources = LTCG_BRACKETS_2026_SOURCES;
 
   ngOnInit(): void {
     this.loading.set(true);
