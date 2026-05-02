@@ -630,29 +630,33 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   const survivorIncome = p.survivorMonthlyIncome ?? null;
   const survivorRatio = p.survivorCostRatio ?? 0.75;
 
-  // Build move schedule indexed by year for O(1) lookup per step.
+  // Build the segment schedule. `schedule` is still needed for trial
+  // initialisation (`initial = schedule[0]`) and for `activeSegmentAt(y)`
+  // — the per-year segment-cost recompute that fires on age transitions
+  // and the spouse-death branch. Move *triggering* (the location swap at
+  // year y) is now driven by `eventsByYear` below, so we no longer need
+  // the year-keyed `movesByYear` map.
+  //
   // If no schedule is provided, synthesize a single "year 0" segment from
   // the legacy scalar baseCost / isForeign / fxDrift params.
   const schedule: LocationMove[] = p.moveSchedule?.length
     ? [...p.moveSchedule].sort((a, b) => a.fromYear - b.fromYear)
     : [{ fromYear: 0, baseCost, isForeign, fxDrift: drift }];
-  const movesByYear = new Map<number, LocationMove>();
-  for (const m of schedule) movesByYear.set(m.fromYear, m);
   const initial = schedule[0];
 
-  // Unified Life Events timeline (#31 step 2a). `compileLifeEvents` projects
-  // legacy fields (oneTimeExpenses, spouseDeathYear + survivorStepUpBenefitUSD,
-  // moveSchedule) plus any caller-supplied `lifeEvents` into a single
-  // year-sorted list, already filtered to the kernel's [0, years) horizon.
-  // Indexed by year for O(1) per-year dispatch lookup. Multiple events in
-  // the same year stack via array.
+  // Unified Life Events timeline (#31 steps 2a + 2b). `compileLifeEvents`
+  // projects legacy fields (oneTimeExpenses, spouseDeathYear +
+  // survivorStepUpBenefitUSD, moveSchedule) plus any caller-supplied
+  // `lifeEvents` into a single year-sorted list, already filtered to the
+  // kernel's [0, years) horizon. Indexed by year for O(1) per-year
+  // dispatch lookup. Multiple events in the same year stack via array.
   //
-  // Step 2a dispatches the trivial event kinds (`oneTimeExpense`, `stepUpBasis`)
-  // from this map. Move (`move`) and spouse-death (`spouseDeath`) events are
-  // present in the map but NOT yet dispatched — those branches still read
-  // legacy `moveSchedule` / `spouseDeathYear` directly because they have
-  // tightly-coupled FX-state / survivorPhase mutations that need separate
-  // refactor passes (steps 2b + 2c).
+  // Steps 2a + 2b dispatch `oneTimeExpense`, `stepUpBasis`, and `move`
+  // events from this map. `spouseDeath` events are present in the map
+  // but NOT yet dispatched — that branch still reads legacy
+  // `spouseDeathYear` + survivor* fields directly because the
+  // survivorPhase / income / cost / Medicare mutations are tightly
+  // coupled and warrant a separate refactor pass (step 2c).
   const eventsByYear = new Map<number, LifeEvent[]>();
   for (const ev of compileLifeEvents(p)) {
     const list = eventsByYear.get(ev.year) ?? [];
@@ -754,14 +758,36 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     }
 
     for (let y = 0; y < years; y++) {
-      const moveThisYear = y > 0 && movesByYear.has(y);
+      // Hoisted from the step-2a position to the top of the year loop —
+      // the move dispatch (#31 step 2b) needs to consult this map BEFORE
+      // the age-transition / spouse-death branches, so all three event
+      // dispatches share one O(1) Map lookup.
+      const eventsThisYear = eventsByYear.get(y);
+
+      // Move dispatch (#31 step 2b). Replaces the legacy
+      // `movesByYear.has(y)` lookup. The `y > 0` guard preserves legacy
+      // behavior: a moveSchedule[0] entry at fromYear=0 is the trial's
+      // initial location (already consumed via `initial = schedule[0]`),
+      // not a move event the kernel re-applies.
+      //
+      // Last-write-wins on duplicates: legacy `movesByYear.set(...)`
+      // overwrote duplicate-year entries, so the LAST move event for the
+      // year is the one that takes effect. Iterate forward and keep
+      // updating `moveEvent` so we end on the last match — byte-identical
+      // to the legacy Map semantics for callers using `moveSchedule`.
+      let moveEvent: { kind: 'move'; year: number; segment: LocationMove } | null = null;
+      if (y > 0 && eventsThisYear) {
+        for (const ev of eventsThisYear) {
+          if (ev.kind === 'move') moveEvent = ev;
+        }
+      }
       const ageTransition = ageTransitionAtYear(y, p);
 
       // Location swap at the start of the year: new cost = new baseCost
       // scaled by accumulated inflation so we move to "$X in today's dollars".
       // FX resets (new currency baseline). Optional one-time move cost.
-      if (moveThisYear) {
-        const m = movesByYear.get(y)!;
+      if (moveEvent) {
+        const m = moveEvent.segment;
         const sc = segmentCostAtYear(m, y, p, survivorPhase);
         cost = sc.total * cumInfl;
         costHealthcare = sc.healthcare * cumInfl;
@@ -798,18 +824,20 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         // sampleYear() / random sampling, same as the inline used to.
       }
 
-      // Early-pass dispatch (#31 step 2a) — handles event kinds whose
-      // effect is a simple balance mutation BEFORE the year's random
-      // return / inflation sampling. Currently only `stepUpBasis`.
-      // Other kinds (move, spouseDeath, oneTimeIncome, careerChange,
-      // incomeChange, inheritedIRA) live in this map for future
-      // dispatcher passes (#31 steps 2b/2c) but are no-ops in this loop
-      // for now — `move` is still consumed via the legacy moveSchedule
-      // branch above, `spouseDeath` via the legacy death branch above,
-      // and the remaining new kinds have no kernel implementation yet
-      // (caller can populate `p.lifeEvents` with them but they're
-      // silently ignored until later steps wire them up).
-      const eventsThisYear = eventsByYear.get(y);
+      // Early-pass dispatch (#31 steps 2a + 2b) — handles event kinds
+      // whose effect is a simple balance mutation BEFORE the year's
+      // random return / inflation sampling. Currently only `stepUpBasis`.
+      //
+      // `move` events are consumed by the move-dispatch block at the top
+      // of the year loop (#31 step 2b). `spouseDeath` events are still
+      // consumed via the legacy `if (deathYear === y)` branch above
+      // pending step 2c. The remaining new kinds (oneTimeIncome,
+      // careerChange, incomeChange, inheritedIRA) live in this map but
+      // have no kernel implementation yet — caller can populate
+      // `p.lifeEvents` with them but they're silently ignored until
+      // later steps wire them up.
+      //
+      // Reuses `eventsThisYear` already looked up at the top of the loop.
       if (eventsThisYear) {
         for (const ev of eventsThisYear) {
           if (ev.kind === 'stepUpBasis') {
