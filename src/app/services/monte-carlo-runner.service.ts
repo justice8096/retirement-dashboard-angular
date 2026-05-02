@@ -80,6 +80,24 @@ export class MonteCarloRunnerService {
                 inflate: e.inflate,
               }))
             : undefined,
+          // Inherited traditional IRA — SECURE Act 10-year drain (#31
+          // priority 5). Routed through the unified `lifeEvents` channel
+          // since `compileLifeEvents` already passes through caller-
+          // supplied LifeEvents verbatim. Per-year balance drain + MAGI
+          // augment is handled by the kernel's inheritedIRAEvents loop.
+          lifeEvents: s.inheritedIRAsEnabled()
+            ? s.inheritedIRAs().map(e => ({
+                kind: 'inheritedIRA' as const,
+                year: e.year,
+                balanceUSD: e.balanceUSD,
+                drainOverYears: e.drainOverYears,
+                // UI stores tax rate as a percent (e.g. 22 = 22%); kernel
+                // expects a decimal. Same convention as meanReturn /
+                // volReturn / fxDrift / etc throughout this object.
+                effectiveTaxRate: e.effectiveTaxRate / 100,
+                label: e.label || undefined,
+              }))
+            : undefined,
           ltcSelfInsureEnabled: s.ltcMode() === 'self-insure' || s.ltcMode() === 'both',
           ltcProbability: s.ltcProbability() / 100,
           ltcCostPerYearUSD: s.ltcCostPerYearUSD(),

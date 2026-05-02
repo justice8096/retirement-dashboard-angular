@@ -241,6 +241,55 @@ test('compileLifeEvents: oneTimeIncomes outside [0, p.years) are filtered', () =
   assert.equal(events[0].year, 5);
 });
 
+// ─── compileLifeEvents — inheritedIRA passthrough (#31 priority 5) ──────
+
+test('compileLifeEvents: inheritedIRA events from lifeEvents are passed through verbatim', () => {
+  const events = compileLifeEvents({
+    years: 30,
+    lifeEvents: [
+      {
+        kind: 'inheritedIRA',
+        year: 8,
+        balanceUSD: 250000,
+        drainOverYears: 10,
+        effectiveTaxRate: 0.22,
+        label: 'Parental IRA',
+      },
+    ],
+  });
+  const ira = events.find((e) => e.kind === 'inheritedIRA');
+  assert.ok(ira, 'inheritedIRA event should exist');
+  assert.equal(ira!.year, 8);
+  const fields = ira as {
+    balanceUSD: number;
+    drainOverYears?: number;
+    effectiveTaxRate?: number;
+    label?: string;
+  };
+  assert.equal(fields.balanceUSD, 250000);
+  assert.equal(fields.drainOverYears, 10);
+  assert.equal(fields.effectiveTaxRate, 0.22);
+  assert.equal(fields.label, 'Parental IRA');
+});
+
+test('compileLifeEvents: inheritedIRA event past horizon is filtered', () => {
+  const events = compileLifeEvents({
+    years: 10,
+    lifeEvents: [
+      // Event year past horizon — `compileLifeEvents` filters by event year.
+      // Note: this means a drain that STARTS in horizon but extends past
+      // is kept (the kernel's drain dispatcher handles per-year
+      // window membership), but a drain that hasn't even started
+      // by the kernel's last year is dropped here.
+      { kind: 'inheritedIRA', year: 12, balanceUSD: 100000 },
+      { kind: 'inheritedIRA', year: 5, balanceUSD: 100000 },
+    ],
+  });
+  const iras = events.filter((e) => e.kind === 'inheritedIRA');
+  assert.equal(iras.length, 1);
+  assert.equal(iras[0].year, 5);
+});
+
 test('compileLifeEvents: events outside [0, p.years) are filtered (Codex #96 fix)', () => {
   const events = compileLifeEvents({
     years: 10,

@@ -138,4 +138,34 @@ export class McScenariosComponent {
       list.map((e, i) => i === idx ? { ...e, ...partial } : e),
     );
   }
+
+  /* ─── Inherited traditional IRA (#31 priority 5 — SECURE Act drain) ── */
+
+  /** Add a default inherited-IRA row — year 8, $250K balance, 10-year
+   *  drain, 22% effective tax. Defaults reflect the most-common case:
+   *  parental inheritance mid-retirement, full SECURE Act window, mid-
+   *  bracket retiree. */
+  protected addInheritedIRA(): void {
+    const current = this.state.inheritedIRAs();
+    const lastYear = current.length ? current[current.length - 1].year : 0;
+    const newYear = Math.min(this.state.years() - 1, Math.max(lastYear + 3, 8));
+    this.state.inheritedIRAs.set([
+      ...current,
+      { year: newYear, balanceUSD: 250000, drainOverYears: 10, effectiveTaxRate: 22, label: 'Parental IRA' },
+    ]);
+    this.state.inheritedIRAsEnabled.set(true);
+  }
+
+  protected removeInheritedIRA(idx: number): void {
+    this.state.inheritedIRAs.update(list => list.filter((_, i) => i !== idx));
+  }
+
+  protected patchInheritedIRA(
+    idx: number,
+    partial: Partial<{ year: number; balanceUSD: number; drainOverYears: number; effectiveTaxRate: number; label: string }>,
+  ): void {
+    this.state.inheritedIRAs.update(list =>
+      list.map((e, i) => i === idx ? { ...e, ...partial } : e),
+    );
+  }
 }
