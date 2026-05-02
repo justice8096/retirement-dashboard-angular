@@ -644,19 +644,24 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     : [{ fromYear: 0, baseCost, isForeign, fxDrift: drift }];
   const initial = schedule[0];
 
-  // Unified Life Events timeline (#31 steps 2a + 2b). `compileLifeEvents`
-  // projects legacy fields (oneTimeExpenses, spouseDeathYear +
-  // survivorStepUpBenefitUSD, moveSchedule) plus any caller-supplied
-  // `lifeEvents` into a single year-sorted list, already filtered to the
-  // kernel's [0, years) horizon. Indexed by year for O(1) per-year
-  // dispatch lookup. Multiple events in the same year stack via array.
+  // Unified Life Events timeline (#31 steps 2a + 2b + 2c).
+  // `compileLifeEvents` projects legacy fields (oneTimeExpenses,
+  // spouseDeathYear + survivorStepUpBenefitUSD, moveSchedule) plus any
+  // caller-supplied `lifeEvents` into a single year-sorted list,
+  // already filtered to the kernel's [0, years) horizon. Indexed by
+  // year for O(1) per-year dispatch lookup. Multiple events in the same
+  // year stack via array.
   //
-  // Steps 2a + 2b dispatch `oneTimeExpense`, `stepUpBasis`, and `move`
-  // events from this map. `spouseDeath` events are present in the map
-  // but NOT yet dispatched — that branch still reads legacy
-  // `spouseDeathYear` + survivor* fields directly because the
-  // survivorPhase / income / cost / Medicare mutations are tightly
-  // coupled and warrant a separate refactor pass (step 2c).
+  // The kernel now dispatches all four legacy-projected event kinds
+  // (`move`, `spouseDeath`, `stepUpBasis`, `oneTimeExpense`) from this
+  // map. The `spouseDeath` dispatcher (step 2c) only triggers the
+  // survivor-phase transition; the per-year survivor-specific reads of
+  // `p.survivor*` fields elsewhere (segmentCostAtYear, the inheritance
+  // tax branch) still run as before, preserving byte-identity. The
+  // remaining LifeEvent kinds (oneTimeIncome, careerChange, incomeChange,
+  // inheritedIRA) have no kernel implementation yet — caller-supplied
+  // events of those kinds pass through `compileLifeEvents` and into
+  // `eventsByYear` but are silently no-op'd in the year loop.
   const eventsByYear = new Map<number, LifeEvent[]>();
   for (const ev of compileLifeEvents(p)) {
     const list = eventsByYear.get(ev.year) ?? [];
@@ -804,11 +809,46 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         costHealthcare = sc.healthcare * cumInfl;
       }
 
-      // Spouse-death transition: income steps down, cost recomputed with
-      // survivor overrides (single-filer tax, single-IRMAA Medicare,
-      // lifestyle ratio on the remainder), and a one-time stepped-up-basis
-      // bump on the taxable portion of the portfolio.
-      if (!survivorPhase && deathYear != null && y === deathYear) {
+      // Spouse-death dispatch (#31 step 2c). Replaces the legacy
+      // `if (deathYear === y)` trigger with a scan of `eventsThisYear`
+      // for a `spouseDeath` event. Mutations are unchanged: flip
+      // `survivorPhase`, swap `income` to the survivor income, and
+      // recompute `cost` / `costHealthcare` for the active segment with
+      // the survivor flag set (which routes segmentCostAtYear through
+      // the survivor-tax / survivor-Medicare / lifestyle-ratio paths
+      // already plumbed at lines 469–502).
+      //
+      // The `!survivorPhase` guard is preserved verbatim — single-shot
+      // transition, idempotent if multiple spouseDeath events somehow
+      // land in the same year. Position in loop is unchanged: AFTER
+      // move + age-transition cost recompute, BEFORE early-pass
+      // stepUpBasis dispatch (so the basis bump still rides on top of
+      // the post-survivor cost).
+      //
+      // The kernel still consumes survivor parameters via direct reads
+      // of `p.survivor*` fields elsewhere (segmentCostAtYear, the
+      // inheritance-tax branch below). The event's `survivorOverrides`
+      // payload exists in the type for future work but is intentionally
+      // not read here — applying it would change kernel behavior, which
+      // step 2c explicitly avoids to preserve byte-identity for legacy
+      // callers. A future pass could overlay `survivorOverrides` onto
+      // `p` at dispatch time so the rest of the kernel sees it.
+      //
+      // NOTE: stepped-up basis bump previously lived in this branch as
+      // an inline `bal += p.survivorStepUpBenefitUSD`. Moved to the
+      // early-pass dispatcher below in step 2a (driven by `stepUpBasis`
+      // events emitted by `compileLifeEvents` whenever spouseDeathYear
+      // is set + survivorStepUpBenefitUSD > 0).
+      let spouseDeathThisYear = false;
+      if (eventsThisYear) {
+        for (const ev of eventsThisYear) {
+          if (ev.kind === 'spouseDeath') {
+            spouseDeathThisYear = true;
+            break;
+          }
+        }
+      }
+      if (!survivorPhase && spouseDeathThisYear) {
         survivorPhase = true;
         if (survivorIncome != null) income = survivorIncome;
         const active = activeSegmentAt(y);
@@ -817,25 +857,21 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         const sc = segmentCostAtYear(active, y, p, true);
         cost = sc.total * cumInfl;
         costHealthcare = sc.healthcare * cumInfl;
-        // NOTE: stepped-up basis bump used to live here as an inline
-        // `bal += p.survivorStepUpBenefitUSD`. Moved to the early dispatch
-        // pass below so it's driven by the unified Life Events timeline
-        // (#31 step 2a). Behavior is byte-identical: dispatch fires before
-        // sampleYear() / random sampling, same as the inline used to.
       }
 
-      // Early-pass dispatch (#31 steps 2a + 2b) — handles event kinds
-      // whose effect is a simple balance mutation BEFORE the year's
-      // random return / inflation sampling. Currently only `stepUpBasis`.
+      // Early-pass dispatch (#31 steps 2a + 2b + 2c) — handles event
+      // kinds whose effect is a simple balance mutation BEFORE the
+      // year's random return / inflation sampling. Currently only
+      // `stepUpBasis`.
       //
-      // `move` events are consumed by the move-dispatch block at the top
-      // of the year loop (#31 step 2b). `spouseDeath` events are still
-      // consumed via the legacy `if (deathYear === y)` branch above
-      // pending step 2c. The remaining new kinds (oneTimeIncome,
-      // careerChange, incomeChange, inheritedIRA) live in this map but
-      // have no kernel implementation yet — caller can populate
-      // `p.lifeEvents` with them but they're silently ignored until
-      // later steps wire them up.
+      // `move` events are consumed by the move-dispatch block at the
+      // top of the year loop (#31 step 2b). `spouseDeath` events are
+      // consumed by the spouse-death-dispatch block above (#31 step 2c).
+      // The remaining new kinds (oneTimeIncome, careerChange,
+      // incomeChange, inheritedIRA) live in this map but have no kernel
+      // implementation yet — caller can populate `p.lifeEvents` with
+      // them but they're silently ignored until later steps wire them
+      // up.
       //
       // Reuses `eventsThisYear` already looked up at the top of the loop.
       if (eventsThisYear) {
