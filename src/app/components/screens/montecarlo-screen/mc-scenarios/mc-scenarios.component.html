@@ -431,6 +431,47 @@
           </span>
         </div>
       </div>
+
+      <!-- Survivor relocation (#31 priority 4) -->
+      <h4 class="death-sub">Survivor Relocation (optional)</h4>
+      <p class="card-sub">
+        Survivor moves to a different location at the death year — to be near
+        family, downsize, or escape a high-cost-of-living area. The chosen
+        location's cost / FX / breakdown becomes active for all subsequent
+        years (including post-relocation Medicare crossover at age 65). Year-
+        based moves on the schedule above whose <em>fromYear</em> is later
+        than the death year still fire afterwards. Leave the toggle off if
+        the survivor would stay put.
+      </p>
+      <label class="moves-toggle">
+        <input type="checkbox"
+          [checked]="state.survivorRelocateEnabled()"
+          (change)="state.survivorRelocateEnabled.set(!state.survivorRelocateEnabled())" />
+        <span>Enable survivor relocation</span>
+      </label>
+      @if (state.survivorRelocateEnabled()) {
+        <div class="death-grid">
+          <label class="param">
+            <span class="param-label">Relocate to</span>
+            <select class="param-input"
+              [ngModel]="state.survivorRelocateLocationId()"
+              (ngModelChange)="state.survivorRelocateLocationId.set($event)">
+              <option value="">— select a location —</option>
+              @for (l of loc.fullLocations(); track l.id) {
+                <option [value]="l.id">{{ l.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="param">
+            <span class="param-label">Move cost ($)</span>
+            <input appNumeric="currency" class="param-input" min="0" step="1000"
+              [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="state.survivorRelocateMoveCostUSD()"
+              (ngModelChange)="state.survivorRelocateMoveCostUSD.set(+$event)" />
+            <span class="param-hint">One-time deduction at relocation. Leave 0 to skip.</span>
+          </label>
+        </div>
+      }
     }
   </div>
 }
