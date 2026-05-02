@@ -1,0 +1,104 @@
+    .map-screen { display: flex; flex-direction: column; gap: 16px; }
+    .screen-header { display: flex; align-items: center; gap: 12px; }
+    .header-icon { font-size: 32px; }
+    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    .badge-new {
+      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
+    }
+
+    .card {
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-radius: 12px; padding: 20px;
+    }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 10px; }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+    .ctrl { display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px; max-width: 320px; }
+    .ctrl-label { font-size: 11px; color: var(--dark-text-muted); }
+    .ctrl-input {
+      padding: 8px 10px; border-radius: 6px; border: 1px solid var(--dark-border);
+      background: var(--dark-bg-secondary); color: var(--dark-text);
+      font-size: 13px; font-family: var(--font-sans); outline: none;
+    }
+    .ctrl-input:focus { border-color: var(--dark-blue); }
+
+    .scale {
+      display: inline-flex; align-items: center; gap: 2px; margin-left: auto;
+      font-size: 11px; color: var(--dark-text-muted);
+    }
+    .scale-label { margin-right: 6px; }
+    .scale-tick { padding: 0 4px; font-variant-numeric: tabular-nums; }
+    .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
+    .swatch.s-0  { background: #D32F2F; }
+    .swatch.s-3  { background: #E65100; }
+    .swatch.s-5  { background: #F9A825; }
+    .swatch.s-7  { background: #9CCC65; }
+    .swatch.s-10 { background: #2E7D32; }
+
+    .map-host {
+      background: var(--dark-bg-card); border: 1px solid var(--dark-border);
+      border-radius: 12px; padding: 6px; overflow: hidden;
+    }
+    .map-el {
+      width: 100%; height: 560px; border-radius: 8px;
+      /* Leaflet sets its own background; keep ours dark so the flash is quick. */
+      background: #1a1a1a;
+    }
+
+    .missing-card { font-size: 13px; }
+    .param-hint {
+      font-size: 12px; color: var(--dark-text-muted);
+      line-height: var(--prose-line-height, 1.5); margin: 0 0 10px;
+    }
+    .param-hint code {
+      background: var(--dark-bg-secondary); padding: 1px 6px; border-radius: 4px;
+      font-family: var(--font-mono, monospace); font-size: 11px;
+    }
+    .missing-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .missing-chip {
+      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      background: var(--dark-bg-secondary); color: var(--dark-text-muted);
+    }
+
+    /* Leaflet popup styling override — match dashboard dark theme. */
+    :host ::ng-deep .leaflet-popup-content-wrapper {
+      background: var(--dark-bg-card);
+      color: var(--dark-text);
+      border: 1px solid var(--dark-border);
+      border-radius: 8px;
+    }
+    :host ::ng-deep .leaflet-popup-tip { background: var(--dark-bg-card); border: 1px solid var(--dark-border); }
+    :host ::ng-deep .leaflet-popup-content {
+      font-family: var(--font-sans); font-size: 12px;
+      line-height: 1.5; margin: 10px 14px;
+    }
+    :host ::ng-deep .leaflet-popup-content .popup-title {
+      font-weight: 700; font-size: 13px; color: var(--dark-text); margin-bottom: 4px;
+    }
+    :host ::ng-deep .leaflet-popup-content .popup-country {
+      font-size: 11px; color: var(--dark-text-muted); margin-bottom: 8px;
+    }
+    :host ::ng-deep .leaflet-popup-content .popup-score {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-weight: 700; margin-bottom: 6px; font-size: 11px;
+    }
+    :host ::ng-deep .leaflet-popup-content .popup-detail { color: var(--dark-text-sec); margin-bottom: 8px; }
+    :host ::ng-deep .leaflet-popup-content .popup-link {
+      display: inline-block; padding: 4px 10px; border-radius: 6px;
+      background: var(--dark-amber); color: #000; font-weight: 700;
+      text-decoration: none; font-size: 11px; cursor: pointer; border: none;
+    }
+    :host ::ng-deep .leaflet-container { background: #1a1a1a; }
+    :host ::ng-deep .map-marker {
+      border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.5);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      transition: transform 0.12s;
+    }
+    :host ::ng-deep .map-marker:hover { transform: scale(1.3); }
+    :host ::ng-deep .leaflet-control-attribution {
+      background: rgba(0, 0, 0, 0.5) !important;
+      color: var(--dark-text-muted) !important;
+    }
+    :host ::ng-deep .leaflet-control-attribution a { color: var(--dark-blue) !important; }
