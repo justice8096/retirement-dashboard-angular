@@ -1,0 +1,139 @@
+    <div class="irmaa-screen">
+      <div class="screen-header">
+        <span class="header-icon">⚕️</span>
+        <div>
+          <h2 class="header-title">Medicare IRMAA</h2>
+          <p class="header-sub">
+            Income-Related Monthly Adjustment Amounts — how your income bumps Part B and Part D premiums.
+          </p>
+        </div>
+        <span class="badge-new">NEW</span>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Your Inputs</h3>
+        <div class="param-grid">
+          <label class="param">
+            <span class="param-label">Filing Status</span>
+            <select class="param-input"
+              [ngModel]="filingStatus()" (ngModelChange)="filingStatus.set($event)">
+              <option value="single">Single</option>
+              <option value="married">Married Filing Jointly</option>
+            </select>
+          </label>
+          <label class="param">
+            <span class="param-label">Projected MAGI (baseline year)</span>
+            <input appNumeric="currency" class="param-input"
+              [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="projectedMAGI()" (ngModelChange)="projectedMAGI.set($event)" />
+            <span class="param-hint">
+              MAGI lookback is 2 years — your 2026 premium is set by 2024 income.
+            </span>
+            @if (dyscalculia.isEnabled() && projectedMAGI() > 0) {
+              <span class="param-hint">— {{ magiAnchor() }}</span>
+            }
+          </label>
+        </div>
+      </div>
+
+      <div class="results">
+        <div class="result-card highlight">
+          <div class="result-label">Lifetime Cost</div>
+          <div class="result-value lg" [class]="dyscalculia.numberSpacingClass()">
+            {{ plainDollars(summary().totalCost) }}
+          </div>
+          <div class="result-explain">Ages 65 – {{ PROJECTION_TO_AGE }}</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Avg / Year</div>
+          <div class="result-value lg">{{ fmt(summary().averageAnnual) }}</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Peak Year</div>
+          <div class="result-value lg">{{ fmt(summary().peakYear) }}</div>
+        </div>
+        <div class="result-card">
+          <div class="result-label">Years at Base (No Surcharge)</div>
+          <div class="result-value lg">{{ summary().yearsAtBase }}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">IRMAA Brackets — 2026 ({{ filingStatus() === 'single' ? 'Single' : 'Married Filing Jointly' }})</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>MAGI Range</th>
+                <th class="right">Part B Surcharge / mo</th>
+                <th class="right">Part D Surcharge / mo</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (b of brackets(); track $index) {
+                <tr [class.row-current]="currentTierIndex() === $index">
+                  <td>{{ rangeLabel(b) }}</td>
+                  <td class="right">{{ b.partBSurcharge > 0 ? fmtSurcharge(b.partBSurcharge) : '—' }}</td>
+                  <td class="right">{{ b.partDSurcharge > 0 ? fmtSurcharge(b.partDSurcharge) : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="param-hint">
+          Base Part B premium: {{ fmtSurcharge(BASE_PART_B_PREMIUM) }}. Surcharges stack on top.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Year-by-Year Projection</h3>
+        @if (!projections().length) {
+          <p class="param-hint">
+            No years to project — set household birth years on the Assumptions screen.
+          </p>
+        } @else {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Age</th>
+                  <th>Year</th>
+                  <th class="right">Projected MAGI</th>
+                  <th>Tier</th>
+                  <th class="right">Part B / yr</th>
+                  <th class="right">Part D / yr</th>
+                  <th class="right">Total / yr</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of projections(); track r.year) {
+                  <tr>
+                    <td>{{ r.age }}</td>
+                    <td>{{ r.year }}</td>
+                    <td class="right">{{ plainDollars(r.projectedMAGI) }}</td>
+                    <td>
+                      <span class="tier-pill" [class.tier-base]="r.tierIndex === 0" [class.tier-surcharged]="r.tierIndex > 0">
+                        {{ r.tierLabel }}
+                      </span>
+                    </td>
+                    <td class="right">{{ fmt(r.partBAnnual) }}</td>
+                    <td class="right">{{ fmt(r.partDAnnual) }}</td>
+                    <td class="right strong">{{ fmt(r.totalAnnual) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <div class="insights">
+        <h3 class="card-title">Planning Notes</h3>
+        <ul>
+          <li>IRMAA uses MAGI from <strong>2 years prior</strong> — 2026 premiums key off 2024 income.</li>
+          <li>Roth conversions raise MAGI and can trigger a surcharge. Model the conversion year carefully.</li>
+          <li>Qualified Charitable Distributions (QCDs) from an IRA don't count toward MAGI.</li>
+          <li>Tier boundaries are cliffs — $1 over a threshold triggers the full surcharge for that year.</li>
+        </ul>
+      </div>
+    </div>

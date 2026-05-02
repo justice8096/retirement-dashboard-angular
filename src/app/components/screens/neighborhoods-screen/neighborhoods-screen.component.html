@@ -1,0 +1,163 @@
+    <div class="nbh-screen">
+      <div class="screen-header">
+        <span class="header-icon">🏘️</span>
+        <div>
+          <h2 class="header-title">Neighborhoods</h2>
+          <p class="header-sub">Explore neighborhoods in your selected retirement destinations</p>
+        </div>
+      </div>
+
+      <!-- Map -->
+      <div class="map-card">
+        <div #mapEl class="map-container"></div>
+      </div>
+
+      @if (!selectedCities().length) {
+        <div class="empty-state">
+          <div class="empty-icon">📍</div>
+          <p>Select cities on the
+            <button class="link-btn" (click)="goToOverview()">Overview</button>
+            tab using the checkboxes, then come back to explore their neighborhoods.
+          </p>
+        </div>
+      } @else {
+        <!-- City tabs from selection -->
+        <div class="city-tabs">
+          @for (city of selectedCities(); track city.id) {
+            <button class="city-tab"
+              [class.active]="activeCity() === city.id"
+              (click)="selectCity(city.id)">
+              {{ city.name }}
+              @if (supplementMap()[city.id]; as supp) {
+                <span class="pill-count">{{ supp.neighborhoods.length }}</span>
+              }
+            </button>
+          }
+        </div>
+
+        <!-- Neighborhood content -->
+        @if (isLoading()) {
+          <div class="status-msg">Loading neighborhoods…</div>
+        } @else if (activeSupplement()) {
+          <div class="nbh-header-row">
+            <h3 class="nbh-city">{{ activeSupplement()!.city }}</h3>
+            <span class="nbh-count">{{ activeSupplement()!.neighborhoods.length }} neighborhoods</span>
+          </div>
+          <div class="nbh-grid">
+            @for (nbh of activeSupplement()!.neighborhoods; track nbh.id) {
+              <div class="nbh-card">
+                <div class="nbh-top">
+                  <h4 class="nbh-name">{{ nbh.name }}</h4>
+                  <span class="nbh-safety" [class]="safetyClass(nbh.safetyRating)">{{ nbh.safetyRating }}</span>
+                </div>
+                <p class="nbh-desc">{{ nbh.description }}</p>
+                <div class="nbh-character">{{ nbh.character }}</div>
+
+                <div class="score-row">
+                  <div class="score">
+                    <span class="score-val">{{ nbh.walkabilityScore }}</span>
+                    <span class="score-label">Walk</span>
+                  </div>
+                  <div class="score">
+                    <span class="score-val">{{ nbh.transitScore }}</span>
+                    <span class="score-label">Transit</span>
+                  </div>
+                  <div class="score expat-score">
+                    <span class="score-val">{{ nbh.expats.communitySize }}</span>
+                    <span class="score-label">Expats</span>
+                  </div>
+                </div>
+
+                @if (nbh.housing) {
+                  <div class="housing-section">
+                    <div class="housing-row">
+                      @if (nbh.housing.avgRentOneBedroomEUR) {
+                        <div class="housing-item">
+                          <span class="h-label">1BR Rent</span>
+                          <span class="h-value">€{{ nbh.housing.avgRentOneBedroomEUR.toLocaleString() }}</span>
+                        </div>
+                      }
+                      @if (nbh.housing.avgRentTwoBedroomEUR) {
+                        <div class="housing-item">
+                          <span class="h-label">2BR Rent</span>
+                          <span class="h-value">€{{ nbh.housing.avgRentTwoBedroomEUR.toLocaleString() }}</span>
+                        </div>
+                      }
+                      @if (nbh.housing.buyPricePerSqmEUR) {
+                        <div class="housing-item">
+                          <span class="h-label">Buy/m²</span>
+                          <span class="h-value">€{{ nbh.housing.buyPricePerSqmEUR.toLocaleString() }}</span>
+                        </div>
+                      }
+                    </div>
+                    @if (nbh.housing.predominantType) {
+                      <div class="housing-type">{{ nbh.housing.predominantType }}</div>
+                    }
+                  </div>
+                }
+
+                @if (nbh.character_notes) {
+                  <div class="nbh-notes">
+                    💡 {{ nbh.character_notes }}
+                    <app-source-tooltip [sources]="nbh.sources" />
+                  </div>
+                } @else {
+                  <div class="nbh-notes">
+                    <app-source-tooltip [sources]="nbh.sources" />
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        } @else if (activeCity()) {
+          <!-- Fallback: show lifestyle data -->
+          @if (activeLoc(); as entry) {
+            <div class="fallback-card">
+              <h3 class="fb-title">{{ entry.name }}, {{ entry.country }}</h3>
+              @if (entry.cities?.length) {
+                <div class="cities-row">
+                  @for (city of entry.cities; track city) {
+                    <span class="city-chip">{{ city }}</span>
+                  }
+                </div>
+              }
+              @if (entry.lifestyle) {
+                <div class="lifestyle-grid">
+                  <div class="ls-item">
+                    <span class="ls-label">Safety</span>
+                    <div class="rating-bar">
+                      <div class="rating-fill" [style.width.%]="(entry.lifestyle.safetyRating / 10) * 100"></div>
+                    </div>
+                    <span class="ls-val">{{ entry.lifestyle.safetyRating }}/10</span>
+                  </div>
+                  <div class="ls-item">
+                    <span class="ls-label">Expat Community</span>
+                    <div class="rating-bar">
+                      <div class="rating-fill expat" [style.width.%]="(entry.lifestyle.expatCommunity / 10) * 100"></div>
+                    </div>
+                    <span class="ls-val">{{ entry.lifestyle.expatCommunity }}/10</span>
+                  </div>
+                  <div class="ls-item">
+                    <span class="ls-label">English</span>
+                    <div class="rating-bar">
+                      <div class="rating-fill english" [style.width.%]="(entry.lifestyle.englishPrevalence / 10) * 100"></div>
+                    </div>
+                    <span class="ls-val">{{ entry.lifestyle.englishPrevalence }}/10</span>
+                  </div>
+                  <div class="ls-item">
+                    <span class="ls-label">Dog Friendly</span>
+                    <div class="rating-bar">
+                      <div class="rating-fill dog" [style.width.%]="(entry.lifestyle.dogFriendly / 10) * 100"></div>
+                    </div>
+                    <span class="ls-val">{{ entry.lifestyle.dogFriendly }}/10</span>
+                  </div>
+                </div>
+              }
+              <div class="no-nbh-hint">
+                Detailed neighborhood data not available for this location.
+              </div>
+            </div>
+          }
+        }
+      }
+    </div>

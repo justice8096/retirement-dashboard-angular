@@ -1,0 +1,60 @@
+    <div class="map-screen">
+      <div class="screen-header">
+        <span class="header-icon">🗺️</span>
+        <div>
+          <h2 class="header-title">Location Map</h2>
+          <p class="header-sub">
+            All {{ totalWithCoords() }} locations plotted geographically, color-coded by the metric you pick.
+          </p>
+        </div>
+        <span class="badge-new">NEW</span>
+      </div>
+
+      <div class="card controls">
+        <label class="ctrl">
+          <span class="ctrl-label">Color by</span>
+          <select class="ctrl-input"
+            [ngModel]="metricId()" (ngModelChange)="metricId.set($event)">
+            @for (m of metrics; track m.id) {
+              <option [value]="m.id">{{ m.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="ctrl">
+          <span class="ctrl-label">Country</span>
+          <select class="ctrl-input"
+            [ngModel]="countryFilter()" (ngModelChange)="countryFilter.set($event)">
+            <option value="">All</option>
+            @for (c of countries(); track c) {
+              <option [value]="c">{{ c }}</option>
+            }
+          </select>
+        </label>
+        <div class="scale">
+          <span class="scale-label">Scale:</span>
+          <span class="swatch s-0"></span><span class="scale-tick">0</span>
+          <span class="swatch s-3"></span>
+          <span class="swatch s-5"></span><span class="scale-tick">5</span>
+          <span class="swatch s-7"></span>
+          <span class="swatch s-10"></span><span class="scale-tick">10</span>
+        </div>
+      </div>
+
+      <div class="map-host">
+        <div #mapEl class="map-el" aria-label="Interactive location map"></div>
+      </div>
+
+      @if (missingCoordIds().length > 0) {
+        <div class="card missing-card">
+          <h3 class="card-title">Not on map ({{ missingCoordIds().length }})</h3>
+          <p class="param-hint">
+            These locations don't have coordinates yet. Add them to <code>city-coordinates.ts</code> to include on the map.
+          </p>
+          <div class="missing-list">
+            @for (id of missingCoordIds(); track id) {
+              <span class="missing-chip">{{ id }}</span>
+            }
+          </div>
+        </div>
+      }
+    </div>
