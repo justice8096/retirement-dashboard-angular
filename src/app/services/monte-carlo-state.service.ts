@@ -119,6 +119,21 @@ export class MonteCarloStateService {
   readonly oneTimeIncomes = signal<{ year: number; amountUSD: number; label: string; inflate: boolean }[]>([]);
   readonly oneTimeIncomesEnabled = signal(false);
 
+  /** Inherited traditional IRA — SECURE Act 10-year forced drawdown (#31
+   *  priority 5). Each entry: starting year, IRA balance at inheritance,
+   *  drain window in years (default 10), heir's effective marginal tax
+   *  rate as a decimal (default 0.22). Drives both the per-year balance
+   *  add (post-tax) and the per-year MAGI augmentation that ripples
+   *  through the pre-65 ACA-subsidy calc in segmentCostAtYear. */
+  readonly inheritedIRAs = signal<{
+    year: number;
+    balanceUSD: number;
+    drainOverYears: number;
+    effectiveTaxRate: number;
+    label: string;
+  }[]>([]);
+  readonly inheritedIRAsEnabled = signal(false);
+
   /** Long-Term Care planning (#21). */
   readonly ltcMode = signal<'off' | 'self-insure' | 'insurance' | 'both'>('off');
   readonly ltcProbability = signal(70);
@@ -462,6 +477,7 @@ export class MonteCarloStateService {
       this.moves(); this.movesEnabled();
       this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
       this.oneTimeIncomes(); this.oneTimeIncomesEnabled();
+      this.inheritedIRAs(); this.inheritedIRAsEnabled();
       this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
       this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
       this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();

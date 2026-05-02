@@ -33,6 +33,8 @@ export interface MonteCarloScenarioParams {
   oneTimeExpenses: unknown;
   oneTimeIncomesEnabled: boolean;
   oneTimeIncomes: unknown;
+  inheritedIRAsEnabled: boolean;
+  inheritedIRAs: unknown;
   ltcMode: string;
   ltcProbability: number;
   ltcCostPerYearUSD: number;

@@ -130,6 +130,8 @@ export class McResultsComponent {
       oneTimeExpenses: s.oneTimeExpenses(),
       oneTimeIncomesEnabled: s.oneTimeIncomesEnabled(),
       oneTimeIncomes: s.oneTimeIncomes(),
+      inheritedIRAsEnabled: s.inheritedIRAsEnabled(),
+      inheritedIRAs: s.inheritedIRAs(),
       ltcMode: s.ltcMode(),
       ltcProbability: s.ltcProbability(),
       ltcCostPerYearUSD: s.ltcCostPerYearUSD(),

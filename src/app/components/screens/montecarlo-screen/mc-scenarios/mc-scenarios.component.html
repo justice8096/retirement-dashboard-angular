@@ -186,6 +186,71 @@
   }
 </div>
 
+<!-- Inherited traditional IRA — SECURE Act 10-year drain (#31 priority 5) -->
+<div class="card moves-card">
+  <h3 class="card-title">Inherited Traditional IRA (SECURE Act drain)</h3>
+  <p class="card-sub">
+    Non-spouse beneficiaries of a traditional IRA from a decedent who died
+    after 2019 must drain the account within 10 years. Distributions are
+    taxed as <strong>ordinary income</strong> (not LTCG / QDI), so each
+    drain year inflates MAGI by the per-year distribution. The kernel
+    applies the post-tax distribution to portfolio balance and ripples the
+    pre-tax distribution into the pre-65 ACA-subsidy calc. <em>Known
+    limitation:</em> the post-65 IRMAA tier jump is not yet modeled — for
+    Medicare-age heirs, the surcharge effect is missed.
+  </p>
+
+  @for (e of state.inheritedIRAs(); track $index; let i = $index) {
+    <div class="timeline-row">
+      <label class="tl-field">
+        <span class="tl-small-label">Year</span>
+        <input appNumeric="age" class="tl-input" min="0" [max]="state.years() - 1"
+          [ngModel]="e.year"
+          (ngModelChange)="patchInheritedIRA(i, { year: +$event })" />
+      </label>
+      <label class="tl-field tl-field-loc">
+        <span class="tl-small-label">Label</span>
+        <input class="tl-input" type="text"
+          [ngModel]="e.label"
+          (ngModelChange)="patchInheritedIRA(i, { label: $event })" />
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Balance ($)</span>
+        <input appNumeric="currency" class="tl-input" step="5000"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="e.balanceUSD"
+          (ngModelChange)="patchInheritedIRA(i, { balanceUSD: +$event })" />
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Drain years</span>
+        <input appNumeric="age" class="tl-input" min="1" max="20" step="1"
+          [ngModel]="e.drainOverYears"
+          (ngModelChange)="patchInheritedIRA(i, { drainOverYears: +$event })" />
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Tax rate (%)</span>
+        <input appNumeric="percent" class="tl-input" min="0" max="50" step="1"
+          [ngModel]="e.effectiveTaxRate"
+          (ngModelChange)="patchInheritedIRA(i, { effectiveTaxRate: +$event })" />
+      </label>
+      <button class="tl-remove" (click)="removeInheritedIRA(i)" aria-label="Remove inherited IRA">✕</button>
+    </div>
+  }
+
+  <button mat-stroked-button class="add-move-btn" (click)="addInheritedIRA()">
+    + Add Inherited IRA
+  </button>
+
+  @if (state.inheritedIRAs().length > 0) {
+    <label class="moves-toggle">
+      <input type="checkbox"
+        [checked]="state.inheritedIRAsEnabled()"
+        (change)="state.inheritedIRAsEnabled.set(!state.inheritedIRAsEnabled())" />
+      <span>Apply inherited IRAs to next simulation run</span>
+    </label>
+  }
+</div>
+
 <!-- Long-Term Care planning -->
 <div class="card death-card">
   <h3 class="card-title">Long-Term Care</h3>

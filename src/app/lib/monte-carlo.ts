@@ -165,10 +165,24 @@ export type LifeEvent =
   | { kind: 'oneTimeExpense'; year: number; amountUSD: number; label?: string; inflate?: boolean }
   | { kind: 'oneTimeIncome'; year: number; amountUSD: number; label?: string; inflate?: boolean }
   | { kind: 'incomeChange'; year: number; monthlyDelta: number; label?: string }
-  /** SECURE Act forced 10-year drawdown of an inherited traditional IRA.
-   *  Spikes MAGI for `drainOverYears` years (default 10), which ripples
-   *  into IRMAA tiers — complex; not yet handled by the kernel. */
-  | { kind: 'inheritedIRA'; year: number; balanceUSD: number; drainOverYears?: number; label?: string }
+  /** SECURE Act forced 10-year drawdown of an inherited traditional IRA
+   *  (#31 priority 5). Each year of the drain window adds
+   *  `(balanceUSD / drainOverYears) × cumInfl × (1 - effectiveTaxRate)` to
+   *  the heir's portfolio balance. Concurrently, the gross per-year
+   *  distribution is added to MAGI for that year, which ripples into the
+   *  ACA-subsidy calculation when the heir is pre-65 (lower subsidy at
+   *  higher MAGI). The post-65 IRMAA tier jump is NOT yet modeled — the
+   *  kernel uses a pre-baked `m.medicareMonthly` set by the runner from
+   *  the heir's baseline MAGI. To capture that effect, the runner would
+   *  need to encode `medicareMonthlyByYear[]` per IRMAA tier crossing.
+   *
+   *  Defaults: `drainOverYears: 10` (SECURE Act mandate),
+   *  `effectiveTaxRate: 0.22` (typical retiree's marginal bracket — 12%
+   *  / 22% / 24% bracket midpoint). The user-facing simplification is
+   *  ordinary income at a single flat rate; a future iteration could
+   *  recompute single-filer brackets per year as the drain stacks on
+   *  base income. */
+  | { kind: 'inheritedIRA'; year: number; balanceUSD: number; drainOverYears?: number; effectiveTaxRate?: number; label?: string }
   | { kind: 'careerChange'; year: number; newMonthlyIncome: number; label?: string };
 
 export interface MonteCarloParams {
@@ -534,7 +548,7 @@ interface SegmentCost {
   healthcare: number;
 }
 
-function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, survivorPhase = false): SegmentCost {
+function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, survivorPhase = false, magiAugment = 0): SegmentCost {
   if (m.nonHealthcareBase == null) return { total: m.baseCost, healthcare: 0 };
   // Survivor-phase overrides: single-filer tax, single-IRMAA Medicare, and a
   // ratio applied to the non-tax / non-healthcare lifestyle portion.
@@ -577,9 +591,14 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
       const medicarePerAdult = (m.medicareMonthly ?? 0) / nAdults;
       const acaFullPerAdult = (m.acaUnsubsidizedMonthly ?? 0) / nAdults;
       // Year-aware MAGI: transition value in year 0, steady state thereafter.
-      const magi = (y === 0 && p.transitionMagiAnnual != null)
+      // Plus optional caller-supplied augmentation for inherited-IRA drain
+      // years (#31 priority 5) — the per-year distribution from a SECURE Act
+      // 10-year drain spikes MAGI in the drain window, lowering the ACA
+      // subsidy cap below.
+      const baseMagi = (y === 0 && p.transitionMagiAnnual != null)
         ? p.transitionMagiAnnual
         : (p.magiAnnual ?? 0);
+      const magi = baseMagi + magiAugment;
       const regime = p.subsidyRegime ?? 'enhanced';
 
       // Annual subsidy cap — regime-dependent:
@@ -724,23 +743,57 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   // year for O(1) per-year dispatch lookup. Multiple events in the same
   // year stack via array.
   //
-  // The kernel now dispatches five event kinds from this map: the four
+  // The kernel now dispatches six event kinds from this map: the four
   // legacy-projected (`move`, `spouseDeath`, `stepUpBasis`,
   // `oneTimeExpense`) plus `oneTimeIncome` (#31 priority 2 —
-  // inheritance / home-sale proceeds / payouts). The `spouseDeath`
-  // dispatcher (step 2c) only triggers the survivor-phase transition;
-  // the per-year survivor-specific reads of `p.survivor*` fields
-  // elsewhere (segmentCostAtYear, the inheritance-tax branch) still
-  // run as before, preserving byte-identity. The remaining LifeEvent
-  // kinds (`careerChange`, `incomeChange`, `inheritedIRA`) have no
-  // kernel implementation yet — caller-supplied events of those kinds
-  // pass through `compileLifeEvents` into `eventsByYear` but are
-  // silently no-op'd in the year loop.
+  // inheritance / home-sale proceeds / payouts) plus `inheritedIRA`
+  // (#31 priority 5 — SECURE Act 10-year drain with pre-65 ACA-subsidy
+  // MAGI ripple via `magiAugmentByYear`). The `spouseDeath` dispatcher
+  // (step 2c) only triggers the survivor-phase transition; the per-year
+  // survivor-specific reads of `p.survivor*` fields elsewhere
+  // (segmentCostAtYear, the inheritance-tax branch) still run as
+  // before, preserving byte-identity. The remaining LifeEvent kinds
+  // (`careerChange`, `incomeChange`) have no kernel implementation yet
+  // — caller-supplied events of those kinds pass through
+  // `compileLifeEvents` into `eventsByYear` but are silently no-op'd
+  // in the year loop.
+  //
+  // Known limitation (#31 priority 5 follow-up): post-65 IRMAA tier
+  // jump from inheritedIRA drain is NOT modeled. The kernel uses a
+  // pre-baked `m.medicareMonthly` set by the runner from the heir's
+  // baseline MAGI; the per-year MAGI augmentation only ripples through
+  // segmentCostAtYear's pre-65 ACA-subsidy branch. To capture the
+  // post-65 ripple, the runner would need to encode
+  // `medicareMonthlyByYear[]` per IRMAA tier crossing, OR the kernel
+  // would need an IRMAA tier table to recompute Medicare premium per
+  // year based on effective MAGI.
   const eventsByYear = new Map<number, LifeEvent[]>();
+  // Pre-extracted inheritedIRA events for the per-year drain dispatcher
+  // (#31 priority 5). Stored separately because their effect spans
+  // `drainOverYears` years from the event's `year`, not just the single
+  // year the event lives in eventsByYear. The trial loop iterates this
+  // list every year and applies the drain when `y` is in the window.
+  const inheritedIRAEvents: Extract<LifeEvent, { kind: 'inheritedIRA' }>[] = [];
   for (const ev of compileLifeEvents(p)) {
     const list = eventsByYear.get(ev.year) ?? [];
     list.push(ev);
     eventsByYear.set(ev.year, list);
+    if (ev.kind === 'inheritedIRA') inheritedIRAEvents.push(ev);
+  }
+
+  // Pre-compute the per-year MAGI augmentation from inherited-IRA drains
+  // (#31 priority 5). Year `y`'s augment is the sum of gross per-year
+  // distributions from any inheritedIRA event whose drain window covers
+  // year `y`. Consumed by `segmentCostAtYear` in the ACA-subsidy branch
+  // (pre-65 heirs only — post-65 IRMAA ripple is a documented limitation).
+  const magiAugmentByYear: number[] = new Array(years).fill(0);
+  for (const ev of inheritedIRAEvents) {
+    const drainYears = Math.max(1, ev.drainOverYears ?? 10);
+    const annualDistribution = ev.balanceUSD / drainYears;
+    for (let dy = 0; dy < drainYears; dy++) {
+      const y = ev.year + dy;
+      if (y >= 0 && y < years) magiAugmentByYear[y] += annualDistribution;
+    }
   }
 
   // Per-year active-segment lookup (input schedule is sorted ascending by
@@ -811,7 +864,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     // otherwise the legacy flat `baseCost`. `costHealthcare` tracks the
     // healthcare-only portion of `cost` in parallel — used for HSA draw
     // each year (#33 item 3).
-    let { total: cost, healthcare: costHealthcare } = segmentCostAtYear(initial, 0, p, false);
+    let { total: cost, healthcare: costHealthcare } = segmentCostAtYear(initial, 0, p, false, magiAugmentByYear[0] ?? 0);
     let curIsForeign = initial.isForeign;
     let curDrift = initial.fxDrift ?? drift;
     let fxMult = 1;
@@ -855,6 +908,14 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // dispatches share one O(1) Map lookup.
       const eventsThisYear = eventsByYear.get(y);
 
+      // Inherited-IRA MAGI augmentation for this year (#31 priority 5).
+      // Pre-computed at trial start; pulled here so all per-year cost
+      // recomputes (move / age-transition / spouse-death branches below)
+      // see the same effective MAGI. Pre-65 ACA-subsidy is the only path
+      // that consumes it (post-65 IRMAA tier ripple is a documented
+      // limitation — see segmentCostAtYear's medicareMonthly handling).
+      const magiAugmentY = magiAugmentByYear[y] ?? 0;
+
       // Move dispatch (#31 step 2b). Replaces the legacy
       // `movesByYear.has(y)` lookup. The `y > 0` guard preserves legacy
       // behavior: a moveSchedule[0] entry at fromYear=0 is the trial's
@@ -879,7 +940,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // FX resets (new currency baseline). Optional one-time move cost.
       if (moveEvent) {
         const m = moveEvent.segment;
-        const sc = segmentCostAtYear(m, y, p, survivorPhase);
+        const sc = segmentCostAtYear(m, y, p, survivorPhase, magiAugmentY);
         cost = sc.total * cumInfl;
         costHealthcare = sc.healthcare * cumInfl;
         curIsForeign = m.isForeign;
@@ -892,7 +953,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         // `trialSchedule` so a post-spouseDeath survivor-relocation
         // (#31 priority 4) sticks across the transition.
         const active = activeSegmentAt(y, trialSchedule);
-        const sc = segmentCostAtYear(active, y, p, survivorPhase);
+        const sc = segmentCostAtYear(active, y, p, survivorPhase, magiAugmentY);
         cost = sc.total * cumInfl;
         costHealthcare = sc.healthcare * cumInfl;
       }
@@ -955,7 +1016,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           const relocate: LocationMove = { ...p.survivorRelocate, fromYear: y };
           trialSchedule = [...trialSchedule, relocate]
             .sort((a, b) => a.fromYear - b.fromYear);
-          const sc = segmentCostAtYear(relocate, y, p, true);
+          const sc = segmentCostAtYear(relocate, y, p, true, magiAugmentY);
           cost = sc.total * cumInfl;
           costHealthcare = sc.healthcare * cumInfl;
           curIsForeign = relocate.isForeign;
@@ -968,7 +1029,7 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           const active = activeSegmentAt(y, trialSchedule);
           // Back out cumulative inflation so segmentCostAtYear gets today's $,
           // then re-inflate for the sim's current-year dollars.
-          const sc = segmentCostAtYear(active, y, p, true);
+          const sc = segmentCostAtYear(active, y, p, true, magiAugmentY);
           cost = sc.total * cumInfl;
           costHealthcare = sc.healthcare * cumInfl;
         }
@@ -983,11 +1044,12 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // top of the year loop (#31 step 2b). `spouseDeath` events are
       // consumed by the spouse-death-dispatch block above (#31 step 2c).
       // `oneTimeIncome` events are consumed by the late-pass dispatch
-      // below (#31 priority 2). The remaining new kinds (`careerChange`,
-      // `incomeChange`, `inheritedIRA`) live in this map but have no
-      // kernel implementation yet — caller can populate `p.lifeEvents`
-      // with them but they're silently ignored until later steps wire
-      // them up.
+      // below (#31 priority 2). `inheritedIRA` events are consumed by
+      // the inheritedIRA-drain loop below the late-pass dispatch (#31
+      // priority 5) — they iterate the pre-extracted `inheritedIRAEvents`
+      // list because their effect spans multiple years. The remaining
+      // new kinds (`careerChange`, `incomeChange`) live in this map but
+      // have no kernel implementation yet.
       //
       // Reuses `eventsThisYear` already looked up at the top of the loop.
       if (eventsThisYear) {
@@ -1094,6 +1156,37 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
             const inflated = (ev.inflate ?? true) ? ev.amountUSD * cumInfl : ev.amountUSD;
             bal += inflated;
           }
+        }
+      }
+
+      // Inherited-IRA per-year drain (#31 priority 5). Iterates all
+      // inheritedIRA events (not just events at year `y`) because the
+      // drain effect spans `drainOverYears` years from the event's
+      // `year`. For each event whose drain window covers `y`, add the
+      // post-tax distribution to balance.
+      //
+      // Distribution math:
+      //   gross = (balanceUSD / drainYears) × cumInfl
+      //   net   = gross × (1 - effectiveTaxRate)
+      //   bal  += net
+      //
+      // The gross distribution was already added to `magiAugmentByYear[y]`
+      // at trial start, so the ACA-subsidy branch in segmentCostAtYear
+      // sees the elevated MAGI for cost recompute (consumed earlier this
+      // tick). The post-tax `net` is what actually grows the heir's
+      // portfolio.
+      //
+      // Tax model: flat `effectiveTaxRate` (default 22%) — the user's
+      // estimate of their marginal ordinary-income rate during the
+      // drain. A future iteration could recompute single-filer brackets
+      // per year based on stacked income; out of scope for this pass.
+      for (const ev of inheritedIRAEvents) {
+        const drainYears = Math.max(1, ev.drainOverYears ?? 10);
+        const yearOfDrain = y - ev.year;
+        if (yearOfDrain >= 0 && yearOfDrain < drainYears) {
+          const gross = (ev.balanceUSD / drainYears) * cumInfl;
+          const taxRate = ev.effectiveTaxRate ?? 0.22;
+          bal += gross * (1 - taxRate);
         }
       }
 
