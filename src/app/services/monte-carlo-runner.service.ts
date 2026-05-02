@@ -5,6 +5,7 @@ import { HealthcareService } from '@services/healthcare.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { LocationFull } from '@models/api.model';
 import { runMonteCarlo } from '@app/lib/monte-carlo';
+import { monthlyMedicareFor } from '@app/lib/irmaa';
 
 /**
  * Orchestrates a Monte Carlo simulation run: assembles the kernel-ready
@@ -126,6 +127,7 @@ export class MonteCarloRunnerService {
           partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
           partTimeEndYear: s.partTimeEndYear(),
           inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
+          medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
           survivorRelocate: this.buildSurvivorRelocate(),
           regime: {
             bullMean: s.regimeBullMean() / 100,
@@ -242,6 +244,56 @@ export class MonteCarloRunnerService {
       const exchangeRate = loc.exchangeRate ?? 1;
       const exemptionUSDBaseline = (inh.exemptionLocal ?? 0) / exchangeRate;
       arr[y] = { effectiveRate, exemptionUSDBaseline };
+    }
+    return arr;
+  }
+
+  /**
+   * Pre-compute per-year Medicare premium override for the inherited-IRA
+   * IRMAA tier ripple (#31 priority 5 follow-up). Returns `undefined` when
+   * inheritedIRAs are disabled — kernel falls back to the segment's flat
+   * `m.medicareMonthly`, preserving byte-identity for non-inheritedIRA
+   * callers.
+   *
+   * Algorithm per year y:
+   *   1. magiAugment = sum of (balanceUSD / drainOverYears) for any
+   *      inheritedIRA event whose drain window covers y.
+   *   2. effectiveMagi = baseline MAGI + magiAugment.
+   *   3. perAdult = monthlyMedicareFor(filingStatus, effectiveMagi).
+   *      Filing status: 'married' if 2+ adults in household, else 'single'.
+   *   4. household total = perAdult × nAdults (matches `m.medicareMonthly`
+   *      semantics — kernel divides by nAdults internally and multiplies
+   *      by Medicare-eligible adult count).
+   *
+   * Sparse semantics: years with augment === 0 are left `undefined` so the
+   * kernel falls through to `m.medicareMonthly` (no-op for non-augmented
+   * years). This preserves the seed-derived Medicare cost for years where
+   * IRMAA wouldn't move; only the augmented years get a tier-aware override.
+   */
+  private buildMedicareMonthlyByYear(years: number): (number | undefined)[] | undefined {
+    const s = this.state;
+    if (!s.inheritedIRAsEnabled()) return undefined;
+    const events = s.inheritedIRAs();
+    if (!events.length) return undefined;
+
+    const adults = s.adults();
+    const nAdults = Math.max(1, adults.length);
+    const filingStatus: 'single' | 'married' = nAdults >= 2 ? 'married' : 'single';
+    const baseMagi = this.healthcare.magi().magiForAca;
+
+    const arr: (number | undefined)[] = new Array(years);
+    for (let y = 0; y < years; y++) {
+      let augment = 0;
+      for (const e of events) {
+        const drainYears = Math.max(1, e.drainOverYears ?? 10);
+        if (y >= e.year && y < e.year + drainYears) {
+          augment += e.balanceUSD / drainYears;
+        }
+      }
+      if (augment <= 0) continue;
+      const effectiveMagi = baseMagi + augment;
+      const perAdult = monthlyMedicareFor(filingStatus, effectiveMagi);
+      arr[y] = perAdult * nAdults;
     }
     return arr;
   }

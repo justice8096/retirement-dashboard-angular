@@ -481,3 +481,107 @@ test('runMonteCarlo: LTC self-insure roll consumes seeded RNG', () => {
 // zero-return params reproducibly trips the bug) but it's coupled to the
 // clamp's behavior, not the RNG mechanism this PR introduces. Filed for the
 // follow-up commit that lands after #111 merges.
+
+// ─── medicareMonthlyByYear override (#31 priority 5 follow-up) ──────────
+
+/** US-segment params with Medicare-eligible adults — exercises the
+ *  age-aware mixed-Medicare/ACA branch in segmentCostAtYear where the
+ *  override matters most. */
+function usMedicareSmokeParams(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    portfolio: 1_000_000,
+    monthlyIncome: 4_000,
+    baseCost: 5_000,
+    isForeign: false,
+    fxDrift: 0,
+    runs: 50,
+    years: 15,
+    meanReturn: 0.06,
+    volReturn: 0.10,
+    meanInflation: 0.025,
+    volInflation: 0.005,
+    currVol: 0,
+    incGrowth: 0.02,
+    returnMode: 'normal',
+    adultBirthYears: [1956, 1958], // both age 65+ at simStartYear 2026
+    simStartYear: 2026,
+    magiAnnual: 80_000,
+    moveSchedule: [{
+      fromYear: 0,
+      baseCost: 5_000,
+      isForeign: false,
+      isUS: true,
+      nonHealthcareBase: 4_000,
+      monthlyIncomeTax: 200,
+      medicareMonthly: 700,           // baseline household-wide Medicare
+      acaUnsubsidizedMonthly: 1_500,
+      acaSubsidyCapPct: 0.085,
+      foreignHealthcareMonthly: 0,
+    }],
+    ...extra,
+  };
+}
+
+test('runMonteCarlo: medicareMonthlyByYear override unset → byte-identical to legacy', () => {
+  // Without the override field, the kernel must produce exactly the same
+  // results array as before this PR. Locks the no-IRMAA-augment path.
+  const a = runMonteCarlo({ ...usMedicareSmokeParams(), seededRandom: mulberry32(42) });
+  const b = runMonteCarlo({ ...usMedicareSmokeParams(), seededRandom: mulberry32(42) });
+  assert.deepEqual(a.results, b.results);
+});
+
+test('runMonteCarlo: medicareMonthlyByYear with all-undefined entries == legacy', () => {
+  // Sparse array of all-undefineds should fall through to m.medicareMonthly.
+  const allUndef = new Array(15).fill(undefined);
+  const a = runMonteCarlo({ ...usMedicareSmokeParams(), seededRandom: mulberry32(42) });
+  const b = runMonteCarlo({
+    ...usMedicareSmokeParams(),
+    medicareMonthlyByYear: allUndef,
+    seededRandom: mulberry32(42),
+  });
+  assert.deepEqual(a.results, b.results, 'all-undefined override must be no-op');
+});
+
+test('runMonteCarlo: medicareMonthlyByYear override raises Medicare cost → lower median', () => {
+  // Inflate Medicare 5x for every year via the override. With both adults
+  // in the household over 65, ALL the household's healthcare cost flows
+  // through this override → meaningful drag on the portfolio.
+  const inflated = new Array(15).fill(700 * 5);
+  const baseline = runMonteCarlo({ ...usMedicareSmokeParams(), seededRandom: mulberry32(42) });
+  const overridden = runMonteCarlo({
+    ...usMedicareSmokeParams(),
+    medicareMonthlyByYear: inflated,
+    seededRandom: mulberry32(42),
+  });
+  assert.ok(
+    overridden.median < baseline.median,
+    `5x Medicare via override should reduce median; baseline ${baseline.median}, overridden ${overridden.median}`,
+  );
+});
+
+test('runMonteCarlo: foreign segment ignores medicareMonthlyByYear override', () => {
+  // Foreign segments use foreignHealthcareMonthly, never m.medicareMonthly,
+  // so the override is naturally inert. Trial with foreign-only schedule
+  // should produce identical results regardless of the override array.
+  const foreignParams = {
+    ...usMedicareSmokeParams(),
+    moveSchedule: [{
+      fromYear: 0,
+      baseCost: 4_000,
+      isForeign: true,
+      isUS: false,
+      nonHealthcareBase: 3_500,
+      monthlyIncomeTax: 100,
+      medicareMonthly: 0,
+      foreignHealthcareMonthly: 500,
+    }],
+  };
+  const inflated = new Array(15).fill(700 * 5);
+  const a = runMonteCarlo({ ...foreignParams, seededRandom: mulberry32(42) });
+  const b = runMonteCarlo({
+    ...foreignParams,
+    medicareMonthlyByYear: inflated,
+    seededRandom: mulberry32(42),
+  });
+  assert.deepEqual(a.results, b.results, 'foreign segment must be inert to override');
+});
