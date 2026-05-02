@@ -853,6 +853,52 @@ test('aggregateRentalIncome: portfolio paper loss adds when properties lose', ()
   assert.equal(a.totalDepreciation, 20000);
 });
 
+test('aggregateRentalIncome: negative cashFlow sums correctly (heavy mortgage)', () => {
+  // Property is cash-negative when mortgage interest dominates.
+  // Two properties, one cash-positive, one cash-negative — totals should
+  // reflect the algebraic sum (Sankey lane logic depends on this sign).
+  const props: RentalProperty[] = [
+    makeRental({
+      id: 'a',
+      monthlyGrossRent: 1000,           // 12000 gross
+      propertyTaxAnnual: 0,
+      otherOpExAnnual: 0,
+      mortgageInterestAnnual: 0,
+    }),                                  // cash = 12000
+    makeRental({
+      id: 'b',
+      monthlyGrossRent: 1000,           // 12000 gross
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 8000,     // 12000 - 4000 - 3000 - 8000 = -3000
+    }),                                  // cash = -3000
+  ];
+  const a = aggregateRentalIncome(props, 0);
+  // 12000 + (-3000) = 9000 net; depreciation 0; taxable = 9000
+  assert.equal(a.totalCashFlow, 9000);
+  assert.equal(a.totalTaxableNet, 9000);
+  assert.equal(a.perProperty[0].breakdown.cashFlow, 12000);
+  assert.equal(a.perProperty[1].breakdown.cashFlow, -3000);
+});
+
+test('aggregateRentalIncome: portfolio cashFlow can be negative overall', () => {
+  // Single deeply-cash-negative property — Sankey must handle this case.
+  const props: RentalProperty[] = [
+    makeRental({
+      id: 'a',
+      monthlyGrossRent: 500,            // 6000 gross
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 5000,     // 6000 - 4000 - 3000 - 5000 = -6000
+      depreciableBasis: 275000,         // 10000 dep
+    }),
+  ];
+  const a = aggregateRentalIncome(props, 0);
+  assert.equal(a.totalCashFlow, -6000);
+  // taxable = cash - depreciation = -6000 - 10000 = -16000 (Schedule E loss)
+  assert.equal(a.totalTaxableNet, -16000);
+});
+
 // defaultRentalProperty --------------------------------------------------
 
 test('defaultRentalProperty: produces a valid, active row', () => {

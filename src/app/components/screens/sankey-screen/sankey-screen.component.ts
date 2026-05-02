@@ -116,15 +116,21 @@ export class SankeyScreenComponent implements OnInit {
     const iraWithdrawal = portfolio * (this.withdrawalPct() / 100);
     const otherAnnual = this.otherMonthlyIncome() * 12;
 
-    // Rental portfolio at year-1 (sim-year 0). Cash flow is what hits the
-    // bank and shows in the diagram; depreciation is paper-only and shrinks
-    // the taxable base (Schedule E shield) without reducing cash flow.
+    // Rental portfolio at year-1 (sim-year 0). Cash flow CAN be negative
+    // (mortgage-heavy years; high vacancy). Split the sign so the diagram
+    // can route inflows and outflows separately:
+    //   - rentalCashIn  → green income lane (only when > 0)
+    //   - rentalCashOut → expense lane "Rental Operating Loss" (only when < 0)
+    // The full signed cash flow still feeds the tax base — a Schedule E
+    // loss reduces AGI before the depreciation shield is applied.
     const rentalAgg = aggregateRentalIncome(this.rental.properties(), 0);
-    const rentalCash = rentalAgg.totalCashFlow;
+    const rentalCashFlow = rentalAgg.totalCashFlow;
     const rentalDepreciation = rentalAgg.totalDepreciation;
+    const rentalCashIn = Math.max(0, rentalCashFlow);
+    const rentalCashOut = Math.max(0, -rentalCashFlow);
 
-    const totalIncome =
-      ss.reduce((s, m) => s + m.annual, 0) + iraWithdrawal + otherAnnual + rentalCash;
+    const otherIncome = ss.reduce((s, m) => s + m.annual, 0) + iraWithdrawal + otherAnnual;
+    const totalIncome = otherIncome + rentalCashIn;
 
     // Expense breakdown — sum monthlyCosts excluding 'taxes' (we compute that),
     // split into 7 named categories + "Other Expenses" catch-all.
@@ -139,14 +145,19 @@ export class SankeyScreenComponent implements OnInit {
       else otherExpenses += annual;
     }
     if (otherExpenses > 0) expenses['Other Expenses'] = otherExpenses;
+    // Rental operating loss enters the diagram as an expense category —
+    // it drains After-Tax Income alongside the location-cost categories.
+    // Routes through the existing drawdown logic if total expenses
+    // exceed after-tax income.
+    if (rentalCashOut > 0) {
+      expenses['Rental Operating Loss'] = (expenses['Rental Operating Loss'] ?? 0) + rentalCashOut;
+    }
     const annualExpenses = Object.values(expenses).reduce((s, v) => s + v, 0);
 
-    // Income tax using the bracket-aware service. Schedule E depreciation
-    // is the only paper expense in totalIncome — it reduces the taxable
-    // base but not the cash flow that lands in the bank. Subtracting it
-    // before the bracket lookup gives the depreciation shield real
-    // teeth on the diagram (the explicit goal of Todo #29).
-    const taxableBase = Math.max(0, totalIncome - rentalDepreciation);
+    // Tax base — Schedule E full impact: signed cash flow (loss reduces
+    // AGI) minus depreciation shield (paper expense, further reduction).
+    // The clamp at 0 prevents negative-tax (refunds aren't modeled here).
+    const taxableBase = Math.max(0, otherIncome + rentalCashFlow - rentalDepreciation);
     const taxResult = this.tax.computeIncomeTax(l, taxableBase);
     const taxes = taxResult.monthlyTax * 12;
     const afterTax = Math.max(0, totalIncome - taxes);
@@ -164,7 +175,7 @@ export class SankeyScreenComponent implements OnInit {
       if (m.annual > 0) add(`SS — ${m.name}`, m.annual, 'income');
     }
     if (otherAnnual > 0) add('Other Income', otherAnnual, 'income');
-    if (rentalCash > 0) add('Rental Income', rentalCash, 'income');
+    if (rentalCashIn > 0) add('Rental Income', rentalCashIn, 'income');
     if (iraWithdrawal > 0) add('Portfolio Withdrawal', iraWithdrawal, 'income');
 
     // Pool

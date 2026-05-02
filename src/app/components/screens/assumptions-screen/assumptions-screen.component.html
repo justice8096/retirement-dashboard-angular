@@ -258,7 +258,11 @@
                 </label>
                 <label class="field compact">
                   <span class="field-label">Depreciation Start (sim-yr)</span>
-                  <input appNumeric="age" class="field-input" step="1"
+                  <!-- Explicit min overrides appNumeric="age"'s default min=0,
+                       which would otherwise block the negative values that
+                       represent depreciation that started before the sim
+                       window (a property held for years before retirement). -->
+                  <input appNumeric="age" class="field-input" step="1" min="-50" max="100"
                     [ngModel]="prop.depreciationStartYear"
                     (ngModelChange)="patchRental(prop.id, { depreciationStartYear: +$event })" />
                 </label>
