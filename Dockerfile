@@ -7,7 +7,13 @@
 FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4ced6eb02ef4 AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+# .npmrc is required: it sets `legacy-peer-deps=true` to satisfy
+# @analogjs/vite-plugin-angular's peerOptional on @angular-devkit/build-angular
+# (the legacy webpack builder) while this project uses the modern
+# @angular/build (Vite-based application builder). Without this, `npm ci`
+# fails to reconcile the lock file. Dependency landed in PR #113 (Vitest +
+# Analog test infra); the Dockerfile didn't get the corresponding update.
+COPY package.json package-lock.json .npmrc ./
 RUN npm ci
 
 # ─── Stage 2: Angular production build ────────────────────────────────────
