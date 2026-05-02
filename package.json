@@ -8,7 +8,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:pure": "tsx --test scripts/test-text-escape.mts",
+    "test:pure": "tsx --test scripts/test-*.mts",
     "check:readability": "node scripts/check-readability.mjs",
     "check:numeric-inputs": "node scripts/check-raw-numeric-inputs.mjs",
     "verify:apportion": "node scripts/verify-apportionment.mjs"
