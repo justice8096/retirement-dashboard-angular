@@ -194,3 +194,44 @@ export const RMD_AGE_SOURCES: Source[] = [
     accessed: '2026-04-20',
   },
 ];
+
+/**
+ * Residential rental real property — straight-line depreciation life
+ * under MACRS (IRC § 168(c)). Commercial real property is 39-year and
+ * is not modeled in v1 of Todo #29.
+ *
+ * Used by `rental-income.ts` helpers; surfaced as a citation on the
+ * Schedule E breakdown panel.
+ */
+export const RENTAL_RESIDENTIAL_DEPRECIATION_LIFE_YEARS = 27.5;
+
+export const RENTAL_DEPRECIATION_SOURCES: Source[] = [
+  {
+    title: 'IRS Pub 527 — Residential Rental Property',
+    url: 'https://www.irs.gov/publications/p527',
+    accessed: '2026-05-02',
+  },
+  {
+    title: 'IRS Pub 946 — How to Depreciate Property',
+    url: 'https://www.irs.gov/publications/p946',
+    accessed: '2026-05-02',
+  },
+  {
+    title: 'IRC § 168 — Accelerated cost recovery system',
+    url: 'https://www.law.cornell.edu/uscode/text/26/168',
+    accessed: '2026-05-02',
+  },
+];
+
+export const RENTAL_SCHEDULE_E_SOURCES: Source[] = [
+  {
+    title: 'IRS Schedule E (Form 1040) — Supplemental Income and Loss',
+    url: 'https://www.irs.gov/forms-pubs/about-schedule-e-form-1040',
+    accessed: '2026-05-02',
+  },
+  {
+    title: 'IRS Pub 527 — Residential Rental Property (Schedule E reporting)',
+    url: 'https://www.irs.gov/publications/p527',
+    accessed: '2026-05-02',
+  },
+];

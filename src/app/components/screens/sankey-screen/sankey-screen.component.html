@@ -34,6 +34,20 @@
             [ngModel]="otherMonthlyIncome()" (ngModelChange)="otherMonthlyIncome.set($event)" />
           <span class="param-hint">Pension, annuity, part-time work, etc. Monthly.</span>
         </label>
+        @if (rental.properties().length > 0) {
+          <div class="ctrl rental-note">
+            <span class="ctrl-label">Rental Income (Schedule E)</span>
+            <span class="ctrl-input"
+              [class]="dyscalculia.numberSpacingClass()">
+              {{ fmt(rental.referenceAggregate().totalCashFlow) }}
+            </span>
+            <span class="param-hint">
+              {{ rental.properties().length }} propert{{ rental.properties().length === 1 ? 'y' : 'ies' }} ·
+              depreciation shield {{ fmt(rental.referenceAggregate().totalDepreciation) }} reduces taxable base.
+              Edit on the Assumptions screen.
+            </span>
+          </div>
+        }
       </div>
 
       <!-- Summary cards -->

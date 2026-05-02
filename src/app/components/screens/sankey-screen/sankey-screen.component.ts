@@ -5,6 +5,8 @@ import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
+import { RentalIncomeService } from '@services/rental-income.service';
+import { aggregateRentalIncome } from '@app/lib/rental-income';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
   FinancialSettings, HouseholdProfile, HouseholdMember, LocationFull,
@@ -83,6 +85,7 @@ export class SankeyScreenComponent implements OnInit {
   readonly loc = inject(LocationService);
   readonly tax = inject(TaxService);
   readonly dyscalculia = inject(DyscalculiaService);
+  readonly rental = inject(RentalIncomeService);
   readonly Math = Math;
 
   readonly CHART_W = CHART_W;
@@ -113,8 +116,15 @@ export class SankeyScreenComponent implements OnInit {
     const iraWithdrawal = portfolio * (this.withdrawalPct() / 100);
     const otherAnnual = this.otherMonthlyIncome() * 12;
 
+    // Rental portfolio at year-1 (sim-year 0). Cash flow is what hits the
+    // bank and shows in the diagram; depreciation is paper-only and shrinks
+    // the taxable base (Schedule E shield) without reducing cash flow.
+    const rentalAgg = aggregateRentalIncome(this.rental.properties(), 0);
+    const rentalCash = rentalAgg.totalCashFlow;
+    const rentalDepreciation = rentalAgg.totalDepreciation;
+
     const totalIncome =
-      ss.reduce((s, m) => s + m.annual, 0) + iraWithdrawal + otherAnnual;
+      ss.reduce((s, m) => s + m.annual, 0) + iraWithdrawal + otherAnnual + rentalCash;
 
     // Expense breakdown — sum monthlyCosts excluding 'taxes' (we compute that),
     // split into 7 named categories + "Other Expenses" catch-all.
@@ -131,8 +141,13 @@ export class SankeyScreenComponent implements OnInit {
     if (otherExpenses > 0) expenses['Other Expenses'] = otherExpenses;
     const annualExpenses = Object.values(expenses).reduce((s, v) => s + v, 0);
 
-    // Income tax using the bracket-aware service (total-income as base).
-    const taxResult = this.tax.computeIncomeTax(l, totalIncome);
+    // Income tax using the bracket-aware service. Schedule E depreciation
+    // is the only paper expense in totalIncome — it reduces the taxable
+    // base but not the cash flow that lands in the bank. Subtracting it
+    // before the bracket lookup gives the depreciation shield real
+    // teeth on the diagram (the explicit goal of Todo #29).
+    const taxableBase = Math.max(0, totalIncome - rentalDepreciation);
+    const taxResult = this.tax.computeIncomeTax(l, taxableBase);
     const taxes = taxResult.monthlyTax * 12;
     const afterTax = Math.max(0, totalIncome - taxes);
 
@@ -149,6 +164,7 @@ export class SankeyScreenComponent implements OnInit {
       if (m.annual > 0) add(`SS — ${m.name}`, m.annual, 'income');
     }
     if (otherAnnual > 0) add('Other Income', otherAnnual, 'income');
+    if (rentalCash > 0) add('Rental Income', rentalCash, 'income');
     if (iraWithdrawal > 0) add('Portfolio Withdrawal', iraWithdrawal, 'income');
 
     // Pool
