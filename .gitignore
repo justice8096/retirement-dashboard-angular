@@ -3,9 +3,13 @@
 
 # Build output
 /dist
+/out-tsc
 
 # Angular cache
 /.angular
+
+# Vitest coverage
+/coverage
 
 # IDE
 .idea/
