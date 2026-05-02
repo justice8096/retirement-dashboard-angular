@@ -1125,7 +1125,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         hsaDraw = Math.min(hsaBal, healthcareAnnual);
         hsaBal -= hsaDraw;
       }
-      bal += (income + activePartTime) * 12 - cost * 12 * costShockMult + hsaDraw;
+      // Phantom-income clamp — mirror of the HSA `healthcareAnnual` floor
+      // a few lines above. `costShockMult = currShock * fxMult * effectiveFxShock`
+      // where `currShock = 1 + currVol * normalRandom()` is unbounded below 0
+      // in foreign segments under high currVol + a deep-negative Gaussian draw.
+      // Without this floor, `bal -= cost * 12 * costShockMult` would flip into
+      // a positive bal addition — fictitious income from no source. Expenses
+      // can be reduced (favorable FX, costShockMult between 0 and 1) but cannot
+      // fund the portfolio.
+      const costAnnualWithShock = Math.max(0, cost * 12 * costShockMult);
+      bal += (income + activePartTime) * 12 - costAnnualWithShock + hsaDraw;
 
       // Late-pass dispatch (#31 step 2a + priority 2) — handles event
       // kinds whose effect is a balance mutation AFTER the year's
