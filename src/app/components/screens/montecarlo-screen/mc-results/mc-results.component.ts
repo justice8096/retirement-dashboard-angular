@@ -147,6 +147,9 @@ export class McResultsComponent {
       survivorStepUpTaxableBalance: s.survivorStepUpTaxableBalance(),
       survivorStepUpGainRatio: s.survivorStepUpGainRatio(),
       survivorStepUpLtcgRate: s.survivorStepUpLtcgRate(),
+      survivorRelocateEnabled: s.survivorRelocateEnabled(),
+      survivorRelocateLocationId: s.survivorRelocateLocationId(),
+      survivorRelocateMoveCostUSD: s.survivorRelocateMoveCostUSD(),
     });
 
     this.api.createScenario({ name, scenarioData }).subscribe({

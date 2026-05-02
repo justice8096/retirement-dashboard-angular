@@ -145,6 +145,14 @@ export class MonteCarloStateService {
   readonly survivorStepUpGainRatio = signal(30);
   readonly survivorStepUpLtcgRate = signal(15);
 
+  /** Survivor relocation (#31 priority 4) — if the spouse dies, swap to
+   *  this location at the death year. Empty `survivorRelocateLocationId`
+   *  means "no relocation"; the toggle gates whether the runner threads
+   *  it into the kernel. */
+  readonly survivorRelocateEnabled = signal(false);
+  readonly survivorRelocateLocationId = signal<string>('');
+  readonly survivorRelocateMoveCostUSD = signal(0);
+
   /* ─── Results + stale-results flag ─────────────────────────────── */
   readonly results = signal<MonteCarloResult | null>(null);
   /** True when a sim input changed since the last completed run. */
@@ -461,6 +469,7 @@ export class MonteCarloStateService {
       this.spouseDeathEnabled(); this.spouseDeathYear();
       this.survivorCostRatio(); this.deceasedMemberIndex();
       this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
+      this.survivorRelocateEnabled(); this.survivorRelocateLocationId(); this.survivorRelocateMoveCostUSD();
       // Only mark stale when there's actually a prior result to be stale.
       // Read via untracked() so runSimulation's results.set() doesn't
       // retrigger this effect and immediately re-set simDirty back to true.

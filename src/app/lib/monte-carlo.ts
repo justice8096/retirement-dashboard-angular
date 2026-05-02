@@ -330,6 +330,30 @@ export interface MonteCarloParams {
   survivorStepUpBenefitUSD?: number;
 
   /**
+   * Optional location swap that fires the year `spouseDeathYear` triggers,
+   * not at a fixed `fromYear`. #31 priority 4 — "if my spouse dies, I'd
+   * downsize / move closer to family / relocate to a cheaper city". The
+   * supplied `LocationMove` is the new active segment (cost / FX / breakdown
+   * fields), with kernel-set `fromYear = spouseDeathYear` injected at
+   * dispatch time. Mutations at the death year mirror a regular move:
+   *   - `cost` / `costHealthcare` recomputed from the relocate segment
+   *      (with survivor flag set, since survivorPhase is true by this point)
+   *   - `curIsForeign` / `curDrift` swapped to the new segment's values
+   *   - `fxMult` reset to 1 (new currency baseline)
+   *   - optional `moveCostUSD` deducted from balance
+   * The relocation is sticky: the trial-local schedule is extended with
+   * the relocate segment so subsequent age-transition cost recomputes
+   * (Medicare crossover at 65) read from the relocate segment, not the
+   * pre-death active segment.
+   *
+   * Year-based moves on `moveSchedule` whose `fromYear > spouseDeathYear`
+   * still fire after the relocation, so the user can still pre-plan a
+   * later move (e.g. "move at year 25 regardless of spouse status").
+   * Year-based moves whose `fromYear ≤ spouseDeathYear` are unaffected.
+   */
+  survivorRelocate?: LocationMove;
+
+  /**
    * Phase 3b — foreign inheritance tax hit at the spouse-death year.
    * Indexed by sim year (0..years-1). Each entry describes the active
    * location's spouse-effective tax rate and USD-baseline exemption.
@@ -719,10 +743,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     eventsByYear.set(ev.year, list);
   }
 
-  // Per-year active-segment lookup (schedule is sorted ascending by fromYear).
-  const activeSegmentAt = (y: number): LocationMove => {
-    let active = schedule[0];
-    for (const s of schedule) {
+  // Per-year active-segment lookup (input schedule is sorted ascending by
+  // fromYear). Parametric on `sched` (#31 priority 4 — survivor
+  // relocation): each trial may extend its own schedule when a survivor-
+  // triggered relocation fires, so this function reads from the supplied
+  // array rather than the outer `schedule`. Steady-state callers (no
+  // relocation) pass the outer `schedule`; mid-trial callers (after a
+  // relocation fires) pass the trial-local extended schedule.
+  const activeSegmentAt = (y: number, sched: LocationMove[] = schedule): LocationMove => {
+    let active = sched[0];
+    for (const s of sched) {
       if (s.fromYear <= y) active = s;
       else break;
     }
@@ -785,6 +815,12 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     let curIsForeign = initial.isForeign;
     let curDrift = initial.fxDrift ?? drift;
     let fxMult = 1;
+    // Trial-local schedule starts as a reference to the outer `schedule`
+    // and is replaced with an extended copy if a survivor-relocation
+    // fires this trial (#31 priority 4). Reading via this binding keeps
+    // post-relocation age-transition cost recomputes pointing at the
+    // relocate segment instead of the pre-death active segment.
+    let trialSchedule: LocationMove[] = schedule;
     // Durable across moves: a one-time FX shock is a global USD repricing
     // and survives segment changes, unlike per-segment drift in fxMult.
     // Only applied to cost when in a foreign segment.
@@ -852,8 +888,10 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
         if (m.moveCostUSD) bal -= m.moveCostUSD;
       } else if (ageTransition) {
         // Medicare crossover or any age-65 transition in a US segment —
-        // recompute the segment's cost without resetting FX.
-        const active = activeSegmentAt(y);
+        // recompute the segment's cost without resetting FX. Reads from
+        // `trialSchedule` so a post-spouseDeath survivor-relocation
+        // (#31 priority 4) sticks across the transition.
+        const active = activeSegmentAt(y, trialSchedule);
         const sc = segmentCostAtYear(active, y, p, survivorPhase);
         cost = sc.total * cumInfl;
         costHealthcare = sc.healthcare * cumInfl;
@@ -901,12 +939,39 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       if (!survivorPhase && spouseDeathThisYear) {
         survivorPhase = true;
         if (survivorIncome != null) income = survivorIncome;
-        const active = activeSegmentAt(y);
-        // Back out cumulative inflation so segmentCostAtYear gets today's $,
-        // then re-inflate for the sim's current-year dollars.
-        const sc = segmentCostAtYear(active, y, p, true);
-        cost = sc.total * cumInfl;
-        costHealthcare = sc.healthcare * cumInfl;
+
+        // Survivor relocation (#31 priority 4) — if the caller supplied
+        // `p.survivorRelocate`, treat the death year as a location swap
+        // to that segment (mirror of regular move dispatch). Extends
+        // the trial-local schedule with the relocate segment so future
+        // age-transition recomputes read from it.
+        //
+        // Stickiness: the relocate segment is appended to `trialSchedule`
+        // with `fromYear = y`, sorted ascending. Year-based moves on
+        // `moveSchedule` whose `fromYear > y` still fire later (the user
+        // can pre-plan a post-survivor-relocation move). Year-based moves
+        // whose `fromYear ≤ y` are unaffected — they already executed.
+        if (p.survivorRelocate) {
+          const relocate: LocationMove = { ...p.survivorRelocate, fromYear: y };
+          trialSchedule = [...trialSchedule, relocate]
+            .sort((a, b) => a.fromYear - b.fromYear);
+          const sc = segmentCostAtYear(relocate, y, p, true);
+          cost = sc.total * cumInfl;
+          costHealthcare = sc.healthcare * cumInfl;
+          curIsForeign = relocate.isForeign;
+          curDrift = relocate.fxDrift ?? curDrift;
+          fxMult = 1; // new currency baseline, same as regular move
+          if (relocate.moveCostUSD) bal -= relocate.moveCostUSD;
+        } else {
+          // No relocation — recompute cost on the pre-death active
+          // segment with the survivor flag. Same as legacy spouseDeath.
+          const active = activeSegmentAt(y, trialSchedule);
+          // Back out cumulative inflation so segmentCostAtYear gets today's $,
+          // then re-inflate for the sim's current-year dollars.
+          const sc = segmentCostAtYear(active, y, p, true);
+          cost = sc.total * cumInfl;
+          costHealthcare = sc.healthcare * cumInfl;
+        }
       }
 
       // Early-pass dispatch (#31 steps 2a + 2b + 2c) — handles event

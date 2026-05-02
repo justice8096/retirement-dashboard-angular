@@ -108,6 +108,7 @@ export class MonteCarloRunnerService {
           partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
           partTimeEndYear: s.partTimeEndYear(),
           inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
+          survivorRelocate: this.buildSurvivorRelocate(),
           regime: {
             bullMean: s.regimeBullMean() / 100,
             bullVol: s.regimeBullVol() / 100,
@@ -156,6 +157,20 @@ export class MonteCarloRunnerService {
       foreignHealthcareMonthly,
       isUS,
     };
+  }
+
+  /** Build the survivor-relocation segment (#31 priority 4). Returns undefined
+   *  when the user hasn't enabled the toggle or hasn't picked a location.
+   *  Kernel injects the death year as `fromYear` at dispatch time, so any
+   *  value here is overwritten — we pass 0 as a safe placeholder. */
+  private buildSurvivorRelocate() {
+    const s = this.state;
+    if (!s.spouseDeathEnabled() || !s.survivorRelocateEnabled()) return undefined;
+    const locId = s.survivorRelocateLocationId();
+    if (!locId) return undefined;
+    const loc = this.loc.fullLocations().find(l => l.id === locId);
+    if (!loc) return undefined;
+    return this.buildSegmentForLocation(loc, 0, s.survivorRelocateMoveCostUSD() || undefined);
   }
 
   /** Build the per-year inheritance-tax payload for the spouse-death scenario.

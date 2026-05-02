@@ -50,6 +50,9 @@ export interface MonteCarloScenarioParams {
   survivorStepUpTaxableBalance: number;
   survivorStepUpGainRatio: number;
   survivorStepUpLtcgRate: number;
+  survivorRelocateEnabled: boolean;
+  survivorRelocateLocationId: string;
+  survivorRelocateMoveCostUSD: number;
 }
 
 /**
