@@ -6,6 +6,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
+import { McLifeEventsTimelineComponent } from '../mc-life-events-timeline/mc-life-events-timeline.component';
 
 /**
  * Monte Carlo "what-if scenarios" sub-component. Bundles the 5
@@ -29,7 +30,7 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
 @Component({
   selector: 'app-mc-scenarios',
   standalone: true,
-  imports: [FormsModule, MatButtonModule, NumericInputDirective],
+  imports: [FormsModule, MatButtonModule, NumericInputDirective, McLifeEventsTimelineComponent],
   templateUrl: './mc-scenarios.component.html',
   styleUrls: ['./mc-scenarios.component.scss'],
 })
