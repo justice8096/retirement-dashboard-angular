@@ -195,6 +195,52 @@ test('compileLifeEvents: oneTimeExpenses with amountUSD <= 0 are filtered', () =
   assert.equal(expenses[0].year, 5);
 });
 
+// ─── compileLifeEvents — oneTimeIncomes (#31 priority 2) ────────────────
+
+test('compileLifeEvents: oneTimeIncomes become oneTimeIncome events', () => {
+  const events = compileLifeEvents({
+    years: 30,
+    oneTimeIncomes: [
+      { year: 8, amountUSD: 100000, label: 'Inheritance' },
+      { year: 15, amountUSD: 50000, label: 'Home sale proceeds', inflate: false },
+    ],
+  });
+  const incomes = events.filter((e) => e.kind === 'oneTimeIncome');
+  assert.equal(incomes.length, 2);
+  assert.equal(incomes[0].year, 8);
+  assert.equal((incomes[0] as { amountUSD: number }).amountUSD, 100000);
+  assert.equal((incomes[0] as { label?: string }).label, 'Inheritance');
+  assert.equal((incomes[1] as { inflate?: boolean }).inflate, false);
+});
+
+test('compileLifeEvents: oneTimeIncomes with amountUSD <= 0 are filtered', () => {
+  const events = compileLifeEvents({
+    years: 30,
+    oneTimeIncomes: [
+      { year: 5, amountUSD: 100000, label: 'real income' },
+      { year: 10, amountUSD: 0, label: 'zero — should be dropped' },
+      { year: 15, amountUSD: -100, label: 'negative — should be dropped' },
+    ],
+  });
+  const incomes = events.filter((e) => e.kind === 'oneTimeIncome');
+  assert.equal(incomes.length, 1);
+  assert.equal(incomes[0].year, 5);
+});
+
+test('compileLifeEvents: oneTimeIncomes outside [0, p.years) are filtered', () => {
+  const events = compileLifeEvents({
+    years: 10,
+    oneTimeIncomes: [
+      { year: 5, amountUSD: 100000, label: 'in horizon' },
+      { year: 15, amountUSD: 100000, label: 'past horizon — drop' },
+      { year: -3, amountUSD: 100000, label: 'before horizon — drop' },
+    ],
+  });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].kind, 'oneTimeIncome');
+  assert.equal(events[0].year, 5);
+});
+
 test('compileLifeEvents: events outside [0, p.years) are filtered (Codex #96 fix)', () => {
   const events = compileLifeEvents({
     years: 10,

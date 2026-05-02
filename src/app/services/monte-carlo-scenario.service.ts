@@ -31,6 +31,8 @@ export interface MonteCarloScenarioParams {
   moves: unknown;
   oneTimeExpensesEnabled: boolean;
   oneTimeExpenses: unknown;
+  oneTimeIncomesEnabled: boolean;
+  oneTimeIncomes: unknown;
   ltcMode: string;
   ltcProbability: number;
   ltcCostPerYearUSD: number;
