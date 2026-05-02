@@ -1,0 +1,125 @@
+    @if (loc.selectedLocation(); as location) {
+      <div class="detail">
+        <!-- Back button -->
+        <button mat-button (click)="loc.clearSelection()" class="back-btn">
+          ← Back to all locations
+        </button>
+
+        <!-- Header -->
+        <div class="detail-header">
+          <div>
+            <h2 class="loc-name">{{ location.name }}</h2>
+            <div class="loc-meta">{{ location.country }} · {{ location.region }}@if (location.subregion) { · {{ location.subregion }} }</div>
+          </div>
+          <div class="loc-total"
+            [class]="dyscalculia.numberSpacingClass()">
+            {{ dyscalculia.isEnabled()
+              ? dyscalculia.formatCurrency(location.monthlyCostTotal ?? 0)
+              : '$' + (location.monthlyCostTotal ?? 0).toLocaleString() }}<span class="per-mo">/mo</span>
+          </div>
+        </div>
+
+        @if (dyscalculia.isEnabled() && dyscalculia.settings().showTextSummaries) {
+          <div class="text-summary">
+            Total estimated monthly cost of living in {{ location.name }},
+            covering housing, food, healthcare, transportation, entertainment, utilities, and other expenses.
+          </div>
+        }
+
+        <!-- Cost breakdown chart -->
+        <div class="breakdown-section">
+          <h3 class="section-title">Monthly Cost Breakdown</h3>
+          <div class="bars">
+            @for (item of breakdown(); track item.label) {
+              <div class="bar-row">
+                <div class="bar-labels">
+                  <span class="bar-name">{{ item.label }}</span>
+                  <span class="bar-value"
+                    [style.color]="item.color"
+                    [class]="dyscalculia.numberSpacingClass()">
+                    {{ dyscalculia.isEnabled()
+                      ? dyscalculia.formatCurrency(item.value)
+                      : '$' + item.value.toLocaleString() }}
+                  </span>
+                </div>
+                <div class="bar-track">
+                  <div class="bar-fill"
+                    [style.width.%]="(item.value / maxCost()) * 100"
+                    [style.background]="item.color">
+                  </div>
+                </div>
+                @if (dyscalculia.isEnabled() && dyscalculia.settings().magnitudeAnchors) {
+                  <div class="bar-anchor">{{ dyscalculia.getMagnitudeAnchor(item.value) }}</div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- FX stress widget (#26) — only for foreign-currency locations.
+             USD-denominated locations have no per-trial FX risk against the
+             user's portfolio (also USD), so showing the slider there would
+             be misleading. -->
+        @if (isForeign()) {
+          <div class="fx-stress-section">
+            <h3 class="section-title">FX Stress Test</h3>
+            <p class="fx-stress-blurb">
+              Your portfolio is in USD; cost-of-living here is in {{ location.currency }}.
+              How would your monthly cost shift if USD weakens or strengthens against
+              {{ location.currency }}? This is a one-time price-level shock — for
+              ongoing per-year FX volatility, see the Monte Carlo screen.
+            </p>
+            <div class="fx-stress-controls">
+              @for (preset of fxPresets; track preset.value) {
+                <button
+                  type="button"
+                  class="fx-preset"
+                  [class.active]="fxShockPct() === preset.value"
+                  (click)="fxShockPct.set(preset.value)">
+                  {{ preset.label }}
+                </button>
+              }
+            </div>
+            <div class="fx-stress-result" [class]="dyscalculia.numberSpacingClass()">
+              <div class="fx-result-row">
+                <span class="fx-result-label">At {{ fxShockPct() > 0 ? '+' : '' }}{{ fxShockPct() }}% USD shift:</span>
+                <span class="fx-result-value">
+                  {{ formatCost(stressedMonthlyTotal()) }}<span class="per-mo">/mo</span>
+                </span>
+              </div>
+              @if (fxShockPct() !== 0) {
+                <div class="fx-result-delta">
+                  {{ fxShockPct() > 0 ? '↑' : '↓' }}
+                  {{ formatCost(Math.abs(stressedMonthlyTotal() - (location.monthlyCostTotal ?? 0))) }}
+                  vs baseline · annualized:
+                  {{ formatCost(Math.abs((stressedMonthlyTotal() - (location.monthlyCostTotal ?? 0)) * 12)) }}/yr
+                </div>
+              }
+            </div>
+            <p class="fx-stress-note">
+              Convention: positive = USD weakens (your dollar buys less local currency,
+              so cost in USD rises). Negative = USD strengthens.
+            </p>
+          </div>
+        }
+
+        <!-- Cost ranges -->
+        <div class="ranges-section">
+          <h3 class="section-title">Cost Ranges (Min – Typical – Max)</h3>
+          <div class="range-grid">
+            @for (item of rangeData(); track item.label) {
+              <div class="range-card">
+                <div class="range-label">{{ item.label }}</div>
+                <div class="range-values">
+                  <span class="range-min">{{ formatCost(item.min) }}</span>
+                  <span class="range-arrow">→</span>
+                  <span class="range-typical">{{ formatCost(item.typical) }}</span>
+                  <span class="range-arrow">→</span>
+                  <span class="range-max">{{ formatCost(item.max) }}</span>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
