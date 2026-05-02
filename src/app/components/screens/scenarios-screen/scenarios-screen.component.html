@@ -1,0 +1,177 @@
+    <div class="scenarios-screen">
+      <div class="screen-header">
+        <span class="header-icon">📋</span>
+        <div>
+          <h2 class="header-title">Saved Scenarios</h2>
+          <p class="header-sub">Compare your saved retirement simulations</p>
+        </div>
+      </div>
+
+      @if (loading()) {
+        <div class="status-msg">Loading scenarios…</div>
+      } @else if (!views().length) {
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No saved scenarios yet.</p>
+          <p class="hint">Run a Monte Carlo simulation and click "💾 Save this scenario" to capture it here.</p>
+        </div>
+      } @else {
+        @if (selectedCount() >= 2) {
+          <!-- Side-by-side comparison table -->
+          <div class="compare-card">
+            <div class="compare-head">
+              <h3 class="compare-title">Side-by-Side ({{ selectedCount() }} selected)</h3>
+              <button mat-button class="compare-clear" (click)="clearSelection()">Clear selection</button>
+            </div>
+            <div class="compare-scroll">
+              <table class="compare-table">
+                <thead>
+                  <tr>
+                    <th class="lbl">Metric</th>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <th class="sc-col">{{ v.scenario.name }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="lbl">Location</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td>{{ v.locationName ?? '—' }}</td>
+                    }
+                  </tr>
+                  <tr class="hi">
+                    <td class="lbl">Success Rate</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td [class.best]="isBestSuccess(v)" [class.worst]="isWorstSuccess(v)">
+                        @if (v.successRatePct !== null) {
+                          <div class="sr">
+                            <span class="sr-num">{{ v.successRatePct.toFixed(0) }}%</span>
+                            <div class="sr-bar">
+                              <div class="sr-fill" [style.width.%]="v.successRatePct"
+                                   [class.good]="v.successRatePct >= 90"
+                                   [class.mid]="v.successRatePct >= 70 && v.successRatePct < 90"
+                                   [class.low]="v.successRatePct < 70"></div>
+                            </div>
+                          </div>
+                        } @else { — }
+                      </td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">Median End Balance</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td [class.best]="isBestMedian(v)" [class.worst]="isWorstMedian(v)"
+                          [class]="dyscalculia.numberSpacingClass()">
+                        {{ v.medianBalance !== null ? fmt(v.medianBalance) : '—' }}
+                      </td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">5th Percentile</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td [class]="dyscalculia.numberSpacingClass()">
+                        {{ v.p5Balance !== null ? fmt(v.p5Balance) : '—' }}
+                      </td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">95th Percentile</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td [class]="dyscalculia.numberSpacingClass()">
+                        {{ v.p95Balance !== null ? fmt(v.p95Balance) : '—' }}
+                      </td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">Apportionment</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td>{{ v.apportion ?? '—' }}</td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">ACA Regime</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td>{{ v.regime ?? '—' }}</td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">MAGI (entered)</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td [class]="dyscalculia.numberSpacingClass()">
+                        {{ v.magi !== null ? fmt(v.magi) : '—' }}
+                      </td>
+                    }
+                  </tr>
+                  <tr>
+                    <td class="lbl">Runs × Years</td>
+                    @for (v of selectedViews(); track v.scenario.id) {
+                      <td>{{ (v.runs ?? '—') }} × {{ (v.years ?? '—') }}</td>
+                    }
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        } @else if (selectedCount() === 1) {
+          <div class="compare-hint">Select one more scenario to compare side-by-side.</div>
+        } @else {
+          <div class="compare-hint">Check the boxes on 2+ scenarios below to compare side-by-side.</div>
+        }
+
+        <div class="scenario-grid">
+          @for (v of views(); track v.scenario.id) {
+            <div class="scenario-card"
+                 [class.favorite]="v.scenario.isFavorite"
+                 [class.selected]="selectedIds().has(v.scenario.id)">
+              <div class="sc-header">
+                <input type="checkbox"
+                  [checked]="selectedIds().has(v.scenario.id)"
+                  (change)="toggleSelected(v.scenario.id)"
+                  [attr.aria-label]="'Select ' + v.scenario.name" />
+                <span class="sc-name">{{ v.scenario.name }}</span>
+                <button class="sc-fav-btn" (click)="toggleFavorite(v.scenario)"
+                        [title]="v.scenario.isFavorite ? 'Unfavorite' : 'Favorite'">
+                  {{ v.scenario.isFavorite ? '★' : '☆' }}
+                </button>
+              </div>
+              <div class="sc-body">
+                @if (v.successRatePct !== null) {
+                  <div class="sc-stat">
+                    <span class="sc-label">Success Rate</span>
+                    <span class="sc-value"
+                      [class.good]="v.successRatePct >= 90"
+                      [class.warn]="v.successRatePct >= 70 && v.successRatePct < 90"
+                      [class.bad]="v.successRatePct < 70">
+                      {{ v.successRatePct.toFixed(0) }}%
+                    </span>
+                  </div>
+                }
+                @if (v.medianBalance !== null) {
+                  <div class="sc-stat">
+                    <span class="sc-label">Median Balance</span>
+                    <span class="sc-value" [class]="dyscalculia.numberSpacingClass()">{{ fmt(v.medianBalance) }}</span>
+                  </div>
+                }
+                @if (v.locationName) {
+                  <div class="sc-stat">
+                    <span class="sc-label">Location</span>
+                    <span class="sc-value sc-loc">{{ v.locationName }}</span>
+                  </div>
+                }
+                @if (v.runs !== null) {
+                  <div class="sc-stat">
+                    <span class="sc-label">Runs</span>
+                    <span class="sc-value">{{ v.runs.toLocaleString() }}</span>
+                  </div>
+                }
+              </div>
+              <div class="sc-footer">
+                <span class="sc-date">{{ v.scenario.updatedAt.substring(0, 10) }}</span>
+                <button mat-button class="sc-delete" (click)="deleteScenario(v.scenario.id)">Delete</button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
