@@ -37,6 +37,14 @@ export interface FinancialSettings {
    *  (`user_financial_settings.rental_properties`). Empty array when no
    *  properties configured. */
   rentalProperties?: RentalProperty[];
+  /** Primary-residence mortgage P+I per month, USD (Todo #28). Sticky —
+   *  the MC kernel does NOT inflate this with CPI (mortgage payments
+   *  are nominal). 0 = no mortgage configured. */
+  mortgageMonthlyPayment?: number;
+  /** Sim-year (exclusive) when the mortgage ends. 0 = no mortgage.
+   *  Early payoff is modeled by setting this to the payoff year and
+   *  adding a oneTimeExpense LifeEvent for the remaining principal. */
+  mortgageEndYear?: number;
   updatedAt: string;
 }
 

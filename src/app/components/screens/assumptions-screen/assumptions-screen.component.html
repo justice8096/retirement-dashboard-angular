@@ -7,7 +7,7 @@
         </div>
         <div class="save-bar">
           @if (saveMsg()) { <span class="save-msg" [class.err]="saveErr()">{{ saveMsg() }}</span> }
-          <button mat-flat-button color="primary" [disabled]="saving() || (!dirty() && !rental.dirty())" (click)="save()">
+          <button mat-flat-button color="primary" [disabled]="saving() || (!dirty() && !rental.dirty() && !mortgageDirty())" (click)="save()">
             {{ saving() ? 'Saving…' : (isNew() ? 'Create Profile' : 'Save Changes') }}
           </button>
         </div>
@@ -330,6 +330,53 @@
                 [ngModel]="rental.referenceYear()"
                 (ngModelChange)="rental.referenceYear.set(+$event)" />
             </label>
+          }
+        </div>
+
+        <!-- Primary-residence mortgage (Todo #28) -->
+        <div class="card">
+          <h3 class="card-title">Primary-Residence Mortgage</h3>
+          <p class="hc-help">
+            Optional. If you own your home and have a mortgage, enter the
+            P+I monthly payment and the sim-year when payments end.
+            Mortgage P+I is <strong>nominal</strong> — the simulation does
+            NOT inflate it with CPI, since fixed-rate payments don't grow
+            with inflation. Entering 0 for either field disables the
+            mortgage. To model an early payoff, set <em>Sim-year Ends</em>
+            to the payoff year and add a one-time expense on the MC scenarios
+            screen for the remaining principal.
+          </p>
+          <div class="field-grid">
+            <label class="field">
+              <span class="field-label">P+I Monthly Payment ($)</span>
+              <input appNumeric="currency" class="field-input" step="50" min="0" max="100000"
+                [class]="dyscalculia.numberSpacingClass()"
+                [ngModel]="mortgageMonthlyPayment()"
+                (ngModelChange)="patchMortgage({ mortgageMonthlyPayment: +$event })" />
+            </label>
+            <label class="field">
+              <span class="field-label">Sim-year Ends (exclusive)</span>
+              <input appNumeric="age" class="field-input" min="0" max="100" step="1"
+                [ngModel]="mortgageEndYear()"
+                (ngModelChange)="patchMortgage({ mortgageEndYear: +$event })" />
+            </label>
+          </div>
+          @if (mortgageMonthlyPayment() > 0 && mortgageEndYear() > 0) {
+            <div class="hc-grid">
+              <div class="hc-stat">
+                <span class="hc-label">Years remaining</span>
+                <span class="hc-value" [class]="dyscalculia.numberSpacingClass()">
+                  {{ mortgageYearsRemaining() }}
+                </span>
+              </div>
+              <div class="hc-stat">
+                <span class="hc-label">Total nominal P+I to payoff</span>
+                <span class="hc-value hc-cost" [class]="dyscalculia.numberSpacingClass()">
+                  {{ fmtYearly(mortgageTotalRemaining()) }}
+                </span>
+                <span class="hc-sub">{{ mortgageYearsRemaining() }} yrs × 12 mo × payment</span>
+              </div>
+            </div>
           }
         </div>
 

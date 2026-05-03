@@ -1261,6 +1261,176 @@ test('runMonteCarlo: propertySale recaptures depreciation at 25% (high-gain case
   );
 });
 
+// ─── runMonteCarlo: mortgage (Todo #28) ────────────────────────────────
+
+test('runMonteCarlo: mortgage=0 → byte-identical to legacy (no mortgage)', () => {
+  // Both fields 0 (the default) must be a no-op: byte-identical to a
+  // run with no mortgage params at all.
+  const seed = 6060;
+  const a = runMonteCarlo(smokeParams({ seededRandom: mulberry32(seed) }));
+  const b = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    mortgageMonthlyPayment: 0,
+    mortgageEndYear: 0,
+  }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});
+
+test('runMonteCarlo: mortgage with endYear=0 is dormant even with payment > 0', () => {
+  // The kernel guard is `mortgageMonthlyPayment > 0 && y < mortgageEndYear`.
+  // endYear=0 means y is never less than it, so payment never deducts.
+  const seed = 6161;
+  const a = runMonteCarlo(smokeParams({ seededRandom: mulberry32(seed) }));
+  const b = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    mortgageMonthlyPayment: 2500,
+    mortgageEndYear: 0,
+  }));
+  assert.deepEqual(a.results, b.results);
+});
+
+test('runMonteCarlo: mortgage deducts P+I × 12 each year before payoff', () => {
+  // Active mortgage strictly reduces median balance vs no-mortgage
+  // baseline. Magnitude lower-bounded by ~years × 12 × payment when
+  // returns are zero, looser bound when returns compound — assert
+  // direction + non-trivial magnitude.
+  const seed = 6262;
+  const baseline = runMonteCarlo(smokeParams({ seededRandom: mulberry32(seed) }));
+  const withMortgage = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    mortgageMonthlyPayment: 2500,    // $30K/yr P+I
+    mortgageEndYear: 10,             // 10 years of payments
+  }));
+  assert.ok(
+    withMortgage.median < baseline.median,
+    `with-mortgage median ${withMortgage.median} should be below baseline ${baseline.median}`,
+  );
+  // 10 yrs × $30K = $300K nominal hit; with compounding-lost-on-deductions
+  // the actual hit is larger. Assert at least $200K to catch a "deduction
+  // not firing" regression.
+  const drop = baseline.median - withMortgage.median;
+  assert.ok(drop > 200_000, `mortgage drop ${drop} should exceed $200K`);
+});
+
+test('runMonteCarlo: mortgage payments do NOT inflate with CPI', () => {
+  // Mortgage P+I is nominal (the whole point of the feature). With high
+  // inflation, the mortgage's real cost falls — and the difference vs
+  // an inflating cost stream should manifest as a smaller hit at high
+  // inflation than at low inflation, for the same payment + duration.
+  // Compare: same nominal mortgage at meanInflation 0% vs 5%, holding
+  // returns + seed identical. The 5%-inflation run should NOT show a
+  // larger mortgage drop (since payments stay nominal).
+  const seed = 6363;
+  const lowInfl = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    meanInflation: 0,
+    volInflation: 0,
+    mortgageMonthlyPayment: 2000,
+    mortgageEndYear: 15,
+  }));
+  const lowInflBaseline = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    meanInflation: 0,
+    volInflation: 0,
+  }));
+  // Drop is in nominal dollars at zero inflation — straightforward.
+  const lowInflDrop = lowInflBaseline.median - lowInfl.median;
+
+  const highInfl = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    meanInflation: 0.05,
+    volInflation: 0,
+    mortgageMonthlyPayment: 2000,
+    mortgageEndYear: 15,
+  }));
+  const highInflBaseline = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    meanInflation: 0.05,
+    volInflation: 0,
+  }));
+  const highInflDrop = highInflBaseline.median - highInfl.median;
+
+  // Both should be positive (mortgage hurts in both cases).
+  assert.ok(lowInflDrop > 0, `lowInflDrop ${lowInflDrop} should be positive`);
+  assert.ok(highInflDrop > 0, `highInflDrop ${highInflDrop} should be positive`);
+  // The high-inflation drop should be roughly the same nominal magnitude
+  // as the low-inflation drop, since mortgage P+I doesn't inflate. Allow
+  // a wide tolerance because returns + cost paths differ. Key invariant:
+  // high-inflation drop is NOT 2x+ the low-inflation drop (that would
+  // indicate inflation is being applied to mortgage payments).
+  const ratio = highInflDrop / lowInflDrop;
+  assert.ok(
+    ratio < 2.0,
+    `mortgage drop ratio ${ratio} (high/low inflation) suggests P+I IS being inflated`,
+  );
+});
+
+test('runMonteCarlo: mortgage stops at endYear (exclusive)', () => {
+  // A mortgage ending year 5 vs year 25 in a 20-year sim: the year-25
+  // case pays for the whole horizon, the year-5 case only pays first 5
+  // years. Year-5 ending → strictly LESS total deduction → higher median.
+  const seed = 6464;
+  const earlyEnd = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    mortgageMonthlyPayment: 2000,
+    mortgageEndYear: 5,              // pays years 0..4
+  }));
+  const lateEnd = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    mortgageMonthlyPayment: 2000,
+    mortgageEndYear: 25,             // pays years 0..19 (full horizon)
+  }));
+  assert.ok(
+    earlyEnd.median > lateEnd.median,
+    `early-payoff median ${earlyEnd.median} should beat late-payoff ${lateEnd.median}`,
+  );
+});
+
+test('runMonteCarlo: mortgage NOT affected by FX shock (USD obligation)', () => {
+  // A USD mortgage doesn't track foreign-currency cost — its deduction
+  // sits OUTSIDE the costShockMult line. Compare a foreign segment with
+  // currVol=0 (no FX noise) vs currVol=10% with the same mortgage; the
+  // mortgage's contribution should be invariant. The location's main
+  // cost line WILL differ (FX noise on cost), so we look at the gap
+  // between with-mortgage and without-mortgage in each currVol regime —
+  // that gap should be near-identical because mortgage doesn't track FX.
+  const seed = 6565;
+  const noFx = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    currVol: 0,
+  }));
+  const noFxMortgage = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    currVol: 0,
+    mortgageMonthlyPayment: 1500,
+    mortgageEndYear: 15,
+  }));
+  const noFxGap = noFx.median - noFxMortgage.median;
+
+  const heavyFx = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    currVol: 0.10,
+  }));
+  const heavyFxMortgage = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    currVol: 0.10,
+    mortgageMonthlyPayment: 1500,
+    mortgageEndYear: 15,
+  }));
+  const heavyFxGap = heavyFx.median - heavyFxMortgage.median;
+
+  // Gap should be approximately FX-invariant — within 30% (noise from
+  // compounding-on-different-balances under FX-shocked cost paths).
+  // Looser tolerance than ideal but enough to catch a regression where
+  // mortgage gets multiplied by costShockMult.
+  const ratio = heavyFxGap / noFxGap;
+  assert.ok(
+    ratio > 0.7 && ratio < 1.3,
+    `mortgage gap FX-ratio ${ratio} should be ~1 (mortgage independent of FX)`,
+  );
+});
+
 test('runMonteCarlo: propertySale with unknown propertyId is silent no-op', () => {
   // Defensive: a stale lifeEvents row referencing a deleted property must
   // not crash or perturb the simulation.

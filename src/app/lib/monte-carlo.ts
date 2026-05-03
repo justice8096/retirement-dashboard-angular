@@ -594,6 +594,23 @@ export interface MonteCarloParams {
   propertySaleFilingStatus?: LtcgFilingStatus;
 
   /**
+   * Primary-residence mortgage P+I per month, USD (Todo #28). Sticky —
+   * the kernel does NOT multiply this by `cumInfl` because mortgage
+   * payments are nominal (the whole point of fixed-rate mortgages, and
+   * the planning lever the todo flags around payoff timing).
+   *
+   * Deducted each year `y < mortgageEndYear` as `mortgageMonthlyPayment × 12`.
+   * 0 (or undefined) means no mortgage — dormant code path.
+   *
+   * Early payoff is modeled by the caller: set `mortgageEndYear` to the
+   * payoff year and add a `oneTimeExpense` LifeEvent for the remaining
+   * principal in that year. No new LifeEvent kind needed.
+   */
+  mortgageMonthlyPayment?: number;
+  /** Exclusive sim-year cutoff for mortgage payments. 0 = no mortgage. */
+  mortgageEndYear?: number;
+
+  /**
    * Optional deterministic-seed RNG. When provided, all kernel-internal
    * random draws (Gaussian return/inflation samples, regime-switch coin
    * flips, currency shocks, LTC start-age + occurrence rolls) consume
@@ -1007,6 +1024,12 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   const partTimeBase = Math.max(0, p.partTimeMonthlyIncome ?? 0);
   const partTimeEndYear = Math.max(0, p.partTimeEndYear ?? 0);
 
+  // Primary-residence mortgage (Todo #28). Both 0 = no mortgage, dormant
+  // code path — byte-identical to legacy callers. Pre-extracted at trial
+  // setup; the per-year deduction is a single `if` in the cost line below.
+  const mortgageMonthlyPayment = Math.max(0, p.mortgageMonthlyPayment ?? 0);
+  const mortgageEndYear = Math.max(0, p.mortgageEndYear ?? 0);
+
   // HSA setup (#33 item 3). Active iff hsaInitialBalance > 0 OR contributions
   // are configured. When inactive, the per-year HSA path is a no-op — the
   // hsaBal accumulator stays at 0, the draw is 0, and `cost` is deducted in
@@ -1327,6 +1350,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // fund the portfolio.
       const costAnnualWithShock = Math.max(0, cost * 12 * costShockMult);
       bal += (income + activePartTime) * 12 - costAnnualWithShock + hsaDraw;
+
+      // Primary-residence mortgage P+I (Todo #28). Sticky — NO cumInfl
+      // multiplier (mortgage payments are nominal) and NO costShockMult
+      // (USD mortgage doesn't track foreign FX). Deducted as a sibling
+      // line so it lands AFTER income & main cost but BEFORE the late-
+      // pass event dispatcher (where a oneTimeExpense for early-payoff
+      // remaining principal would land in the same year).
+      if (mortgageMonthlyPayment > 0 && y < mortgageEndYear) {
+        bal -= mortgageMonthlyPayment * 12;
+      }
 
       // Late-pass dispatch (#31 step 2a + priority 2) — handles event
       // kinds whose effect is a balance mutation AFTER the year's

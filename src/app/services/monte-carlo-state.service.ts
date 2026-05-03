@@ -506,6 +506,11 @@ export class MonteCarloStateService {
       // Rental properties (Todo #34) — kernel pre-computes per-year cash +
       // taxable arrays from this list, so any edit invalidates prior results.
       this.rental.properties();
+      // Mortgage fields (Todo #28) — read via the fin() signal which
+      // updates on every successful financial save / load. Kernel deducts
+      // a sticky annual P+I until mortgageEndYear, so any edit must
+      // invalidate prior results.
+      this.fin();
       // Only mark stale when there's actually a prior result to be stale.
       // Read via untracked() so runSimulation's results.set() doesn't
       // retrigger this effect and immediately re-set simDirty back to true.

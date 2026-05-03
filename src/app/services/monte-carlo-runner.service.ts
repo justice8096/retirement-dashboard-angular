@@ -126,6 +126,12 @@ export class MonteCarloRunnerService {
           // Filing status for LTCG bracket lookup on propertySale events
           // (Todo #35). Two-adult households → MFJ; single-adult → single.
           propertySaleFilingStatus: s.adults().length >= 2 ? 'mfj' : 'single',
+          // Primary-residence mortgage (Todo #28). Read directly from
+          // FinancialSettings — no separate state signal needed since
+          // these are simple scalars (unlike the rental array). Both
+          // 0 = no mortgage, dormant kernel path.
+          mortgageMonthlyPayment: Number(f.mortgageMonthlyPayment) || 0,
+          mortgageEndYear: Number(f.mortgageEndYear) || 0,
           inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
           medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
           survivorRelocate: this.buildSurvivorRelocate(),
