@@ -3,8 +3,10 @@ import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { HealthcareService } from '@services/healthcare.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
+import { RentalIncomeService } from '@services/rental-income.service';
 import { LocationFull } from '@models/api.model';
 import { runMonteCarlo } from '@app/lib/monte-carlo';
+import { aggregateRentalIncome } from '@app/lib/rental-income';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
 
 /**
@@ -26,6 +28,7 @@ export class MonteCarloRunnerService {
   private readonly loc = inject(LocationService);
   private readonly taxSvc = inject(TaxService);
   private readonly healthcare = inject(HealthcareService);
+  private readonly rental = inject(RentalIncomeService);
 
   /** True while the kernel is executing. Templates bind to this for the
    *  Run-button label / disable state. */
@@ -126,6 +129,11 @@ export class MonteCarloRunnerService {
           survivorStepUpBenefitUSD: s.spouseDeathEnabled() ? s.survivorStepUpBenefitUSD() : undefined,
           partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
           partTimeEndYear: s.partTimeEndYear(),
+          // Rental Schedule E income (Todo #34, Stage 4b of #29). Pass-through
+          // to the kernel which pre-computes per-year cash + taxable arrays
+          // and applies them in the year loop. Empty array (no properties
+          // configured) is byte-identical to a legacy run.
+          rentalProperties: this.rental.properties(),
           inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
           medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
           survivorRelocate: this.buildSurvivorRelocate(),
@@ -272,9 +280,11 @@ export class MonteCarloRunnerService {
    */
   private buildMedicareMonthlyByYear(years: number): (number | undefined)[] | undefined {
     const s = this.state;
-    if (!s.inheritedIRAsEnabled()) return undefined;
-    const events = s.inheritedIRAs();
-    if (!events.length) return undefined;
+    const iraEvents = s.inheritedIRAsEnabled() ? s.inheritedIRAs() : [];
+    const rentalProps = this.rental.properties();
+    // Rental loss-years can also move IRMAA tiers (downward) — include
+    // them whenever properties are configured, not just when iraEvents are.
+    if (!iraEvents.length && !rentalProps.length) return undefined;
 
     const adults = s.adults();
     const nAdults = Math.max(1, adults.length);
@@ -284,14 +294,23 @@ export class MonteCarloRunnerService {
     const arr: (number | undefined)[] = new Array(years);
     for (let y = 0; y < years; y++) {
       let augment = 0;
-      for (const e of events) {
+      for (const e of iraEvents) {
         const drainYears = Math.max(1, e.drainOverYears ?? 10);
         if (y >= e.year && y < e.year + drainYears) {
           augment += e.balanceUSD / drainYears;
         }
       }
-      if (augment <= 0) continue;
-      const effectiveMagi = baseMagi + augment;
+      // Rental Schedule E taxable contribution — can be negative (paper
+      // loss from depreciation), which legitimately reduces MAGI and may
+      // shift the household to a lower IRMAA tier. Mirrors the kernel's
+      // magiAugmentByYear contribution.
+      if (rentalProps.length) {
+        augment += aggregateRentalIncome(rentalProps, y).totalTaxableNet;
+      }
+      // Skip years with no augmentation in either direction — kernel
+      // falls through to the segment's flat `m.medicareMonthly`.
+      if (augment === 0) continue;
+      const effectiveMagi = Math.max(0, baseMagi + augment);
       const perAdult = monthlyMedicareFor(filingStatus, effectiveMagi);
       arr[y] = perAdult * nAdults;
     }

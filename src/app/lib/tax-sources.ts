@@ -181,6 +181,36 @@ export function ltcgHarvestingSummary(
   };
 }
 
+/**
+ * Federal LTCG tax on a long-term capital gain, given filing status and
+ * ordinary taxable income. Stacked-on-ordinary semantics per IRC § 1(h):
+ * the gain `L` sits on top of ordinary income `O`, and the LTCG bracket
+ * tops apply to the combined stack.
+ *
+ *   - 0% bracket: portion of L that fits below `zeroTop − O`
+ *   - 20% bracket: portion of L that pushes the combined above `fifteenTop`
+ *   - 15% bracket: the remainder
+ *
+ * Mirrors `ltcgFederalTax` in retirement-api/shared/taxes.js. Returns 0
+ * for non-positive gain. Does NOT include NIIT (separate 3.8% surtax) or
+ * state-level LTCG.
+ */
+export function ltcgFederalTax(
+  ltcgIncome: number,
+  ordinaryTaxableIncome: number,
+  filingStatus: LtcgFilingStatus,
+): number {
+  if (!(ltcgIncome > 0)) return 0;
+  const brackets = LTCG_BRACKETS_2026[filingStatus] ?? LTCG_BRACKETS_2026.mfj;
+  const O = Math.max(0, ordinaryTaxableIncome);
+  const L = ltcgIncome;
+  const combined = O + L;
+  const inZero = Math.max(0, Math.min(L, brackets.zeroTop - O));
+  const inTwenty = Math.max(0, Math.min(L, combined - brackets.fifteenTop));
+  const inFifteen = L - inZero - inTwenty;
+  return inFifteen * 0.15 + inTwenty * 0.20;
+}
+
 /** SECURE 2.0 RMD start ages. */
 export const RMD_AGE_SOURCES: Source[] = [
   {

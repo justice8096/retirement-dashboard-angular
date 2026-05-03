@@ -15,6 +15,7 @@
  */
 
 import { HISTORICAL_RETURNS, bootstrapYear } from '../data/historical-returns';
+import { aggregateRentalIncome, type RentalProperty } from './rental-income';
 
 export type ReturnMode = 'normal' | 'bootstrap' | 'regime' | 'historical-sequence';
 
@@ -528,6 +529,40 @@ export interface MonteCarloParams {
   medicareMonthlyByYear?: (number | undefined)[];
 
   /**
+   * Optional rental property portfolio (Todo #34, Stage 4b of #29).
+   *
+   * For each year in horizon the kernel pre-computes Schedule E aggregates
+   * via `aggregateRentalIncome`, then in the year loop:
+   *
+   *   - Adds `cashFlow × cumInfl` to balance (the actual cash hitting the
+   *     bank from rents net of operating expenses + mortgage interest).
+   *   - Subtracts `max(0, taxableNet) × cumInfl × rentalEffectiveTaxRate`
+   *     as the household's tax bill on the Schedule E line. The clamp at 0
+   *     means a paper loss does NOT credit household tax — only its MAGI
+   *     ripple flows through (see below). Avoids double-counting the
+   *     depreciation shield against income that the segment's pre-baked
+   *     monthlyIncomeTax already taxes.
+   *   - Augments `magiAugmentByYear[y]` with `taxableNet × cumInfl` so
+   *     ACA subsidy calc sees the correct Schedule E impact (positive
+   *     pushes MAGI up; negative paper loss correctly reduces it).
+   *
+   * Ownership window respected: years before `ownedFromYear` or at/after
+   * `ownedThroughYear` produce zero contribution. Depreciation rolls off
+   * after 27.5 years per `straightLineDepreciation`.
+   *
+   * Empty/undefined array = no rental income (legacy callers byte-identical).
+   */
+  rentalProperties?: RentalProperty[];
+
+  /**
+   * Effective marginal tax rate applied to rental Schedule E taxable
+   * income (decimal, e.g. 0.22 = 22%). Default 0.22. Mirrors the
+   * `effectiveTaxRate` field on inheritedIRA events. Single rate is a
+   * v1 simplification — actual rates step through brackets year-to-year.
+   */
+  rentalEffectiveTaxRate?: number;
+
+  /**
    * Optional deterministic-seed RNG. When provided, all kernel-internal
    * random draws (Gaussian return/inflation samples, regime-switch coin
    * flips, currency shocks, LTC start-age + occurrence rolls) consume
@@ -876,6 +911,28 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     for (let dy = 0; dy < drainYears; dy++) {
       const y = ev.year + dy;
       if (y >= 0 && y < years) magiAugmentByYear[y] += annualDistribution;
+    }
+  }
+
+  // Pre-compute per-year rental Schedule E aggregates (Todo #34, Stage 4b).
+  // Empty/undefined rentalProperties → zeroed arrays → byte-identical to
+  // legacy callers (no allocation/perf impact beyond the two arrays).
+  // The taxableNet contribution feeds magiAugmentByYear here (today's $);
+  // the year-loop applies cumulative inflation when reading.
+  const rentalProps = p.rentalProperties ?? [];
+  const rentalEffTaxRate = p.rentalEffectiveTaxRate ?? 0.22;
+  const rentalCashByYear: number[] = new Array(years).fill(0);
+  const rentalTaxableByYear: number[] = new Array(years).fill(0);
+  if (rentalProps.length) {
+    for (let y = 0; y < years; y++) {
+      const agg = aggregateRentalIncome(rentalProps, y);
+      rentalCashByYear[y] = agg.totalCashFlow;
+      rentalTaxableByYear[y] = agg.totalTaxableNet;
+      // Schedule E flows directly into AGI/MAGI per IRC § 62(a)(4).
+      // Negative (paper-loss years from depreciation) correctly reduces
+      // ACA MAGI for the year — the same direction the user sees on
+      // the Sankey diagram's tax-base reduction.
+      magiAugmentByYear[y] += agg.totalTaxableNet;
     }
   }
 
@@ -1280,6 +1337,21 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           const taxRate = ev.effectiveTaxRate ?? 0.22;
           bal += gross * (1 - taxRate);
         }
+      }
+
+      // Rental Schedule E cash flow + tax (Todo #34, Stage 4b of #29).
+      // Cash inflow is the gross rental cashFlow (rents net of operating
+      // expenses + mortgage interest, sign included). Tax is the household's
+      // bill on Schedule E line 26, computed as max(0, taxableNet) × rate
+      // — clamping at 0 so a paper loss does NOT credit household tax. The
+      // shield's downward MAGI ripple already flowed through magiAugmentByYear
+      // at trial start; this avoids double-counting it against household
+      // ordinary-income tax (which is pre-baked into the segment cost).
+      if (rentalProps.length) {
+        const rentalCashThisYear = rentalCashByYear[y] * cumInfl;
+        const rentalTaxableThisYear = rentalTaxableByYear[y] * cumInfl;
+        const rentalTaxOwed = Math.max(0, rentalTaxableThisYear) * rentalEffTaxRate;
+        bal += rentalCashThisYear - rentalTaxOwed;
       }
 
       // Long-Term Care deductions (independent of one-time expenses; see #21).
