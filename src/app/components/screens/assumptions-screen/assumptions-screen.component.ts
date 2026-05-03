@@ -41,6 +41,22 @@ export class AssumptionsScreenComponent implements OnInit {
   readonly draft = signal<HouseholdProfile | null>(null);
   readonly dirty = signal(false);
 
+  // Primary-residence mortgage (Todo #28). Two scalars on FinancialSettings;
+  // local signals here so the Save button can detect dirty edits and the
+  // forkJoin can fire a paired PUT alongside household + rental.
+  readonly mortgageMonthlyPayment = signal(0);
+  readonly mortgageEndYear = signal(0);
+  readonly mortgageDirty = signal(false);
+
+  /** Years remaining on the mortgage from sim-year 0. Live preview. */
+  readonly mortgageYearsRemaining = computed(() =>
+    Math.max(0, this.mortgageEndYear()),
+  );
+  /** Total nominal P+I dollars from sim-year 0 to payoff. Live preview. */
+  readonly mortgageTotalRemaining = computed(() =>
+    this.mortgageMonthlyPayment() * 12 * this.mortgageYearsRemaining(),
+  );
+
   readonly dependentCount = computed(() =>
     this.draft()?.members.filter(m => m.role === 'dependent').length ?? 0
   );
@@ -72,6 +88,28 @@ export class AssumptionsScreenComponent implements OnInit {
     this.loc.loadFull();
     this.healthcare.load();
     this.rental.load();
+    // Mortgage fields piggyback on the financial endpoint (Todo #28).
+    // No dedicated service — two scalars don't justify one. Failures are
+    // benign (fields stay at 0 = no mortgage configured).
+    this.api.getFinancial().subscribe({
+      next: (f) => {
+        this.mortgageMonthlyPayment.set(Number(f.mortgageMonthlyPayment) || 0);
+        this.mortgageEndYear.set(Number(f.mortgageEndYear) || 0);
+        this.mortgageDirty.set(false);
+      },
+      error: () => { /* leave at 0 defaults; Settings screen will surface load errors */ },
+    });
+  }
+
+  /** Patch one or both mortgage fields. Flips dirty so the Save button enables. */
+  patchMortgage(partial: { mortgageMonthlyPayment?: number; mortgageEndYear?: number }): void {
+    if (partial.mortgageMonthlyPayment !== undefined) {
+      this.mortgageMonthlyPayment.set(partial.mortgageMonthlyPayment);
+    }
+    if (partial.mortgageEndYear !== undefined) {
+      this.mortgageEndYear.set(partial.mortgageEndYear);
+    }
+    this.mortgageDirty.set(true);
   }
 
   private emptyProfile(): HouseholdProfile {
@@ -248,16 +286,25 @@ export class AssumptionsScreenComponent implements OnInit {
         feedingMode: (p.type === 'dog' || p.type === 'cat') ? p.feedingMode : null,
       })),
     };
-    // Persist household + rental in parallel (Todo #36). Both must succeed
-    // for the user-facing "Saved." banner. forkJoin emits once both complete;
-    // an error from either propagates and surfaces a single failure message.
+    // Persist household + rental + mortgage in parallel (Todos #36 + #28).
+    // All three must succeed for the user-facing "Saved." banner. forkJoin
+    // emits once all complete; an error from any arm propagates and
+    // surfaces a single failure message. Each arm short-circuits to of(null)
+    // when not dirty so we don't fire spurious PUTs.
     forkJoin({
       household: this.api.updateHousehold(payload),
       rental: this.rental.dirty() ? this.rental.save() : of(null),
+      mortgage: this.mortgageDirty()
+        ? this.api.updateFinancial({
+            mortgageMonthlyPayment: this.mortgageMonthlyPayment(),
+            mortgageEndYear: this.mortgageEndYear(),
+          })
+        : of(null),
     }).subscribe({
       next: ({ household: h }) => {
         this.draft.set(h);
         this.dirty.set(false);
+        this.mortgageDirty.set(false);
         this.saving.set(false);
         // First successful PUT created the profile — flip out of new-user mode
         // so the welcome banner disappears and the button label reverts.
