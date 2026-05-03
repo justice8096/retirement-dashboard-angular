@@ -15,7 +15,8 @@
  */
 
 import { HISTORICAL_RETURNS, bootstrapYear } from '../data/historical-returns';
-import { aggregateRentalIncome, type RentalProperty } from './rental-income';
+import { aggregateRentalIncome, straightLineDepreciation, type RentalProperty } from './rental-income';
+import { ltcgFederalTax, type LtcgFilingStatus } from './tax-sources';
 
 export type ReturnMode = 'normal' | 'bootstrap' | 'regime' | 'historical-sequence';
 
@@ -184,7 +185,28 @@ export type LifeEvent =
    *  recompute single-filer brackets per year as the drain stacks on
    *  base income. */
   | { kind: 'inheritedIRA'; year: number; balanceUSD: number; drainOverYears?: number; effectiveTaxRate?: number; label?: string }
-  | { kind: 'careerChange'; year: number; newMonthlyIncome: number; label?: string };
+  | { kind: 'careerChange'; year: number; newMonthlyIncome: number; label?: string }
+  /**
+   * Sale of a rental property in `RentalProperty[]` portfolio (Todo #35).
+   *
+   * In year `year`, the kernel:
+   *   1. Computes accumulated depreciation = `straightLineDepreciation`
+   *      summed from `depreciationStartYear` through saleYear.
+   *   2. adjustedBasis = depreciableBasis − accumulatedDepreciation.
+   *   3. netSalePrice = salePriceUSD − sellingExpenses.
+   *   4. gain = netSalePrice − adjustedBasis (signed).
+   *   5. If gain > 0: Sec 1250 recapture = min(gain, accumulatedDepreciation) × 0.25;
+   *      remaining gain at LTCG rates (`ltcgFederalTax`).
+   *      bal += netSalePrice − recaptureTax − ltcgTax.
+   *   6. If gain ≤ 0: capital loss; bal += netSalePrice (loss not yet
+   *      modeled against ordinary income — out of scope v1).
+   *   7. Property is auto-zeroed from rental aggregation starting
+   *      saleYear (kernel pre-trial overrides `ownedThroughYear`).
+   *
+   * v1 simplifications: NIIT 3.8% surtax not modeled; state tax not
+   * modeled; capital-loss carryforward not modeled.
+   */
+  | { kind: 'propertySale'; year: number; propertyId: string; salePriceUSD: number; sellingExpenses?: number; label?: string };
 
 export interface MonteCarloParams {
   /** Starting portfolio balance in USD */
@@ -563,6 +585,15 @@ export interface MonteCarloParams {
   rentalEffectiveTaxRate?: number;
 
   /**
+   * Filing status for LTCG bracket lookup on propertySale events
+   * (Todo #35). Defaults to 'mfj'. Single-filer households should
+   * pass 'single'. Drives the `ltcgFederalTax` stacked-on-ordinary
+   * computation; the ordinary-income stack is approximated as
+   * `monthlyIncome × 12` of the trial.
+   */
+  propertySaleFilingStatus?: LtcgFilingStatus;
+
+  /**
    * Optional deterministic-seed RNG. When provided, all kernel-internal
    * random draws (Gaussian return/inflation samples, regime-switch coin
    * flips, currency shocks, LTC start-age + occurrence rolls) consume
@@ -892,11 +923,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   // year the event lives in eventsByYear. The trial loop iterates this
   // list every year and applies the drain when `y` is in the window.
   const inheritedIRAEvents: Extract<LifeEvent, { kind: 'inheritedIRA' }>[] = [];
+  // Pre-extracted propertySale events (Todo #35). Indexed by propertyId
+  // for O(1) lookup during pre-trial ownership-window override and during
+  // the year-loop dispatcher.
+  const propertySaleByPropertyId = new Map<string, Extract<LifeEvent, { kind: 'propertySale' }>>();
   for (const ev of compileLifeEvents(p)) {
     const list = eventsByYear.get(ev.year) ?? [];
     list.push(ev);
     eventsByYear.set(ev.year, list);
     if (ev.kind === 'inheritedIRA') inheritedIRAEvents.push(ev);
+    if (ev.kind === 'propertySale') propertySaleByPropertyId.set(ev.propertyId, ev);
   }
 
   // Pre-compute the per-year MAGI augmentation from inherited-IRA drains
@@ -919,8 +955,24 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   // legacy callers (no allocation/perf impact beyond the two arrays).
   // The taxableNet contribution feeds magiAugmentByYear here (today's $);
   // the year-loop applies cumulative inflation when reading.
-  const rentalProps = p.rentalProperties ?? [];
+  //
+  // Todo #35: a propertySale event for a property auto-zeros its rental
+  // income from the sale year onward — implemented by overriding the
+  // property's `ownedThroughYear` to min(existing, saleYear). Per
+  // `scheduleENetAnnual`, ownedThroughYear is exclusive, so simYear ===
+  // saleYear is already inactive (consistent with the dispatcher firing
+  // at year start before the year's rental income would have accrued).
+  const rawRentalProps = p.rentalProperties ?? [];
+  const rentalProps: RentalProperty[] = propertySaleByPropertyId.size
+    ? rawRentalProps.map((rp) => {
+        const sale = propertySaleByPropertyId.get(rp.id);
+        if (!sale) return rp;
+        const existingThrough = rp.ownedThroughYear ?? Number.POSITIVE_INFINITY;
+        return { ...rp, ownedThroughYear: Math.min(existingThrough, sale.year) };
+      })
+    : rawRentalProps;
   const rentalEffTaxRate = p.rentalEffectiveTaxRate ?? 0.22;
+  const propertySaleFilingStatus: LtcgFilingStatus = p.propertySaleFilingStatus ?? 'mfj';
   const rentalCashByYear: number[] = new Array(years).fill(0);
   const rentalTaxableByYear: number[] = new Array(years).fill(0);
   if (rentalProps.length) {
@@ -1304,6 +1356,65 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           } else if (ev.kind === 'oneTimeIncome') {
             const inflated = (ev.inflate ?? true) ? ev.amountUSD * cumInfl : ev.amountUSD;
             bal += inflated;
+          } else if (ev.kind === 'propertySale') {
+            // Property sale (Todo #35) — Sec 1250 depreciation recapture
+            // + LTCG on the gain. Sale prices in nominal year-of-sale
+            // dollars; multiply by `cumInfl` so the user can enter
+            // today-dollar estimates and have them grow with CPI.
+            //
+            // Math:
+            //   netSale       = (salePrice − sellingExpenses) × cumInfl
+            //   accDepreciation = sum_{startYr..saleYr} straightLineDepreciation
+            //   adjustedBasis = depreciableBasis − accDepreciation
+            //   gain          = netSale − adjustedBasis        (signed)
+            //   recapTaxable  = min(max(0, gain), accDepreciation)
+            //   ltcgTaxable   = max(0, gain) − recapTaxable
+            //   recaptureTax  = recapTaxable × 0.25  (Sec 1250 cap)
+            //   ltcgTax       = ltcgFederalTax(ltcgTaxable, ordinary, status)
+            //   bal          += netSale − adjustedBasis × 0  (basis is
+            //                   already-spent capital; not a current-year
+            //                   inflow) − recaptureTax − ltcgTax
+            //
+            // Equivalently the user's net cash from sale is:
+            //   bal += netSale − recaptureTax − ltcgTax
+            // (assuming no mortgage payoff at sale — out of scope v1)
+            const prop = rawRentalProps.find((rp) => rp.id === ev.propertyId);
+            if (!prop) continue; // unknown propertyId — silent no-op
+            const sellingExp = ev.sellingExpenses ?? 0;
+            const netSale = Math.max(0, ev.salePriceUSD - sellingExp) * cumInfl;
+            // Accumulated depreciation in today's $ — basis is also in
+            // today's $ so they correctly offset; LTCG / recapture taxes
+            // apply to the inflated nominal gain, hence cumInfl on netSale
+            // alone. Same convention as oneTimeExpense / oneTimeIncome.
+            let accDep = 0;
+            for (let dy = prop.depreciationStartYear; dy < y; dy++) {
+              accDep += straightLineDepreciation(
+                prop.depreciableBasis,
+                dy,
+                prop.depreciationStartYear,
+              );
+            }
+            const inflatedBasis = Math.max(0, prop.depreciableBasis - accDep) * cumInfl;
+            const gain = netSale - inflatedBasis;
+            let totalTax = 0;
+            if (gain > 0) {
+              const recapTaxable = Math.min(gain, accDep * cumInfl);
+              const ltcgTaxable = gain - recapTaxable;
+              const recaptureTax = recapTaxable * 0.25;
+              // Stack LTCG on top of the trial's current ordinary income
+              // (monthlyIncome × 12 × cumInfl approximates today's tax-bracket
+              // position, scaled to nominal). Survivor phase uses survivor
+              // income; same approximation.
+              const ordinaryStack = (survivorPhase
+                ? p.survivorMonthlyIncome ?? p.monthlyIncome
+                : p.monthlyIncome) * 12 * cumInfl;
+              const ltcgTax = ltcgFederalTax(ltcgTaxable, ordinaryStack, propertySaleFilingStatus);
+              totalTax = recaptureTax + ltcgTax;
+            }
+            // Capital loss (gain ≤ 0): no tax owed; full netSale to bal.
+            // Loss-against-ordinary carryforward (IRC § 1211(b) $3K/yr
+            // limit) is out of scope v1.
+            bal += netSale - totalTax;
           }
         }
       }

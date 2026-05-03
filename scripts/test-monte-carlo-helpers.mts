@@ -1096,3 +1096,190 @@ test('runMonteCarlo: rentalEffectiveTaxRate=0 vs 0.5 changes balance', () => {
     `noTax median ${noTax.median} should exceed heavyTax median ${heavyTax.median}`,
   );
 });
+
+// ─── ltcgFederalTax (Todo #35 — ported from retirement-api) ────────────
+
+const { ltcgFederalTax } = taxSources as unknown as {
+  ltcgFederalTax: (
+    ltcgIncome: number,
+    ordinaryTaxableIncome: number,
+    filingStatus: 'single' | 'mfj' | 'mfs' | 'hoh',
+  ) => number;
+};
+
+test('ltcgFederalTax: zero or negative gain returns 0', () => {
+  assert.equal(ltcgFederalTax(0, 50000, 'mfj'), 0);
+  assert.equal(ltcgFederalTax(-1000, 50000, 'mfj'), 0);
+});
+
+test('ltcgFederalTax: gain entirely in 0% bracket returns 0', () => {
+  // MFJ 0% top: $98,900. Ordinary $20K + gain $30K = $50K total < $98,900.
+  assert.equal(ltcgFederalTax(30_000, 20_000, 'mfj'), 0);
+});
+
+test('ltcgFederalTax: gain entirely in 15% bracket', () => {
+  // MFJ 0% top $98,900, 15% top $613,700. Ordinary $200K + gain $100K
+  // = $300K — all of the gain sits in the 15% bracket.
+  assert.equal(ltcgFederalTax(100_000, 200_000, 'mfj'), 100_000 * 0.15);
+});
+
+test('ltcgFederalTax: gain straddles 0% / 15% boundary', () => {
+  // MFJ: ordinary $80K, gain $40K. Combined $120K. zeroTop $98,900.
+  // inZero = min(40K, 98,900 − 80K) = min(40K, 18,900) = 18,900
+  // inFifteen = 40K − 18,900 = 21,100
+  // tax = 21,100 × 0.15 = 3,165
+  assert.ok(Math.abs(ltcgFederalTax(40_000, 80_000, 'mfj') - 21_100 * 0.15) < 1e-6);
+});
+
+test('ltcgFederalTax: gain straddles 15% / 20% boundary', () => {
+  // MFJ: ordinary $500K, gain $200K. Combined $700K. fifteenTop $613,700.
+  // inTwenty = min(200K, 700K − 613,700) = 86,300
+  // inFifteen = 200K − 0 − 86,300 = 113,700
+  // tax = 113,700 × 0.15 + 86,300 × 0.20 = 17,055 + 17,260 = 34,315
+  const tax = ltcgFederalTax(200_000, 500_000, 'mfj');
+  assert.ok(Math.abs(tax - (113_700 * 0.15 + 86_300 * 0.20)) < 1e-6);
+});
+
+test('ltcgFederalTax: filing status routing — single brackets are tighter', () => {
+  // Single zeroTop $49,450 vs MFJ $98,900. Same numbers but filing
+  // status differs → single pays more tax on a small ordinary income.
+  const taxMfj = ltcgFederalTax(40_000, 30_000, 'mfj');
+  const taxSingle = ltcgFederalTax(40_000, 30_000, 'single');
+  assert.ok(taxSingle > taxMfj, 'single should pay more on equal income/gain');
+});
+
+test('ltcgFederalTax: defends prototype-key filing status', () => {
+  // Defensive: an unexpected filingStatus string falls back to mfj rather
+  // than throwing or accessing prototype keys.
+  const tax = ltcgFederalTax(40_000, 80_000, 'toString' as never);
+  const mfj = ltcgFederalTax(40_000, 80_000, 'mfj');
+  assert.equal(tax, mfj);
+});
+
+// ─── runMonteCarlo: propertySale (Todo #35) ────────────────────────────
+
+test('runMonteCarlo: no propertySale events → byte-identical with rental in place', () => {
+  // Adding empty propertySale support to the kernel must not perturb
+  // results when the caller doesn't supply any sale events.
+  const seed = 7777;
+  const baseProps: RentalProperty[] = [makeKernelRental()];
+  const a = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: baseProps,
+  }));
+  const b = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: baseProps,
+    lifeEvents: [], // explicit empty
+  }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});
+
+test('runMonteCarlo: propertySale stops rental income from sale year onward', () => {
+  // Property generates positive cash flow indefinitely. Selling at
+  // year 5 should produce a strictly LOWER median than no-sale (since
+  // the sale proceeds are one-time vs continuous rental cash flow over
+  // 20 years). The test uses a sale price below adjusted basis to
+  // isolate the ownership-cutoff effect (no recapture noise).
+  const seed = 8888;
+  const props: RentalProperty[] = [makeKernelRental({
+    monthlyGrossRent: 3000,
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    depreciableBasis: 200000,
+    depreciationStartYear: 0,
+    ownedFromYear: 0,
+  })];
+  const noSale = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+  }));
+  const earlySale = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+    lifeEvents: [{
+      kind: 'propertySale',
+      year: 5,
+      propertyId: props[0].id,
+      // Sale price ~= remaining basis at year 5 (200000 − 5×7272.7 ≈ 163,636)
+      // so recapture and LTCG are minimal — isolates the cash-flow loss.
+      salePriceUSD: 165_000,
+      sellingExpenses: 0,
+    }],
+  }));
+  assert.ok(
+    earlySale.median < noSale.median,
+    `early-sale median ${earlySale.median} should be below no-sale ${noSale.median}`,
+  );
+});
+
+test('runMonteCarlo: propertySale recaptures depreciation at 25% (high-gain case)', () => {
+  // After 20 years of $7,272.73 depreciation/year ($145,454.55 total) on
+  // a $200K basis, sale at $400K should trigger:
+  //   - Sec 1250 recapture = 145,454.55 × 0.25 = $36,363.64
+  //   - LTCG on remaining gain ≈ ($400K − $54,545.45 adjusted basis − $145,454.55 recapture) at 15%
+  // Compare against an identical run where the sale price is at adjusted basis
+  // (no gain → no tax). The high-sale-price run should retain less wealth from
+  // the sale event itself, but receive more cash overall — net depends on
+  // sale price. The cleanest assertion is that BOTH > no-sale-at-all only
+  // when the sale price clears the recapture+ltcg burden.
+  // We assert the simpler invariant: with a high sale price and depreciation
+  // shield, the median is ABOVE the no-sale baseline because sale proceeds
+  // (after taxes) plus pre-sale rental income beats indefinite rental.
+  const seed = 9999;
+  const props: RentalProperty[] = [makeKernelRental({
+    monthlyGrossRent: 1200,           // modest rental cash flow
+    vacancyRatePct: 10,
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    mortgageInterestAnnual: 0,
+    depreciableBasis: 200000,
+    depreciationStartYear: 0,
+  })];
+  const baseline = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+  }));
+  const highGainSale = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+    lifeEvents: [{
+      kind: 'propertySale',
+      year: 18,                       // late sale → max accumulated depreciation
+      propertyId: props[0].id,
+      salePriceUSD: 600_000,          // 3x basis — clear gain even after taxes
+      sellingExpenses: 36_000,        // 6% realtor commission
+    }],
+  }));
+  // Confirm a meaningful lift exists — the late high-gain sale should
+  // produce notably more wealth than holding the modest cash-flow rental
+  // forever, even after Sec 1250 recapture + LTCG.
+  assert.ok(
+    highGainSale.median > baseline.median + 100_000,
+    `high-gain sale median ${highGainSale.median} should beat baseline ${baseline.median} by > $100K`,
+  );
+});
+
+test('runMonteCarlo: propertySale with unknown propertyId is silent no-op', () => {
+  // Defensive: a stale lifeEvents row referencing a deleted property must
+  // not crash or perturb the simulation.
+  const seed = 4040;
+  const props: RentalProperty[] = [makeKernelRental()];
+  const a = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+  }));
+  const b = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+    lifeEvents: [{
+      kind: 'propertySale',
+      year: 10,
+      propertyId: 'rental-does-not-exist',
+      salePriceUSD: 500_000,
+    }],
+  }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});

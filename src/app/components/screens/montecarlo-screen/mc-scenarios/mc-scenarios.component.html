@@ -257,6 +257,86 @@
   }
 </div>
 
+<!-- Property sales (Todo #35 — Sec 1250 recapture + LTCG) -->
+<div class="card moves-card">
+  <h3 class="card-title">Property Sales (Schedule E recapture + LTCG)</h3>
+  <p class="card-sub">
+    Sell a rental property in a specific sim-year. The kernel computes
+    <strong>Sec 1250 depreciation recapture</strong> (25% of accumulated
+    depreciation, capped at the gain) plus <strong>LTCG on the remaining gain</strong>
+    (using {{ state.adults().length >= 2 ? 'MFJ' : 'single' }} 2026 brackets,
+    stacked on top of ordinary income). Net proceeds hit the portfolio
+    balance. Rental income from the sold property auto-stops the year of
+    the sale. Add properties on the <em>Assumptions</em> screen first.
+    <em>Out of scope v1:</em> NIIT 3.8% surtax, state-level LTCG, capital-loss
+    carryforward against ordinary income.
+  </p>
+
+  @if (rental.properties().length === 0) {
+    <p class="empty-hint">
+      No rental properties configured. Add one on the Assumptions screen
+      to enable a sale event here.
+    </p>
+  }
+
+  @for (e of state.propertySales(); track $index; let i = $index) {
+    <div class="timeline-row">
+      <label class="tl-field">
+        <span class="tl-small-label">Year</span>
+        <input appNumeric="age" class="tl-input" min="0" [max]="state.years() - 1"
+          [ngModel]="e.year"
+          (ngModelChange)="patchPropertySale(i, { year: +$event })" />
+      </label>
+      <label class="tl-field tl-field-loc">
+        <span class="tl-small-label">Property</span>
+        <select class="tl-input"
+          [ngModel]="e.propertyId"
+          (ngModelChange)="patchPropertySale(i, { propertyId: $event })">
+          @for (prop of rental.properties(); track prop.id) {
+            <option [value]="prop.id">{{ prop.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Sale Price ($)</span>
+        <input appNumeric="currency" class="tl-input" step="10000"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="e.salePriceUSD"
+          (ngModelChange)="patchPropertySale(i, { salePriceUSD: +$event })" />
+      </label>
+      <label class="tl-field">
+        <span class="tl-small-label">Selling Expenses ($)</span>
+        <input appNumeric="currency" class="tl-input" step="1000"
+          [class]="dyscalculia.numberSpacingClass()"
+          [ngModel]="e.sellingExpenses"
+          (ngModelChange)="patchPropertySale(i, { sellingExpenses: +$event })" />
+      </label>
+      <label class="tl-field tl-field-loc">
+        <span class="tl-small-label">Label (optional)</span>
+        <input class="tl-input" type="text"
+          [ngModel]="e.label"
+          (ngModelChange)="patchPropertySale(i, { label: $event })" />
+      </label>
+      <button class="tl-remove" (click)="removePropertySale(i)" aria-label="Remove property sale">✕</button>
+    </div>
+  }
+
+  <button mat-stroked-button class="add-move-btn"
+    [disabled]="rental.properties().length === 0"
+    (click)="addPropertySale()">
+    + Add Property Sale
+  </button>
+
+  @if (state.propertySales().length > 0) {
+    <label class="moves-toggle">
+      <input type="checkbox"
+        [checked]="state.propertySalesEnabled()"
+        (change)="state.propertySalesEnabled.set(!state.propertySalesEnabled())" />
+      <span>Apply property sales to next simulation run</span>
+    </label>
+  }
+</div>
+
 <!-- Long-Term Care planning -->
 <div class="card death-card">
   <h3 class="card-title">Long-Term Care</h3>
