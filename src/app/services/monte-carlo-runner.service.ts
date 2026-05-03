@@ -97,6 +97,11 @@ export class MonteCarloRunnerService {
           ltcDurationYears: s.ltcDurationYears(),
           ltcStartAgeMin: s.ltcStartAgeMin(),
           ltcStartAgeMax: s.ltcStartAgeMax(),
+          // Medicaid spend-down (Todo #21 Slice B) — gated on self-insure
+          // mode since the clamp only matters when there's a real LTC drain.
+          medicaidSpendDownEnabled: (s.ltcMode() === 'self-insure' || s.ltcMode() === 'both')
+            && s.medicaidSpendDownEnabled(),
+          medicaidAssetThresholdUSD: s.medicaidAssetThresholdUSD(),
           ltcInsuranceMonthly: (s.ltcMode() === 'insurance' || s.ltcMode() === 'both')
             ? s.ltcInsuranceMonthly() : 0,
           ltcInsuranceStartAge: s.ltcInsuranceStartAge(),

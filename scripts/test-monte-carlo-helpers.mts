@@ -1261,6 +1261,174 @@ test('runMonteCarlo: propertySale recaptures depreciation at 25% (high-gain case
   );
 });
 
+// ─── ltc-costs lookup (Todo #21 Slice A) ───────────────────────────────
+
+import ltcCosts from '../src/app/lib/ltc-costs';
+
+const {
+  defaultLtcCostForCountry,
+  LTC_COST_BY_COUNTRY,
+  LTC_COST_FOREIGN_DEFAULT,
+} = ltcCosts as unknown as {
+  defaultLtcCostForCountry: (country: string | null | undefined) => number;
+  LTC_COST_BY_COUNTRY: Readonly<Record<string, number>>;
+  LTC_COST_FOREIGN_DEFAULT: number;
+};
+
+test('defaultLtcCostForCountry: known country returns seeded value', () => {
+  assert.equal(defaultLtcCostForCountry('United States'), 108_000);
+  assert.equal(defaultLtcCostForCountry('Mexico'), 20_000);
+  assert.equal(defaultLtcCostForCountry('Portugal'), 25_000);
+});
+
+test('defaultLtcCostForCountry: unknown country falls back to foreign default', () => {
+  assert.equal(defaultLtcCostForCountry('Atlantis'), LTC_COST_FOREIGN_DEFAULT);
+  assert.equal(defaultLtcCostForCountry('Wakanda'), LTC_COST_FOREIGN_DEFAULT);
+});
+
+test('defaultLtcCostForCountry: null/undefined/empty returns foreign default', () => {
+  assert.equal(defaultLtcCostForCountry(null), LTC_COST_FOREIGN_DEFAULT);
+  assert.equal(defaultLtcCostForCountry(undefined), LTC_COST_FOREIGN_DEFAULT);
+  assert.equal(defaultLtcCostForCountry(''), LTC_COST_FOREIGN_DEFAULT);
+});
+
+test('defaultLtcCostForCountry: defends prototype-key access', () => {
+  // Without the hasOwnProperty guard, `'toString'` would return the
+  // inherited Object.prototype method (a function, truthy) — not a number.
+  assert.equal(defaultLtcCostForCountry('toString' as never), LTC_COST_FOREIGN_DEFAULT);
+  assert.equal(defaultLtcCostForCountry('hasOwnProperty' as never), LTC_COST_FOREIGN_DEFAULT);
+});
+
+test('LTC_COST_BY_COUNTRY: covers all 16 dataset countries', () => {
+  // Spelling must match the location dataset's `country` field exactly.
+  // If a new country is added to the dataset, this test will fail and
+  // someone must research its LTC cost (or accept the foreign default).
+  const required = [
+    'Colombia', 'Costa Rica', 'Croatia', 'Cyprus', 'Ecuador', 'France',
+    'Greece', 'Ireland', 'Italy', 'Malta', 'Mexico', 'Panama',
+    'Portugal', 'Spain', 'United States', 'Uruguay',
+  ];
+  for (const c of required) {
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(LTC_COST_BY_COUNTRY, c),
+      `LTC_COST_BY_COUNTRY missing country: ${c}`,
+    );
+    assert.ok(
+      typeof LTC_COST_BY_COUNTRY[c] === 'number' && LTC_COST_BY_COUNTRY[c] > 0,
+      `LTC_COST_BY_COUNTRY[${c}] should be a positive number`,
+    );
+  }
+});
+
+// ─── runMonteCarlo: Medicaid spend-down (Todo #21 Slice B) ─────────────
+
+test('runMonteCarlo: medicaidSpendDownEnabled=false → byte-identical legacy', () => {
+  // Baseline: caller doesn't pass medicaid params at all.
+  // Compare: caller passes medicaidSpendDownEnabled=false explicitly.
+  // Both should produce byte-identical results.
+  const seed = 7070;
+  const ltcParams = {
+    ltcSelfInsureEnabled: true,
+    ltcProbability: 0.7,
+    ltcCostPerYearUSD: 108_000,
+    adultBirthYears: [1960],          // 65 at sim-year 0 if planningStartYear=2025
+    simStartYear: 2025,
+  };
+  const a = runMonteCarlo(smokeParams({ ...ltcParams, isForeign: false, seededRandom: mulberry32(seed) }));
+  const b = runMonteCarlo(smokeParams({
+    ...ltcParams,
+    isForeign: false,
+    seededRandom: mulberry32(seed),
+    medicaidSpendDownEnabled: false,
+  }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});
+
+test('runMonteCarlo: Medicaid clamp produces strictly higher median (US segment)', () => {
+  // Setup: low-portfolio + heavy LTC self-insure → trials deplete
+  // hard without Medicaid. With Medicaid clamp, the LTC drain is
+  // limited to (bal − threshold), so trials retain more wealth post-
+  // LTC. Median terminal balance should be strictly higher.
+  //
+  // Note: Medicaid covers LTC cost, NOT post-LTC living expenses, so
+  // catastrophic-final-bal scenarios still occur (continued sim cost
+  // drains the threshold afterward). The robust invariant is "median
+  // is meaningfully better with Medicaid", not "worst case bounded".
+  const seed = 7171;
+  const ltcParams = {
+    portfolio: 600_000,
+    ltcSelfInsureEnabled: true,
+    ltcProbability: 1.0,                // every trial gets LTC
+    ltcCostPerYearUSD: 200_000,         // expensive
+    ltcDurationYears: 5,
+    ltcStartAgeMin: 75, ltcStartAgeMax: 75,
+    adultBirthYears: [1960],
+    simStartYear: 2025,
+    runs: 200,
+  };
+  const noMedicaid = runMonteCarlo(smokeParams({
+    ...ltcParams,
+    isForeign: false,
+    seededRandom: mulberry32(seed),
+  }));
+  const withMedicaid = runMonteCarlo(smokeParams({
+    ...ltcParams,
+    isForeign: false,
+    seededRandom: mulberry32(seed),
+    medicaidSpendDownEnabled: true,
+    medicaidAssetThresholdUSD: 2000,
+  }));
+  // Medicaid clamp protects bal from full LTC drain — those saved
+  // dollars compound through the rest of the horizon. Median terminal
+  // balance must be strictly higher.
+  assert.ok(
+    withMedicaid.median > noMedicaid.median,
+    `Medicaid median ${withMedicaid.median} should exceed no-Medicaid ${noMedicaid.median}`,
+  );
+  // And the lift should be material — at least the LTC cost saved
+  // (~$200K × ≤5 years, less the expected per-year drain that would
+  // have happened on a depleting balance). Loose lower bound: $50K.
+  const lift = withMedicaid.median - noMedicaid.median;
+  assert.ok(
+    lift > 50_000,
+    `Medicaid lift ${lift} should exceed $50K`,
+  );
+});
+
+test('runMonteCarlo: Medicaid does NOT apply to foreign segments', () => {
+  // Foreign-segment LTC: Medicaid should be inert. Compare a foreign
+  // run with Medicaid on/off — results should be byte-identical because
+  // the `isUSNow` guard short-circuits the clamp.
+  const seed = 7272;
+  const ltcParams = {
+    ltcSelfInsureEnabled: true,
+    ltcProbability: 1.0,
+    ltcCostPerYearUSD: 50_000,
+    adultBirthYears: [1960],
+    simStartYear: 2025,
+  };
+  const off = runMonteCarlo(smokeParams({
+    ...ltcParams,
+    isForeign: true,                    // foreign segment
+    seededRandom: mulberry32(seed),
+    medicaidSpendDownEnabled: false,
+  }));
+  const onButForeign = runMonteCarlo(smokeParams({
+    ...ltcParams,
+    isForeign: true,
+    seededRandom: mulberry32(seed),
+    medicaidSpendDownEnabled: true,
+    medicaidAssetThresholdUSD: 2000,
+  }));
+  // Caveat: smokeParams.isForeign maps to a single (foreign) segment in
+  // the kernel's auto-built schedule; activeSegmentAt(y).isUS is false
+  // throughout. The Medicaid clamp's gate `m.isUS` is therefore false
+  // every year, so the with-Medicaid run should be byte-identical.
+  assert.deepEqual(off.results, onButForeign.results);
+  assert.deepEqual(off.paths, onButForeign.paths);
+});
+
 // ─── runMonteCarlo: mortgage (Todo #28) ────────────────────────────────
 
 test('runMonteCarlo: mortgage=0 → byte-identical to legacy (no mortgage)', () => {

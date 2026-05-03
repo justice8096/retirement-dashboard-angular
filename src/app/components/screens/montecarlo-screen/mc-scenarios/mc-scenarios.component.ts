@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
@@ -8,6 +8,7 @@ import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { RentalIncomeService } from '@services/rental-income.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { McLifeEventsTimelineComponent } from '../mc-life-events-timeline/mc-life-events-timeline.component';
+import { defaultLtcCostForCountry } from '@app/lib/ltc-costs';
 
 /**
  * Monte Carlo "what-if scenarios" sub-component. Bundles the 5
@@ -46,6 +47,25 @@ export class McScenariosComponent {
     if (unit === '/yr') return this.currency.currencyYearly(amount);
     if (unit === '/mo') return this.currency.currencyMonthly(amount);
     return this.currency.currency(amount);
+  }
+
+  /** Country of the currently-selected location (for LTC cost hints). */
+  protected readonly selectedCountry = computed<string | null>(() =>
+    this.state.selectedLoc()?.country ?? null,
+  );
+
+  /** Median LTC cost (USD/yr) for the selected country, with a foreign-
+   *  generic fallback. Surfaced as a hint on the LTC cost input so users
+   *  see a country-appropriate starting point rather than the global US
+   *  default ($108K) regardless of where they're retiring. */
+  protected readonly defaultLtcCostForLocation = computed<number>(() =>
+    defaultLtcCostForCountry(this.selectedCountry()),
+  );
+
+  /** Apply the country-default LTC cost to the kernel input. Wired to a
+   *  small "Use median" button next to the cost field. */
+  protected useDefaultLtcCost(): void {
+    this.state.ltcCostPerYearUSD.set(this.defaultLtcCostForLocation());
   }
 
   /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */
