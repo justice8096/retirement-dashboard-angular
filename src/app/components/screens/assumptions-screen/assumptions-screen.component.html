@@ -7,7 +7,7 @@
         </div>
         <div class="save-bar">
           @if (saveMsg()) { <span class="save-msg" [class.err]="saveErr()">{{ saveMsg() }}</span> }
-          <button mat-flat-button color="primary" [disabled]="saving() || !dirty()" (click)="save()">
+          <button mat-flat-button color="primary" [disabled]="saving() || (!dirty() && !rental.dirty())" (click)="save()">
             {{ saving() ? 'Saving…' : (isNew() ? 'Create Profile' : 'Save Changes') }}
           </button>
         </div>

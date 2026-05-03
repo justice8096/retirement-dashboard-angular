@@ -1,5 +1,7 @@
 export type RetirementPath = 'traditional' | 'fire' | 'explore';
 
+import type { RentalProperty } from '@app/lib/rental-income';
+
 export interface FinancialSettings {
   portfolioBalance: number;
   fxDriftEnabled: boolean;
@@ -31,6 +33,10 @@ export interface FinancialSettings {
   rothFeesPct?: number;
   taxableFeesPct?: number;
   hsaFeesPct?: number;
+  /** Rental property portfolio (Todo #36). JSONB-persisted on the api
+   *  (`user_financial_settings.rental_properties`). Empty array when no
+   *  properties configured. */
+  rentalProperties?: RentalProperty[];
   updatedAt: string;
 }
 

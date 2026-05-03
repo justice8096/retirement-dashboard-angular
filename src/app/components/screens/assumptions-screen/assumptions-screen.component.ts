@@ -2,6 +2,7 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { forkJoin, of } from 'rxjs';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
@@ -70,6 +71,7 @@ export class AssumptionsScreenComponent implements OnInit {
     });
     this.loc.loadFull();
     this.healthcare.load();
+    this.rental.load();
   }
 
   private emptyProfile(): HouseholdProfile {
@@ -246,8 +248,14 @@ export class AssumptionsScreenComponent implements OnInit {
         feedingMode: (p.type === 'dog' || p.type === 'cat') ? p.feedingMode : null,
       })),
     };
-    this.api.updateHousehold(payload).subscribe({
-      next: (h) => {
+    // Persist household + rental in parallel (Todo #36). Both must succeed
+    // for the user-facing "Saved." banner. forkJoin emits once both complete;
+    // an error from either propagates and surfaces a single failure message.
+    forkJoin({
+      household: this.api.updateHousehold(payload),
+      rental: this.rental.dirty() ? this.rental.save() : of(null),
+    }).subscribe({
+      next: ({ household: h }) => {
         this.draft.set(h);
         this.dirty.set(false);
         this.saving.set(false);
