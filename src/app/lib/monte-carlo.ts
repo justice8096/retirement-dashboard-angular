@@ -1119,6 +1119,11 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
     // post-relocation age-transition cost recomputes pointing at the
     // relocate segment instead of the pre-death active segment.
     let trialSchedule: LocationMove[] = schedule;
+    // Survivor-relocation FX swap is deferred until AFTER the death-year
+    // inheritance-tax calculation. See the spouseDeath dispatcher comment
+    // for rationale (Codex P1 on PR #107). Set in the dispatcher; cleared
+    // by the apply-pending-swap block after the IHT line.
+    let pendingRelocateSwap: LocationMove | null = null;
     // Durable across moves: a one-time FX shock is a global USD repricing
     // and survives segment changes, unlike per-segment drift in fxMult.
     // Only applied to cost when in a foreign segment.
@@ -1264,9 +1269,28 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           const sc = segmentCostAtYear(relocate, y, p, true, magiAugmentY);
           cost = sc.total * cumInfl;
           costHealthcare = sc.healthcare * cumInfl;
-          curIsForeign = relocate.isForeign;
-          curDrift = relocate.fxDrift ?? curDrift;
-          fxMult = 1; // new currency baseline, same as regular move
+          // Defer the FX-state swap until AFTER the death-year inheritance-tax
+          // calculation. Codex P1 on PR #107: the runner pre-bakes
+          // `inheritanceTaxByYear[y]` from the regular move schedule (the
+          // deceased's domicile at death), so swapping FX state here would
+          // mis-denominate the exemption when the survivor relocates to a
+          // different currency on the death year. Pinning the swap until
+          // after IHT keeps `curIsForeign / fxMult / curDrift / fxShockMult`
+          // and the year-y `currShock` sample on the pre-relocation segment
+          // for the IHT line, matching the runner's pre-baked entry.
+          //
+          // The post-IHT swap restores byte-identity for non-deathYear
+          // relocate scenarios (none today — survivor relocate fires only
+          // on deathYear by construction), and for the rest of year y the
+          // cost-deduction sees the post-relo segment via `cost` /
+          // `costHealthcare` (already recomputed above) plus the new FX
+          // state. There is a small year-y artifact in `costShockMult`
+          // because `currShock` was sampled with pre-relocation
+          // `curIsForeign` — the deceased's currency volatility
+          // momentarily scales survivor's USD cost. Centered on 1 with
+          // O(currVol) variance; one-year noise. Tolerable in exchange
+          // for the much larger IHT correctness fix.
+          pendingRelocateSwap = relocate;
           if (relocate.moveCostUSD) bal -= relocate.moveCostUSD;
         } else {
           // No relocation — recompute cost on the pre-death active
@@ -1331,6 +1355,19 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           const taxableUSD = Math.max(0, deceasedShareUSD - exemptionUSD);
           bal -= taxableUSD * inhEntry.effectiveRate;
         }
+      }
+
+      // Apply the survivor-relocation FX swap deferred from the spouseDeath
+      // dispatcher (Codex P1 on PR #107). The IHT block above has already
+      // consumed the pre-relocation FX state for the deceased's exemption
+      // denomination; from this point onward in year y (cost-deduction,
+      // late-pass events, HSA, mortgage), the survivor's destination
+      // segment governs FX behavior — matching regular-move semantics.
+      if (pendingRelocateSwap) {
+        curIsForeign = pendingRelocateSwap.isForeign;
+        curDrift = pendingRelocateSwap.fxDrift ?? curDrift;
+        fxMult = 1;
+        pendingRelocateSwap = null;
       }
 
       // Part-time income stops at `partTimeEndYear` (exclusive — year == end is zero).
