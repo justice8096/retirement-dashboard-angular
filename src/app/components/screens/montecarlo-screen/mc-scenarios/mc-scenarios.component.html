@@ -372,7 +372,15 @@
         <input appNumeric="currency" class="param-input" min="0" step="5000"
           [class]="dyscalculia.numberSpacingClass()"
           [ngModel]="state.ltcCostPerYearUSD()" (ngModelChange)="state.ltcCostPerYearUSD.set(+$event)" />
-        <span class="param-hint">US median ~$108K (private room nursing home). International often $30–60K.</span>
+        <span class="param-hint">
+          @if (selectedCountry(); as c) {
+            Median for {{ c }}: <strong>{{ fmt(defaultLtcCostForLocation(), '/yr') }}</strong> —
+            <button type="button" class="link-btn" (click)="useDefaultLtcCost()">use median</button>.
+          } @else {
+            US median ~$108K. International often $15–60K depending on country.
+          }
+          Estimates only; varies widely by city tier and care level.
+        </span>
       </label>
       <label class="param">
         <span class="param-label">Duration (years)</span>
@@ -391,6 +399,40 @@
           [ngModel]="state.ltcStartAgeMax()" (ngModelChange)="state.ltcStartAgeMax.set(+$event)" />
         <span class="param-hint">Anchored on the oldest adult in the household.</span>
       </label>
+    </div>
+
+    <!-- Medicaid spend-down (Todo #21 Slice B). Subsection inside LTC self-insure
+         since it only matters when there's a real LTC drain to clamp. -->
+    <div class="death-grid">
+      <label class="param">
+        <span class="param-label">Medicaid spend-down (US only)</span>
+        <select class="param-input"
+          [ngModel]="state.medicaidSpendDownEnabled()"
+          (ngModelChange)="state.medicaidSpendDownEnabled.set($event === 'true')">
+          <option [ngValue]="false">Off (full self-pay until depleted)</option>
+          <option [ngValue]="true">On (Medicaid covers below threshold)</option>
+        </select>
+        <span class="param-hint">
+          When on, US-segment LTC drains stop pulling once portfolio
+          balance hits the threshold below — Medicaid covers the rest.
+          Doesn't apply to foreign segments. v1 simplifications: federal
+          floor only; home-equity exemption + 5-year look-back not modeled;
+          couple vs individual threshold not auto-computed.
+        </span>
+      </label>
+      @if (state.medicaidSpendDownEnabled()) {
+        <label class="param">
+          <span class="param-label">Asset threshold ($)</span>
+          <input appNumeric="currency" class="param-input" min="0" max="100000" step="500"
+            [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="state.medicaidAssetThresholdUSD()"
+            (ngModelChange)="state.medicaidAssetThresholdUSD.set(+$event)" />
+          <span class="param-hint">
+            Federal floor is $2,000 individual / $3,000 couple, but states
+            range $2,000–$15,000. Look up your state's CSRA / asset limit.
+          </span>
+        </label>
+      }
     </div>
   }
 

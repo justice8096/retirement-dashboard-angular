@@ -463,6 +463,27 @@ export interface MonteCarloParams {
   ltcStartAgeMax?: number;       // default 88
 
   /**
+   * Medicaid spend-down (Todo #21). When enabled, US-segment LTC drains
+   * are clamped so portfolio balance can't drop below the asset
+   * threshold — once the household has spent down to the threshold,
+   * Medicaid covers the remaining nursing-home cost. Default false to
+   * preserve byte-identical legacy behavior.
+   *
+   * v1 simplifications (documented in UI):
+   *   - Federal floor only — actual state thresholds vary $2K..$15K
+   *   - Home equity exemption not modeled (most states exempt up to
+   *     $713K equity in primary residence; doesn't affect liquid bal)
+   *   - Look-back period (5-year asset transfer rule per IRC § 1396p(c))
+   *     not modeled — sim just clamps at the threshold each year
+   *   - Couple vs individual threshold not modeled — caller passes
+   *     the household-appropriate value
+   *   - Foreign segments: Medicaid doesn't apply abroad. Drain proceeds
+   *     unclamped during foreign-segment LTC years.
+   */
+  medicaidSpendDownEnabled?: boolean;
+  medicaidAssetThresholdUSD?: number; // default 2000 (federal floor for individual)
+
+  /**
    * Long-Term Care insurance premium — flat monthly $ deducted from balance
    * once the oldest adult reaches `ltcInsuranceStartAge`. Independent of the
    * self-insure roll; can stack. Default 0 (no insurance modelled).
@@ -895,10 +916,13 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   // the year-keyed `movesByYear` map.
   //
   // If no schedule is provided, synthesize a single "year 0" segment from
-  // the legacy scalar baseCost / isForeign / fxDrift params.
+  // the legacy scalar baseCost / isForeign / fxDrift params. `isUS` is
+  // derived as the negation of `isForeign` so kernel paths that gate on
+  // `m.isUS` (Medicaid spend-down, US-specific Medicare swap) work for
+  // legacy callers without forcing them to provide a full LocationMove.
   const schedule: LocationMove[] = p.moveSchedule?.length
     ? [...p.moveSchedule].sort((a, b) => a.fromYear - b.fromYear)
-    : [{ fromYear: 0, baseCost, isForeign, fxDrift: drift }];
+    : [{ fromYear: 0, baseCost, isForeign, isUS: !isForeign, fxDrift: drift }];
   const initial = schedule[0];
 
   // Unified Life Events timeline (#31 steps 2a + 2b + 2c).
@@ -1049,6 +1073,12 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
   const ltcDurationY = Math.max(0.1, p.ltcDurationYears ?? 2.4);
   const ltcStartAgeMin = Math.max(50, p.ltcStartAgeMin ?? 78);
   const ltcStartAgeMax = Math.max(ltcStartAgeMin, p.ltcStartAgeMax ?? 88);
+  // Medicaid spend-down (Todo #21). When enabled + segment.isUS, clamps
+  // each LTC drain so bal can't fall below the threshold. Both fields
+  // default to disabled / 2000 for byte-identical legacy when caller
+  // doesn't opt in.
+  const medicaidEnabled = !!p.medicaidSpendDownEnabled;
+  const medicaidThreshold = Math.max(0, p.medicaidAssetThresholdUSD ?? 2000);
   const ltcInsMonthly = Math.max(0, p.ltcInsuranceMonthly ?? 0);
   const ltcInsStartAge = Math.max(0, p.ltcInsuranceStartAge ?? 60);
   const calStart = p.simStartYear ?? new Date().getFullYear();
@@ -1501,7 +1531,22 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       // Long-Term Care deductions (independent of one-time expenses; see #21).
       // Self-insure: per-trial probabilistic LTC stay. Insurance: flat
       // monthly premium once the oldest adult crosses ltcInsuranceStartAge.
+      //
+      // Medicaid spend-down (Todo #21): when enabled AND the active
+      // segment is US, the per-year drain is clamped so bal cannot
+      // fall below `medicaidThreshold`. The unspent remainder is
+      // implicitly covered by Medicaid (no household impact). Foreign
+      // segments bypass the clamp — Medicaid doesn't apply abroad.
       if (ltcSelfInsure && oldestAge0 != null) {
+        const isUSNow = medicaidEnabled
+          ? activeSegmentAt(y, trialSchedule).isUS
+          : false;
+        const applyLtcDraw = (proposedDraw: number): void => {
+          const draw = (medicaidEnabled && isUSNow)
+            ? Math.min(proposedDraw, Math.max(0, bal - medicaidThreshold))
+            : proposedDraw;
+          bal -= draw;
+        };
         if (ltcUseExpectedValue) {
           // Spread the EV across the start-age distribution, not the midpoint.
           // Random mode: ltcStartSimYear = floor(start - oldestAge0), window
@@ -1513,6 +1558,11 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
           // Sum of occupancy across years equals `dur`, so total EV cost
           // equals ltcProbability × cost × dur — matching random mode's
           // cross-trial expectation.
+          //
+          // EV mode + Medicaid is an approximation: the clamp is applied
+          // to the probability-weighted draw, not to a real per-trial
+          // depletion. For accurate Medicaid-protected scenarios prefer
+          // random mode. Documented in the UI hint.
           const dur = Math.max(1, Math.round(ltcDurationY));
           const startRange = ltcStartAgeMax - ltcStartAgeMin;
           let occupancy: number;
@@ -1526,12 +1576,12 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
             occupancy = Math.max(0, upperStart - lowerStart) / startRange;
           }
           if (occupancy > 0) {
-            bal -= ltcCostUSD * cumInfl * ltcProbability * occupancy;
+            applyLtcDraw(ltcCostUSD * cumInfl * ltcProbability * occupancy);
           }
         } else if (y >= ltcStartSimYear && y < ltcEndSimYear && ltcStartSimYear >= 0) {
           // Random mode: per-trial roll already gated whether this trial sees
           // LTC at all; deduct the full cost in each year of the window.
-          bal -= ltcCostUSD * cumInfl;
+          applyLtcDraw(ltcCostUSD * cumInfl);
         }
       }
       if (ltcInsMonthly > 0 && oldestAge0 != null && (oldestAge0 + y) >= ltcInsStartAge) {

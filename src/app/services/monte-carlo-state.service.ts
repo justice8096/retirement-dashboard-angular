@@ -160,6 +160,14 @@ export class MonteCarloStateService {
   readonly ltcInsuranceMonthly = signal(350);
   readonly ltcInsuranceStartAge = signal(60);
 
+  /** Medicaid spend-down (Todo #21 Slice B). When enabled + segment is
+   *  US, LTC drains can't pull bal below the asset threshold; remainder
+   *  is implicitly covered by Medicaid. Default OFF — opt-in to preserve
+   *  byte-identical legacy MC results for users who haven't enabled it. */
+  readonly medicaidSpendDownEnabled = signal(false);
+  /** Federal floor for individual asset limit. States range up to $15K. */
+  readonly medicaidAssetThresholdUSD = signal(2000);
+
   /** FX stress test (#26). */
   readonly fxShockEnabled = signal(false);
   readonly fxShockYear = signal(5);
@@ -498,6 +506,7 @@ export class MonteCarloStateService {
       this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
       this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
       this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();
+      this.medicaidSpendDownEnabled(); this.medicaidAssetThresholdUSD();
       this.fxShockEnabled(); this.fxShockYear(); this.fxShockPct();
       this.spouseDeathEnabled(); this.spouseDeathYear();
       this.survivorCostRatio(); this.deceasedMemberIndex();
