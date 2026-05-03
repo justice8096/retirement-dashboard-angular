@@ -201,7 +201,14 @@ export function ltcgFederalTax(
   filingStatus: LtcgFilingStatus,
 ): number {
   if (!(ltcgIncome > 0)) return 0;
-  const brackets = LTCG_BRACKETS_2026[filingStatus] ?? LTCG_BRACKETS_2026.mfj;
+  // Own-property-only lookup. Without this guard, an attacker-controlled
+  // (or stale-typed) filingStatus like `'toString'` returns the inherited
+  // Object.prototype method — truthy enough to defeat `??`. Mirrors
+  // `pickByFilingStatus` defensiveness in retirement-api/shared/taxes.js
+  // (Codex P1 fix on api PR #89).
+  const brackets = Object.prototype.hasOwnProperty.call(LTCG_BRACKETS_2026, filingStatus)
+    ? LTCG_BRACKETS_2026[filingStatus]
+    : LTCG_BRACKETS_2026.mfj;
   const O = Math.max(0, ordinaryTaxableIncome);
   const L = ltcgIncome;
   const combined = O + L;

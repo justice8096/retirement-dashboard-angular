@@ -136,6 +136,20 @@ export class MonteCarloStateService {
   }[]>([]);
   readonly inheritedIRAsEnabled = signal(false);
 
+  /** Property sales (Todo #35) — propertySale LifeEvent rows. Each entry
+   *  references a RentalProperty by id (chosen from RentalIncomeService's
+   *  portfolio) and fires Sec 1250 depreciation recapture + LTCG on the
+   *  gain at the sale year. The kernel auto-zeros the property's rental
+   *  income from the sale year onward. */
+  readonly propertySales = signal<{
+    year: number;
+    propertyId: string;
+    salePriceUSD: number;
+    sellingExpenses: number;
+    label: string;
+  }[]>([]);
+  readonly propertySalesEnabled = signal(false);
+
   /** Long-Term Care planning (#21). */
   readonly ltcMode = signal<'off' | 'self-insure' | 'insurance' | 'both'>('off');
   readonly ltcProbability = signal(70);
@@ -480,6 +494,7 @@ export class MonteCarloStateService {
       this.oneTimeExpenses(); this.oneTimeExpensesEnabled();
       this.oneTimeIncomes(); this.oneTimeIncomesEnabled();
       this.inheritedIRAs(); this.inheritedIRAsEnabled();
+      this.propertySales(); this.propertySalesEnabled();
       this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
       this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
       this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();

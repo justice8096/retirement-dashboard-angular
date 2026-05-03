@@ -84,24 +84,13 @@ export class MonteCarloRunnerService {
                 inflate: e.inflate,
               }))
             : undefined,
-          // Inherited traditional IRA — SECURE Act 10-year drain (#31
-          // priority 5). Routed through the unified `lifeEvents` channel
-          // since `compileLifeEvents` already passes through caller-
-          // supplied LifeEvents verbatim. Per-year balance drain + MAGI
-          // augment is handled by the kernel's inheritedIRAEvents loop.
-          lifeEvents: s.inheritedIRAsEnabled()
-            ? s.inheritedIRAs().map(e => ({
-                kind: 'inheritedIRA' as const,
-                year: e.year,
-                balanceUSD: e.balanceUSD,
-                drainOverYears: e.drainOverYears,
-                // UI stores tax rate as a percent (e.g. 22 = 22%); kernel
-                // expects a decimal. Same convention as meanReturn /
-                // volReturn / fxDrift / etc throughout this object.
-                effectiveTaxRate: e.effectiveTaxRate / 100,
-                label: e.label || undefined,
-              }))
-            : undefined,
+          // Inherited traditional IRA + property sales — both routed
+          // through the unified `lifeEvents` channel.
+          //   - inheritedIRA: SECURE Act 10-year drain (#31 priority 5)
+          //   - propertySale: Sec 1250 recapture + LTCG (Todo #35)
+          // `compileLifeEvents` passes them through to the kernel
+          // verbatim; per-kind dispatchers handle the math.
+          lifeEvents: this.buildLifeEvents(),
           ltcSelfInsureEnabled: s.ltcMode() === 'self-insure' || s.ltcMode() === 'both',
           ltcProbability: s.ltcProbability() / 100,
           ltcCostPerYearUSD: s.ltcCostPerYearUSD(),
@@ -134,6 +123,9 @@ export class MonteCarloRunnerService {
           // and applies them in the year loop. Empty array (no properties
           // configured) is byte-identical to a legacy run.
           rentalProperties: this.rental.properties(),
+          // Filing status for LTCG bracket lookup on propertySale events
+          // (Todo #35). Two-adult households → MFJ; single-adult → single.
+          propertySaleFilingStatus: s.adults().length >= 2 ? 'mfj' : 'single',
           inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
           medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
           survivorRelocate: this.buildSurvivorRelocate(),
@@ -185,6 +177,44 @@ export class MonteCarloRunnerService {
       foreignHealthcareMonthly,
       isUS,
     };
+  }
+
+  /** Combine all caller-supplied LifeEvent rows into the unified channel
+   *  consumed by the kernel's `compileLifeEvents`. Currently merges:
+   *    - inheritedIRA events (#31 priority 5, [PR #108](https://github.com/justice8096/retirement-dashboard-angular/pull/108))
+   *    - propertySale events (Todo #35) — Sec 1250 recapture + LTCG
+   *  Returns `undefined` when neither toggle is enabled, so legacy
+   *  callers and tests stay byte-identical when nothing is configured. */
+  private buildLifeEvents() {
+    const s = this.state;
+    const events: import('@app/lib/monte-carlo').LifeEvent[] = [];
+    if (s.inheritedIRAsEnabled()) {
+      for (const e of s.inheritedIRAs()) {
+        events.push({
+          kind: 'inheritedIRA',
+          year: e.year,
+          balanceUSD: e.balanceUSD,
+          drainOverYears: e.drainOverYears,
+          // UI stores tax rate as a percent (e.g. 22 = 22%); kernel
+          // expects a decimal. Same convention throughout this object.
+          effectiveTaxRate: e.effectiveTaxRate / 100,
+          label: e.label || undefined,
+        });
+      }
+    }
+    if (s.propertySalesEnabled()) {
+      for (const e of s.propertySales()) {
+        events.push({
+          kind: 'propertySale',
+          year: e.year,
+          propertyId: e.propertyId,
+          salePriceUSD: e.salePriceUSD,
+          sellingExpenses: e.sellingExpenses || undefined,
+          label: e.label || undefined,
+        });
+      }
+    }
+    return events.length ? events : undefined;
   }
 
   /** Build the survivor-relocation segment (#31 priority 4). Returns undefined

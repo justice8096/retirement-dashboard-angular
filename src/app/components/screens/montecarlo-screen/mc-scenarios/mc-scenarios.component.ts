@@ -5,6 +5,7 @@ import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
+import { RentalIncomeService } from '@services/rental-income.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { McLifeEventsTimelineComponent } from '../mc-life-events-timeline/mc-life-events-timeline.component';
 
@@ -38,6 +39,7 @@ export class McScenariosComponent {
   protected readonly loc = inject(LocationService);
   protected readonly dyscalculia = inject(DyscalculiaService);
   protected readonly state = inject(MonteCarloStateService);
+  protected readonly rental = inject(RentalIncomeService);
   private readonly currency = inject(CurrencyFormatService);
 
   protected fmt(amount: number, unit: '/mo' | '/yr' | '' = '/mo'): string {
@@ -166,6 +168,38 @@ export class McScenariosComponent {
     partial: Partial<{ year: number; balanceUSD: number; drainOverYears: number; effectiveTaxRate: number; label: string }>,
   ): void {
     this.state.inheritedIRAs.update(list =>
+      list.map((e, i) => i === idx ? { ...e, ...partial } : e),
+    );
+  }
+
+  /* ─── Property sales (Todo #35 — Sec 1250 recapture + LTCG) ────────── */
+
+  /** Add a property-sale row tied to the first available rental property.
+   *  No-op when the user has no properties configured (the empty-state
+   *  hint in the template tells them to add one on Assumptions first). */
+  protected addPropertySale(): void {
+    const props = this.rental.properties();
+    if (!props.length) return;
+    const firstId = props[0].id;
+    const current = this.state.propertySales();
+    const lastYear = current.length ? current[current.length - 1].year : 0;
+    const newYear = Math.min(this.state.years() - 1, Math.max(lastYear + 3, 10));
+    this.state.propertySales.set([
+      ...current,
+      { year: newYear, propertyId: firstId, salePriceUSD: 400000, sellingExpenses: 24000, label: '' },
+    ]);
+    this.state.propertySalesEnabled.set(true);
+  }
+
+  protected removePropertySale(idx: number): void {
+    this.state.propertySales.update(list => list.filter((_, i) => i !== idx));
+  }
+
+  protected patchPropertySale(
+    idx: number,
+    partial: Partial<{ year: number; propertyId: string; salePriceUSD: number; sellingExpenses: number; label: string }>,
+  ): void {
+    this.state.propertySales.update(list =>
       list.map((e, i) => i === idx ? { ...e, ...partial } : e),
     );
   }
