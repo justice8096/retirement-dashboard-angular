@@ -950,3 +950,149 @@ test('defaultRentalProperty: produces a valid, active row', () => {
   const r2 = defaultRentalProperty();
   assert.notEqual(r.id, r2.id);
 });
+
+// ─── runMonteCarlo: rental-income kernel integration (Todo #34) ────────
+
+/** Build a rental property suitable for kernel integration tests. */
+function makeKernelRental(overrides: Partial<RentalProperty> = {}): RentalProperty {
+  return {
+    id: 'k1',
+    label: 'Kernel rental',
+    monthlyGrossRent: 2500,
+    vacancyRatePct: 8,
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    mortgageInterestAnnual: 0,
+    depreciableBasis: 200000,
+    depreciationStartYear: 0,
+    ownedFromYear: 0,
+    ownedThroughYear: undefined,
+    ...overrides,
+  };
+}
+
+test('runMonteCarlo: rentalProperties=undefined → byte-identical to legacy', () => {
+  // Empty/missing rental array must not change kernel behavior at all.
+  // Anything else means the rental code path is leaking into legacy runs.
+  const baseSeed = 4242;
+  const a = runMonteCarlo(smokeParams({ seededRandom: mulberry32(baseSeed) }));
+  const b = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(baseSeed),
+    rentalProperties: [],
+  }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});
+
+test('runMonteCarlo: positive rental cash flow shifts median up', () => {
+  // Cash-positive rental adds money to the household every year. With
+  // identical seeds, the with-rental run should end with strictly higher
+  // median balance.
+  const seed = 99;
+  const baseline = runMonteCarlo(smokeParams({ seededRandom: mulberry32(seed) }));
+  const withRental = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: [makeKernelRental({
+      monthlyGrossRent: 3000,           // 36000 gross
+      vacancyRatePct: 5,                // 1800 vacancy → 34200 effective
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 0,
+      depreciableBasis: 200000,         // 7272.7 dep
+      // cash = 34200 - 4000 - 3000 - 0 = 27200/yr
+      // taxable = 27200 - 7272.7 ≈ 19927.3
+    })],
+  }));
+  assert.ok(
+    withRental.median > baseline.median,
+    `expected with-rental median ${withRental.median} > baseline ${baseline.median}`,
+  );
+});
+
+test('runMonteCarlo: depreciation shield reduces tax burden', () => {
+  // Same cash flow, different basis: more basis → more depreciation →
+  // less rental tax owed → higher final balance. Isolates the shield's
+  // effect on bal independent of the cash inflow.
+  const seed = 137;
+  const cashOnly = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: [makeKernelRental({
+      monthlyGrossRent: 2000,           // 24000 gross
+      vacancyRatePct: 0,
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 0,
+      depreciableBasis: 0,              // NO depreciation shield
+      // cash = taxable = 24000 - 4000 - 3000 = 17000/yr
+    })],
+  }));
+  const shielded = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: [makeKernelRental({
+      monthlyGrossRent: 2000,
+      vacancyRatePct: 0,
+      propertyTaxAnnual: 4000,
+      otherOpExAnnual: 3000,
+      mortgageInterestAnnual: 0,
+      depreciableBasis: 275000,         // 10000/yr depreciation shield
+      // cash = 17000/yr (unchanged), taxable = 7000/yr (shielded by 10K dep)
+    })],
+  }));
+  assert.ok(
+    shielded.median > cashOnly.median,
+    `expected shielded median ${shielded.median} > cash-only ${cashOnly.median}`,
+  );
+});
+
+test('runMonteCarlo: ownership window respected (delayed property)', () => {
+  // A property with ownedFromYear=15 in a 20-year sim contributes only
+  // years 15..19 — about a quarter of the ownership of an always-on property.
+  // Median lift should be much smaller than the always-on case.
+  const seed = 271;
+  const alwaysOn = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: [makeKernelRental({ ownedFromYear: 0 })],
+  }));
+  const delayed = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: [makeKernelRental({ ownedFromYear: 15 })],
+  }));
+  const baseline = runMonteCarlo(smokeParams({ seededRandom: mulberry32(seed) }));
+  // Both should beat baseline (positive cash always helps), but delayed lift < always-on lift.
+  const alwaysLift = alwaysOn.median - baseline.median;
+  const delayedLift = delayed.median - baseline.median;
+  assert.ok(
+    alwaysLift > delayedLift,
+    `always-on lift ${alwaysLift} should exceed delayed lift ${delayedLift}`,
+  );
+  assert.ok(
+    delayedLift >= 0,
+    `delayed lift ${delayedLift} should be non-negative`,
+  );
+});
+
+test('runMonteCarlo: rentalEffectiveTaxRate=0 vs 0.5 changes balance', () => {
+  // Same property; only the marginal rate differs. Higher rate → less
+  // post-tax retained → lower final balance.
+  const seed = 314;
+  const props: RentalProperty[] = [makeKernelRental({
+    monthlyGrossRent: 3000,
+    propertyTaxAnnual: 4000,
+    otherOpExAnnual: 3000,
+    depreciableBasis: 100000,           // small shield, ensures positive taxable
+  })];
+  const noTax = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+    rentalEffectiveTaxRate: 0,
+  }));
+  const heavyTax = runMonteCarlo(smokeParams({
+    seededRandom: mulberry32(seed),
+    rentalProperties: props,
+    rentalEffectiveTaxRate: 0.50,
+  }));
+  assert.ok(
+    noTax.median > heavyTax.median,
+    `noTax median ${noTax.median} should exceed heavyTax median ${heavyTax.median}`,
+  );
+});

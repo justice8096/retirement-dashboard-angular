@@ -1,6 +1,7 @@
 import { Injectable, inject, signal, computed, effect, untracked } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { HealthcareService } from '@services/healthcare.service';
+import { RentalIncomeService } from '@services/rental-income.service';
 import {
   FinancialSettings, WithdrawalStrategy, LocationFull,
   HouseholdProfile, HouseholdMember,
@@ -63,6 +64,7 @@ function estimateBenefitAtClaim(m: HouseholdMember): number {
 export class MonteCarloStateService {
   private readonly loc = inject(LocationService);
   private readonly healthcare = inject(HealthcareService);
+  private readonly rental = inject(RentalIncomeService);
 
   /* ─── Async-loaded snapshots ───────────────────────────────────── */
   readonly fin = signal<FinancialSettings | null>(null);
@@ -486,6 +488,9 @@ export class MonteCarloStateService {
       this.survivorCostRatio(); this.deceasedMemberIndex();
       this.survivorStepUpTaxableBalance(); this.survivorStepUpGainRatio(); this.survivorStepUpLtcgRate();
       this.survivorRelocateEnabled(); this.survivorRelocateLocationId(); this.survivorRelocateMoveCostUSD();
+      // Rental properties (Todo #34) — kernel pre-computes per-year cash +
+      // taxable arrays from this list, so any edit invalidates prior results.
+      this.rental.properties();
       // Only mark stale when there's actually a prior result to be stale.
       // Read via untracked() so runSimulation's results.set() doesn't
       // retrigger this effect and immediately re-set simDirty back to true.
