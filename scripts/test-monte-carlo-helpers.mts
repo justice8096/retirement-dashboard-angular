@@ -1621,3 +1621,119 @@ test('runMonteCarlo: propertySale with unknown propertyId is silent no-op', () =
   assert.deepEqual(a.results, b.results);
   assert.deepEqual(a.paths, b.paths);
 });
+
+// ─── survivor relocation IHT FX denomination (Codex P1 on PR #107) ──────
+
+test('runMonteCarlo: survivor relocation IHT respects pre-relocation FX state', () => {
+  // Codex P1 on PR #107: when survivor relocates on the death year, the
+  // FX state must NOT be swapped before the inheritance-tax calculation.
+  // The runner pre-bakes `inheritanceTaxByYear[y]` from the regular move
+  // schedule (= deceased's domicile at death), so swapping FX state to
+  // the survivor's destination first mis-denominates the exemption.
+  //
+  // Test setup: foreign segment with drift that compounds over 10 years.
+  // Both scenarios use the same seed and the same survivorRelocate
+  // (to US) — only `fxDrift` sign differs. Pre-fix, the FX swap to US
+  // happened BEFORE the IHT line, so `effectiveFx = curIsForeign ? ... : 1`
+  // collapsed to 1 in both scenarios — drift sign was invisible to IHT.
+  // Post-fix, the drift accumulated through year 10 is reflected in the
+  // exemption denomination: positive drift (currency strengthens) yields
+  // a larger USD exemption and smaller tax; negative drift yields the
+  // opposite.
+  //
+  // Zeroed return / inflation / volatility makes the bug's effect cleanly
+  // visible in `results[0]` (single-trial deterministic balance after the
+  // year-10 IHT hit). Cost / income are 0 so post-death years don't
+  // perturb the balance.
+  const baseParams = {
+    portfolio: 1_000_000,
+    monthlyIncome: 0,
+    baseCost: 0,
+    isForeign: true,
+    runs: 1,
+    years: 12,
+    meanReturn: 0,
+    volReturn: 0,
+    meanInflation: 0,
+    volInflation: 0,
+    currVol: 0,
+    incGrowth: 0,
+    returnMode: 'normal' as const,
+    spouseDeathYear: 10,
+    inheritanceTaxByYear: (() => {
+      const arr: ({ effectiveRate: number; exemptionUSDBaseline: number } | undefined)[] = new Array(12);
+      arr[10] = { effectiveRate: 0.4, exemptionUSDBaseline: 100_000 };
+      return arr;
+    })(),
+    survivorRelocate: {
+      fromYear: 0, // overwritten by kernel
+      baseCost: 0,
+      isForeign: false,
+      isUS: true,
+      fxDrift: 0,
+    },
+  };
+
+  const strengthening = runMonteCarlo({
+    ...baseParams,
+    fxDrift: 0.05, // foreign currency strengthens 5%/yr
+    seededRandom: mulberry32(42),
+  });
+  const weakening = runMonteCarlo({
+    ...baseParams,
+    fxDrift: -0.05, // foreign currency weakens 5%/yr
+    seededRandom: mulberry32(42),
+  });
+
+  // Hand-computed expected balances at year-12 horizon end:
+  //
+  //   strengthening: fxMult after year-10 drift bump = 1.05^11 ≈ 1.7103
+  //     effectiveFx = 1.7103
+  //     exemptionUSD = 100_000 × 1.7103 ≈ 171_034
+  //     deceasedShareUSD = 0.5 × 1_000_000 = 500_000
+  //     taxableUSD = max(0, 500_000 − 171_034) = 328_966
+  //     tax = 328_966 × 0.4 = 131_586
+  //     bal = 1_000_000 − 131_586 = 868_414
+  //
+  //   weakening: fxMult after year-10 drift bump = 0.95^11 ≈ 0.5688
+  //     effectiveFx = 0.5688
+  //     exemptionUSD = 100_000 × 0.5688 ≈ 56_880
+  //     taxableUSD = 500_000 − 56_880 = 443_120
+  //     tax = 443_120 × 0.4 = 177_248
+  //     bal = 1_000_000 − 177_248 = 822_752
+  //
+  // Difference ~$45K. Pre-fix would have produced identical balances
+  // since effectiveFx = 1 in both (US after swap).
+  const gap = strengthening.results[0]! - weakening.results[0]!;
+  assert.ok(
+    gap > 30_000,
+    `survivorRelocate IHT must respect pre-relo FX state: ` +
+      `strengthening bal ${strengthening.results[0]} vs weakening bal ${weakening.results[0]} ` +
+      `(gap ${gap.toFixed(0)} should exceed $30K). ` +
+      `Pre-fix bug would yield gap ≈ 0 because effectiveFx collapses to 1 post-swap.`,
+  );
+});
+
+test('runMonteCarlo: no-survivorRelocate IHT path remains byte-identical', () => {
+  // Guards against accidental regression: the deferred-swap fix must NOT
+  // change behavior when survivorRelocate is undefined (the legacy
+  // spouseDeath path).
+  const ihtArr: ({ effectiveRate: number; exemptionUSDBaseline: number } | undefined)[] = new Array(20);
+  ihtArr[10] = { effectiveRate: 0.4, exemptionUSDBaseline: 100_000 };
+  const a = runMonteCarlo(smokeParams({
+    spouseDeathYear: 10,
+    survivorIncome: 2_000,
+    survivorBirthYear: 1958,
+    inheritanceTaxByYear: ihtArr,
+    seededRandom: mulberry32(123),
+  }));
+  const b = runMonteCarlo(smokeParams({
+    spouseDeathYear: 10,
+    survivorIncome: 2_000,
+    survivorBirthYear: 1958,
+    inheritanceTaxByYear: ihtArr,
+    seededRandom: mulberry32(123),
+  }));
+  assert.deepEqual(a.results, b.results);
+  assert.deepEqual(a.paths, b.paths);
+});
