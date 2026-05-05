@@ -46,7 +46,9 @@ export class AssumptionsScreenComponent implements OnInit {
   // forkJoin can fire a paired PUT alongside household + rental.
   readonly mortgageMonthlyPayment = signal(0);
   readonly mortgageEndYear = signal(0);
-  readonly mortgageDirty = signal(false);
+  // Single dirty flag for any FinancialSettings-bound field on this screen
+  // (mortgage + transitionYearExtraIncome). One PUT covers all of them.
+  readonly financialDirty = signal(false);
 
   /** Years remaining on the mortgage from sim-year 0. Live preview. */
   readonly mortgageYearsRemaining = computed(() =>
@@ -88,14 +90,15 @@ export class AssumptionsScreenComponent implements OnInit {
     this.loc.loadFull();
     this.healthcare.load();
     this.rental.load();
-    // Mortgage fields piggyback on the financial endpoint (Todo #28).
-    // No dedicated service — two scalars don't justify one. Failures are
-    // benign (fields stay at 0 = no mortgage configured).
+    // Mortgage + transition-year fields piggyback on the financial endpoint
+    // (Todos #28, #38). No dedicated service — three scalars don't justify
+    // one. Failures are benign (fields stay at 0 defaults).
     this.api.getFinancial().subscribe({
       next: (f) => {
         this.mortgageMonthlyPayment.set(Number(f.mortgageMonthlyPayment) || 0);
         this.mortgageEndYear.set(Number(f.mortgageEndYear) || 0);
-        this.mortgageDirty.set(false);
+        this.healthcare.transitionYearExtraIncome.set(Number(f.transitionYearExtraIncome) || 0);
+        this.financialDirty.set(false);
       },
       error: () => { /* leave at 0 defaults; Settings screen will surface load errors */ },
     });
@@ -109,7 +112,13 @@ export class AssumptionsScreenComponent implements OnInit {
     if (partial.mortgageEndYear !== undefined) {
       this.mortgageEndYear.set(partial.mortgageEndYear);
     }
-    this.mortgageDirty.set(true);
+    this.financialDirty.set(true);
+  }
+
+  /** Patch the transition-year ACA spike. Flips dirty so the Save button enables. */
+  patchTransitionYearExtraIncome(value: number): void {
+    this.healthcare.transitionYearExtraIncome.set(Number.isFinite(value) ? value : 0);
+    this.financialDirty.set(true);
   }
 
   private emptyProfile(): HouseholdProfile {
@@ -294,17 +303,18 @@ export class AssumptionsScreenComponent implements OnInit {
     forkJoin({
       household: this.api.updateHousehold(payload),
       rental: this.rental.dirty() ? this.rental.save() : of(null),
-      mortgage: this.mortgageDirty()
+      financial: this.financialDirty()
         ? this.api.updateFinancial({
             mortgageMonthlyPayment: this.mortgageMonthlyPayment(),
             mortgageEndYear: this.mortgageEndYear(),
+            transitionYearExtraIncome: this.healthcare.transitionYearExtraIncome(),
           })
         : of(null),
     }).subscribe({
       next: ({ household: h }) => {
         this.draft.set(h);
         this.dirty.set(false);
-        this.mortgageDirty.set(false);
+        this.financialDirty.set(false);
         this.saving.set(false);
         // First successful PUT created the profile — flip out of new-user mode
         // so the welcome banner disappears and the button label reverts.

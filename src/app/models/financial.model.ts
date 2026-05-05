@@ -45,6 +45,10 @@ export interface FinancialSettings {
    *  Early payoff is modeled by setting this to the payoff year and
    *  adding a oneTimeExpense LifeEvent for the remaining principal. */
   mortgageEndYear?: number;
+  /** First-year ACA transition extra income (Todo #38). One-shot MAGI
+   *  bump in sim year 0 only — severance, unused PTO, final-year
+   *  bonuses, year-of-retirement RMDs. 0 = no transition spike. */
+  transitionYearExtraIncome?: number;
   updatedAt: string;
 }
 
