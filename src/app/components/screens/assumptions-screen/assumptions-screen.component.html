@@ -7,7 +7,7 @@
         </div>
         <div class="save-bar">
           @if (saveMsg()) { <span class="save-msg" [class.err]="saveErr()">{{ saveMsg() }}</span> }
-          <button mat-flat-button color="primary" [disabled]="saving() || (!dirty() && !rental.dirty() && !mortgageDirty())" (click)="save()">
+          <button mat-flat-button color="primary" [disabled]="saving() || (!dirty() && !rental.dirty() && !financialDirty())" (click)="save()">
             {{ saving() ? 'Saving…' : (isNew() ? 'Create Profile' : 'Save Changes') }}
           </button>
         </div>
@@ -547,7 +547,7 @@
                 <input appNumeric="currency" class="field-input" step="1000"
                   [class]="dyscalculia.numberSpacingClass()"
                   [ngModel]="healthcare.transitionYearExtraIncome()"
-                  (ngModelChange)="healthcare.transitionYearExtraIncome.set(+$event)" />
+                  (ngModelChange)="patchTransitionYearExtraIncome(+$event)" />
               </label>
               @if (healthcare.transitionYearExtraIncome() > 0) {
                 <div class="hc-hint" [class]="dyscalculia.numberSpacingClass()">
