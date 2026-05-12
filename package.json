@@ -26,7 +26,7 @@
     "@angular/platform-browser": "^21.2.12",
     "@angular/platform-browser-dynamic": "^21.2.12",
     "@angular/router": "^21.2.12",
-    "@clerk/clerk-js": "^6.7.7",
+    "@clerk/clerk-js": "^6.10.1",
     "d3-sankey": "^0.12.3",
     "leaflet": "^1.9.4",
     "rxjs": "~7.8.0",
