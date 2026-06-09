@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
@@ -163,6 +163,7 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .fire-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -262,7 +263,7 @@ export class FireSetupScreenComponent implements OnInit {
     fxDriftAnnualRate: 1,
     ssCutEnabled: false,
     ssCutYear: 2034,
-    ssCola: 2.5,
+    ssCola: 2.8,  // 2026 SSA COLA (announced 2025-10-24); was 2.5% for 2025
     equityPct: 60,
     bondPct: 30,
     cashPct: 10,

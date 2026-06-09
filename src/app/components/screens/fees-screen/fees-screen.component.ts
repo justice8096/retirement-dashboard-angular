@@ -1,4 +1,4 @@
-﻿import { Component, inject, signal, computed, OnInit } from '@angular/core';
+﻿import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
@@ -13,6 +13,7 @@ import { debounceTime, Subject } from 'rxjs';
   standalone: true,
   imports: [FormsModule, NumericInputDirective],
   templateUrl: './fees-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./fees-screen.component.scss'],
 })
 export class FeesScreenComponent implements OnInit {

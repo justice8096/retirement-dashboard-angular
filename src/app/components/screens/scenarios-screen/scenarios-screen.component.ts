@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -30,6 +30,7 @@ interface ScenarioView {
   standalone: true,
   imports: [MatButtonModule],
   templateUrl: './scenarios-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./scenarios-screen.component.scss'],
 })
 export class ScenariosScreenComponent implements OnInit {

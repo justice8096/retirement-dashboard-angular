@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
@@ -12,6 +12,7 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
   standalone: true,
   imports: [FormsModule, MatButtonModule, MatSlideToggleModule, NumericInputDirective],
   templateUrl: './settings-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./settings-screen.component.scss'],
 })
 export class SettingsScreenComponent implements OnInit {
@@ -30,7 +31,7 @@ export class SettingsScreenComponent implements OnInit {
     fxDriftAnnualRate: 1,
     ssCutEnabled: false,
     ssCutYear: 2034,
-    ssCola: 2.5,
+    ssCola: 2.8,  // 2026 SSA COLA (announced 2025-10-24); was 2.5% for 2025
     equityPct: 60,
     bondPct: 30,
     cashPct: 10,

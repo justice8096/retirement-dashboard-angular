@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { sankey, sankeyLinkHorizontal, SankeyNode, SankeyLink, SankeyGraph } from 'd3-sankey';
 import { ApiService } from '@services/api.service';
@@ -78,6 +78,7 @@ const BREAKOUT_EXPENSE_KEYS: Record<string, string> = {
   standalone: true,
   imports: [FormsModule, NumericInputDirective],
   templateUrl: './sankey-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./sankey-screen.component.scss'],
 })
 export class SankeyScreenComponent implements OnInit {

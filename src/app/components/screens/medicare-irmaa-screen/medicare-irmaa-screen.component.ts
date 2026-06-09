@@ -1,40 +1,20 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { HouseholdProfile } from '@models/api.model';
+import {
+  IRMAABracket,
+  IRMAA_BRACKETS_2026,
+  BASE_PART_B_PREMIUM_2026,
+} from '@app/lib/irmaa';
 
-/* 2026 IRMAA brackets (income lookback = 2 years prior).
- * Base Part B premium paid on top of the surcharge.
- * Source: CMS Medicare Part B premium and IRMAA, 2026 release. */
-interface IRMAABracket {
-  min: number;
-  max: number;
-  partBSurcharge: number;  // monthly $ added to base
-  partDSurcharge: number;  // monthly $ added to the Part D plan premium
-}
-
-const IRMAA_BRACKETS: Record<'single' | 'married', IRMAABracket[]> = {
-  single: [
-    { min: 0,       max: 106000,   partBSurcharge: 0,     partDSurcharge: 0 },
-    { min: 106000,  max: 133000,   partBSurcharge: 74.0,  partDSurcharge: 13.7 },
-    { min: 133000,  max: 167000,   partBSurcharge: 185.0, partDSurcharge: 35.5 },
-    { min: 167000,  max: 200000,   partBSurcharge: 295.9, partDSurcharge: 57.3 },
-    { min: 200000,  max: 500000,   partBSurcharge: 406.9, partDSurcharge: 79.0 },
-    { min: 500000,  max: Infinity, partBSurcharge: 444.0, partDSurcharge: 85.8 },
-  ],
-  married: [
-    { min: 0,       max: 212000,   partBSurcharge: 0,     partDSurcharge: 0 },
-    { min: 212000,  max: 266000,   partBSurcharge: 74.0,  partDSurcharge: 13.7 },
-    { min: 266000,  max: 334000,   partBSurcharge: 185.0, partDSurcharge: 35.5 },
-    { min: 334000,  max: 400000,   partBSurcharge: 295.9, partDSurcharge: 57.3 },
-    { min: 400000,  max: 750000,   partBSurcharge: 406.9, partDSurcharge: 79.0 },
-    { min: 750000,  max: Infinity, partBSurcharge: 444.0, partDSurcharge: 85.8 },
-  ],
-};
-
-const BASE_PART_B_PREMIUM = 185;  // monthly $
+/* 2026 IRMAA brackets + base Part B premium are the single source of truth in
+ * @app/lib/irmaa (also consumed by the Monte Carlo survivor phase). Aliased
+ * here so this screen and the simulation never drift apart. */
+const IRMAA_BRACKETS = IRMAA_BRACKETS_2026;
+const BASE_PART_B_PREMIUM = BASE_PART_B_PREMIUM_2026;
 const MEDICARE_START_AGE = 65;
 const MAGI_GROWTH = 0.03;         // 3% annual assumed income growth
 const PROJECTION_TO_AGE = 100;
@@ -55,6 +35,7 @@ interface ProjectionRow {
   standalone: true,
   imports: [FormsModule, NumericInputDirective],
   templateUrl: './medicare-irmaa-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./medicare-irmaa-screen.component.scss'],
 })
 export class MedicareIrmaaScreenComponent implements OnInit {

@@ -1,6 +1,7 @@
 import {
   Component, inject, signal, computed, effect, ElementRef, viewChild,
   AfterViewInit, OnDestroy,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
@@ -89,6 +90,7 @@ const METRICS: MetricDef[] = [
   standalone: true,
   imports: [FormsModule],
   templateUrl: './map-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./map-screen.component.scss'],
 })
 export class MapScreenComponent implements AfterViewInit, OnDestroy {

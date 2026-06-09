@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ConcreteTilesComponent } from '@components/concrete-tiles/concrete-tiles.component';
@@ -122,6 +122,7 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .calc-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -25,6 +25,7 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
   standalone: true,
   imports: [FormsModule, NumericInputDirective],
   templateUrl: './mc-parameters.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mc-parameters.component.scss'],
 })
 export class McParametersComponent {

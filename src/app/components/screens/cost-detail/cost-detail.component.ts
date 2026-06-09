@@ -1,4 +1,4 @@
-import { Component, inject, input, computed, OnInit } from '@angular/core';
+import { Component, inject, input, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { ItemsService } from '@services/items.service';
@@ -100,6 +100,7 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .cost-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }

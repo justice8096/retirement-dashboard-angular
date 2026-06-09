@@ -1,4 +1,4 @@
-import { Component, inject, signal, HostListener } from '@angular/core';
+import { Component, inject, signal, HostListener, ChangeDetectionStrategy } from '@angular/core';
 import { DyslexiaService } from '@services/dyslexia.service';
 
 /**
@@ -24,6 +24,7 @@ import { DyslexiaService } from '@services/dyslexia.service';
       }
     </button>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .fab {
       position: fixed;

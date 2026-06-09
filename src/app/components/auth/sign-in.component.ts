@@ -1,5 +1,6 @@
 import {
   Component, inject, ElementRef, AfterViewInit, OnDestroy, viewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { AuthService } from '@services/auth.service';
 
@@ -26,6 +27,7 @@ import { AuthService } from '@services/auth.service';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     :host { display: block; height: 100vh; }
     .auth-shell {

@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal, effect, OnInit } from '@angular/core';
+import { Component, inject, computed, signal, effect, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CostDetailComponent } from '../cost-detail/cost-detail.component';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -105,6 +105,7 @@ interface PricedMedication {
       }
     </section>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .meds-panel {
       margin-top: 20px;

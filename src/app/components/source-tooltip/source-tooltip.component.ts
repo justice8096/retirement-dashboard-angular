@@ -1,4 +1,4 @@
-import { Component, computed, input, signal, HostListener } from '@angular/core';
+import { Component, computed, input, signal, HostListener, ChangeDetectionStrategy } from '@angular/core';
 import { Source } from '@models/api.model';
 
 /**
@@ -44,6 +44,7 @@ import { Source } from '@models/api.model';
       }
     </span>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .wrap {
       position: relative;

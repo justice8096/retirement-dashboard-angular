@@ -1,4 +1,4 @@
-import { Component, inject, signal, effect, untracked } from '@angular/core';
+import { Component, inject, signal, effect, untracked, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -30,6 +30,7 @@ import { CalmRevealService } from '@services/calm-reveal.service';
   imports: [MatButtonModule],
   templateUrl: './mc-results.component.html',
   styleUrls: ['./mc-results.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   providers: [CalmRevealService],
 })
 export class McResultsComponent {

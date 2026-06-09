@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { LocationService } from '@services/location.service';
@@ -97,7 +97,7 @@ type SortBy = 'income' | 'country' | 'type';
                        [class.red]="incomeBand(loc) === 'high'">
                     @if (loc.visa?.incomeRequirement?.monthly) {
                       {{ (loc.visa?.incomeRequirement?.currency || loc.currency) }}
-                      {{ loc.visa?.incomeRequirement?.monthly | number:'1.0-0' }}
+                      {{ $safeNavigationMigration(loc.visa?.incomeRequirement?.monthly) | number:'1.0-0' }}
                     } @else {
                       <span class="muted">—</span>
                     }
@@ -127,7 +127,7 @@ type SortBy = 'income' | 'country' | 'type';
                 [class.red]="incomeBand(sel) === 'high'">
                 @if (sel.visa?.incomeRequirement?.monthly) {
                   {{ (sel.visa?.incomeRequirement?.currency || sel.currency) }}
-                  {{ sel.visa?.incomeRequirement?.monthly | number:'1.0-0' }}
+                  {{ $safeNavigationMigration(sel.visa?.incomeRequirement?.monthly) | number:'1.0-0' }}
                 } @else { Not available }
               </div>
             </div>
@@ -161,6 +161,7 @@ type SortBy = 'income' | 'country' | 'type';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .visa-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }

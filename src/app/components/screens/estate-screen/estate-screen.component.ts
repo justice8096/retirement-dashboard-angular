@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
@@ -34,6 +34,7 @@ interface EstateYear {
   standalone: true,
   imports: [FormsModule, NumericInputDirective, SourceTooltipComponent],
   templateUrl: './estate-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./estate-screen.component.scss'],
 })
 export class EstateScreenComponent implements OnInit {

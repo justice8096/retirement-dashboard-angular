@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
@@ -23,6 +23,7 @@ import { HISTORICAL_PRESETS, statsForRange } from '@app/data/historical-returns'
   standalone: true,
   imports: [FormsModule, NumericInputDirective],
   templateUrl: './mc-sampling.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mc-sampling.component.scss'],
 })
 export class McSamplingComponent {

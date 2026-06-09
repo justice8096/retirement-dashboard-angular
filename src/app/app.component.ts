@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, effect, HostListener } from '@angular/core';
+import { Component, inject, OnInit, signal, effect, HostListener, ChangeDetectionStrategy } from '@angular/core';
 import { NavigationService } from '@services/navigation.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { DyslexiaService } from '@services/dyslexia.service';
@@ -89,6 +89,7 @@ import { HelpService } from '@services/help.service';
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .shell {
       height: 100vh;

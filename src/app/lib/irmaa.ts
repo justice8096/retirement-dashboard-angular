@@ -1,8 +1,11 @@
 /**
  * 2026 Medicare IRMAA (Income-Related Monthly Adjustment Amount) brackets.
  *
- * Source: CMS Medicare Part B premium and IRMAA 2026 release.
- *   https://www.cms.gov/newsroom/press-releases/cms-announces-2026-medicare-part-b-premiums-deductibles-and-irmaa-amounts
+ * Source: CMS finalized 2026 Medicare Part A & B premiums/deductibles and
+ * IRMAA amounts, released November 14, 2025.
+ *   https://www.cms.gov/newsroom/fact-sheets/2026-medicare-parts-b-premiums-deductibles
+ * 2026 standard Part B premium $202.90 (up from $185.00 in 2025). Tier-1
+ * IRMAA thresholds: $109,000 single / $218,000 MFJ (up from $106k/$212k).
  *
  * Single-filer thresholds are roughly half of MFJ — so a surviving spouse with
  * unchanged MAGI can jump into a higher surcharge tier just by losing joint
@@ -20,24 +23,24 @@ export interface IRMAABracket {
 
 export const IRMAA_BRACKETS_2026: Record<'single' | 'married', IRMAABracket[]> = {
   single: [
-    { min: 0,       max: 106000,   partBSurcharge: 0,     partDSurcharge: 0 },
-    { min: 106000,  max: 133000,   partBSurcharge: 74.0,  partDSurcharge: 13.7 },
-    { min: 133000,  max: 167000,   partBSurcharge: 185.0, partDSurcharge: 35.5 },
-    { min: 167000,  max: 200000,   partBSurcharge: 295.9, partDSurcharge: 57.3 },
-    { min: 200000,  max: 500000,   partBSurcharge: 406.9, partDSurcharge: 79.0 },
-    { min: 500000,  max: Infinity, partBSurcharge: 444.0, partDSurcharge: 85.8 },
+    { min: 0,       max: 109000,   partBSurcharge: 0,     partDSurcharge: 0 },
+    { min: 109000,  max: 137000,   partBSurcharge: 81.2,  partDSurcharge: 14.5 },
+    { min: 137000,  max: 171000,   partBSurcharge: 202.9, partDSurcharge: 37.5 },
+    { min: 171000,  max: 205000,   partBSurcharge: 324.6, partDSurcharge: 60.4 },
+    { min: 205000,  max: 500000,   partBSurcharge: 446.3, partDSurcharge: 83.3 },
+    { min: 500000,  max: Infinity, partBSurcharge: 487.0, partDSurcharge: 91.0 },
   ],
   married: [
-    { min: 0,       max: 212000,   partBSurcharge: 0,     partDSurcharge: 0 },
-    { min: 212000,  max: 266000,   partBSurcharge: 74.0,  partDSurcharge: 13.7 },
-    { min: 266000,  max: 334000,   partBSurcharge: 185.0, partDSurcharge: 35.5 },
-    { min: 334000,  max: 400000,   partBSurcharge: 295.9, partDSurcharge: 57.3 },
-    { min: 400000,  max: 750000,   partBSurcharge: 406.9, partDSurcharge: 79.0 },
-    { min: 750000,  max: Infinity, partBSurcharge: 444.0, partDSurcharge: 85.8 },
+    { min: 0,       max: 218000,   partBSurcharge: 0,     partDSurcharge: 0 },
+    { min: 218000,  max: 274000,   partBSurcharge: 81.2,  partDSurcharge: 14.5 },
+    { min: 274000,  max: 342000,   partBSurcharge: 202.9, partDSurcharge: 37.5 },
+    { min: 342000,  max: 410000,   partBSurcharge: 324.6, partDSurcharge: 60.4 },
+    { min: 410000,  max: 750000,   partBSurcharge: 446.3, partDSurcharge: 83.3 },
+    { min: 750000,  max: Infinity, partBSurcharge: 487.0, partDSurcharge: 91.0 },
   ],
 };
 
-export const BASE_PART_B_PREMIUM_2026 = 185; // monthly USD
+export const BASE_PART_B_PREMIUM_2026 = 202.90; // monthly USD (2026 standard)
 
 /** Look up the IRMAA bracket for a given filing status + MAGI. */
 export function irmaaBracketFor(

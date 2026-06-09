@@ -1,4 +1,4 @@
-import { Component, inject, ElementRef, QueryList, ViewChildren, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, inject, ElementRef, QueryList, ViewChildren, AfterViewInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { FocusMonitor } from '@angular/cdk/a11y';
 import { NavigationService } from '@services/navigation.service';
 
@@ -33,6 +33,7 @@ import { NavigationService } from '@services/navigation.service';
       </button>
     </nav>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .rail {
       width: 180px;

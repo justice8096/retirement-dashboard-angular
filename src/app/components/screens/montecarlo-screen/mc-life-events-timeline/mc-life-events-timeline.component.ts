@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { LocationService } from '@services/location.service';
 
@@ -57,6 +57,7 @@ interface SpanMark {
   standalone: true,
   imports: [],
   templateUrl: './mc-life-events-timeline.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mc-life-events-timeline.component.scss'],
 })
 export class McLifeEventsTimelineComponent {

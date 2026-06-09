@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
@@ -34,6 +34,7 @@ import { defaultLtcCostForCountry } from '@app/lib/ltc-costs';
   standalone: true,
   imports: [FormsModule, MatButtonModule, NumericInputDirective, McLifeEventsTimelineComponent],
   templateUrl: './mc-scenarios.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./mc-scenarios.component.scss'],
 })
 export class McScenariosComponent {

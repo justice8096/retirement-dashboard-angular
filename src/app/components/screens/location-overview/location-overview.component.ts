@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, computed } from '@angular/core';
+import { Component, inject, OnInit, computed, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
@@ -10,6 +10,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
   standalone: true,
   imports: [FormsModule, MatButtonModule],
   templateUrl: './location-overview.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./location-overview.component.scss'],
 })
 export class LocationOverviewComponent implements OnInit {

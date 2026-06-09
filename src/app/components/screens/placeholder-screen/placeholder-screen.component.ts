@@ -1,4 +1,4 @@
-import { Component, inject, computed } from '@angular/core';
+import { Component, inject, computed, ChangeDetectionStrategy } from '@angular/core';
 import { NavigationService } from '@services/navigation.service';
 
 @Component({
@@ -17,6 +17,7 @@ import { NavigationService } from '@services/navigation.service';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .placeholder {
       display: flex;
