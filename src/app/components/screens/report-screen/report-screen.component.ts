@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -41,6 +41,7 @@ type ServicesBag = Record<string, ServicesBagEntry | null>;
   standalone: true,
   imports: [FormsModule],
   templateUrl: './report-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./report-screen.component.scss'],
 })
 export class ReportScreenComponent {

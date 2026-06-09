@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { NavigationService } from '@services/navigation.service';
@@ -127,6 +127,7 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .onboarding-page {
       min-height: 100vh;

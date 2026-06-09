@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
@@ -68,6 +68,7 @@ function estimateBenefitAtClaim(m: HouseholdMember): number {
   imports: [MatButtonModule, SourceTooltipComponent, McResultsComponent, McParametersComponent, McSamplingComponent, McScenariosComponent],
   templateUrl: './montecarlo-screen.component.html',
   styleUrls: ['./montecarlo-screen.component.scss'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   providers: [MonteCarloStateService, MonteCarloRunnerService],
 })
 export class MontecarloScreenComponent implements OnInit {

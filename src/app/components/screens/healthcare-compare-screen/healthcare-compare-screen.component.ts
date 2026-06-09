@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -24,6 +24,7 @@ const ACA_MONTHLY_ESTIMATE = 1200;
   standalone: true,
   imports: [FormsModule, SourceTooltipComponent],
   templateUrl: './healthcare-compare-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./healthcare-compare-screen.component.scss'],
 })
 export class HealthcareCompareScreenComponent implements OnInit {

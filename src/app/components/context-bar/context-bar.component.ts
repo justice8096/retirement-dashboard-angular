@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { NavigationService } from '@services/navigation.service';
 import { HelpService } from '@services/help.service';
 
@@ -48,6 +48,7 @@ import { HelpService } from '@services/help.service';
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .bar {
       display: flex;

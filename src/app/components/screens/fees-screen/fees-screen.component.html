@@ -80,27 +80,27 @@
             <label class="param">
               <span class="param-label">Trading Commission (%)</span>
               <input appNumeric="percent" class="param-input" step="0.01"
-                [ngModel]="fees()?.brokerageFeePct" (ngModelChange)="updateField('brokerageFeePct', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.brokerageFeePct)" (ngModelChange)="updateField('brokerageFeePct', $event)" />
               <span class="param-hint">Per-trade percentage fee</span>
             </label>
             <label class="param">
               <span class="param-label">Flat Trade Fee ($)</span>
               <input appNumeric="currency" class="param-input" step="0.01"
                 [class]="dyscalculia.numberSpacingClass()"
-                [ngModel]="fees()?.brokerageFeeFlat" (ngModelChange)="updateField('brokerageFeeFlat', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.brokerageFeeFlat)" (ngModelChange)="updateField('brokerageFeeFlat', $event)" />
               <span class="param-hint">Per-trade flat fee (e.g. $4.95)</span>
             </label>
             <label class="param">
               <span class="param-label">Annual Account Fee ($)</span>
               <input appNumeric="currency" class="param-input" step="1"
                 [class]="dyscalculia.numberSpacingClass()"
-                [ngModel]="fees()?.brokerageAnnualFee" (ngModelChange)="updateField('brokerageAnnualFee', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.brokerageAnnualFee)" (ngModelChange)="updateField('brokerageAnnualFee', $event)" />
               <span class="param-hint">Yearly custody or maintenance fee</span>
             </label>
             <label class="param">
               <span class="param-label">Fund Expense Ratio (%)</span>
               <input appNumeric="percent" class="param-input" step="0.01"
-                [ngModel]="fees()?.brokerageExpenseRatio" (ngModelChange)="updateField('brokerageExpenseRatio', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.brokerageExpenseRatio)" (ngModelChange)="updateField('brokerageExpenseRatio', $event)" />
               <span class="param-hint">Weighted average fund expense ratio</span>
             </label>
           </div>
@@ -115,21 +115,21 @@
               <span class="param-label">Outgoing Wire Fee ($)</span>
               <input appNumeric="currency" class="param-input" step="1"
                 [class]="dyscalculia.numberSpacingClass()"
-                [ngModel]="fees()?.wireTransferFeeUsd" (ngModelChange)="updateField('wireTransferFeeUsd', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.wireTransferFeeUsd)" (ngModelChange)="updateField('wireTransferFeeUsd', $event)" />
               <span class="param-hint">US bank outgoing wire charge</span>
             </label>
             <label class="param">
               <span class="param-label">Receiving Bank Fee ({{ localCurrency() }})</span>
               <input appNumeric="currency" class="param-input" step="1"
                 [class]="dyscalculia.numberSpacingClass()"
-                [ngModel]="fees()?.wireTransferFeeLocal" (ngModelChange)="updateField('wireTransferFeeLocal', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.wireTransferFeeLocal)" (ngModelChange)="updateField('wireTransferFeeLocal', $event)" />
               <span class="param-hint">Local bank incoming wire charge</span>
             </label>
             <label class="param">
               <span class="param-label">ACH/Domestic Transfer ($)</span>
               <input appNumeric="currency" class="param-input" step="0.01"
                 [class]="dyscalculia.numberSpacingClass()"
-                [ngModel]="fees()?.achTransferFee" (ngModelChange)="updateField('achTransferFee', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.achTransferFee)" (ngModelChange)="updateField('achTransferFee', $event)" />
               <span class="param-hint">US domestic ACH transfer fee</span>
             </label>
           </div>
@@ -143,20 +143,20 @@
             <label class="param">
               <span class="param-label">FX Spread (%)</span>
               <input appNumeric="percent" class="param-input" step="0.01"
-                [ngModel]="fees()?.fxSpreadPct" (ngModelChange)="updateField('fxSpreadPct', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.fxSpreadPct)" (ngModelChange)="updateField('fxSpreadPct', $event)" />
               <span class="param-hint">Bank/broker markup on mid-market rate</span>
             </label>
             <label class="param">
               <span class="param-label">FX Fixed Fee ($)</span>
               <input appNumeric="currency" class="param-input" step="0.01"
                 [class]="dyscalculia.numberSpacingClass()"
-                [ngModel]="fees()?.fxFixedFee" (ngModelChange)="updateField('fxFixedFee', $event)" />
+                [ngModel]="$safeNavigationMigration(fees()?.fxFixedFee)" (ngModelChange)="updateField('fxFixedFee', $event)" />
               <span class="param-hint">Flat per-conversion fee</span>
             </label>
             <label class="param">
               <span class="param-label">FX Provider</span>
               <select class="param-input"
-                [ngModel]="fees()?.fxProvider" (ngModelChange)="updateField('fxProvider', $event)">
+                [ngModel]="$safeNavigationMigration(fees()?.fxProvider)" (ngModelChange)="updateField('fxProvider', $event)">
                 <option value="bank">Bank Transfer</option>
                 <option value="wise">Wise (TransferWise)</option>
                 <option value="ofx">OFX</option>

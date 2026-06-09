@@ -1,4 +1,4 @@
-import { Component, inject, HostListener, computed } from '@angular/core';
+import { Component, inject, HostListener, computed, ChangeDetectionStrategy } from '@angular/core';
 import { HelpService } from '@services/help.service';
 import { NavigationService } from '@services/navigation.service';
 import { DyslexiaService } from '@services/dyslexia.service';
@@ -110,6 +110,7 @@ import { CATEGORIES } from '@models/navigation.model';
       </aside>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .backdrop {
       position: fixed;

@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -24,6 +24,7 @@ type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
   standalone: true,
   imports: [FormsModule, MatButtonModule, NumericInputDirective],
   templateUrl: './assumptions-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./assumptions-screen.component.scss'],
 })
 export class AssumptionsScreenComponent implements OnInit {

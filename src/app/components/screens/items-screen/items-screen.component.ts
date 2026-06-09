@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ItemsService } from '@services/items.service';
 import { ITEM_CATEGORIES, ItemCategoryKey } from '../../../data/item-catalog';
@@ -57,6 +57,7 @@ import { ITEM_CATEGORIES, ItemCategoryKey } from '../../../data/item-catalog';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .items-screen { display: flex; flex-direction: column; gap: 14px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }

@@ -16,37 +16,40 @@
     "verify:apportion": "node scripts/verify-apportionment.mjs"
   },
   "dependencies": {
-    "@angular/animations": "^21.2.12",
-    "@angular/cdk": "^21.2.10",
-    "@angular/common": "^21.2.12",
-    "@angular/compiler": "^21.2.12",
-    "@angular/core": "^21.2.12",
-    "@angular/forms": "^21.2.12",
-    "@angular/material": "^21.2.10",
-    "@angular/platform-browser": "^21.2.12",
-    "@angular/platform-browser-dynamic": "^21.2.12",
-    "@angular/router": "^21.2.12",
-    "@clerk/clerk-js": "^6.10.1",
+    "@angular/animations": "^22.0.0",
+    "@angular/cdk": "^22.0.0",
+    "@angular/common": "^22.0.0",
+    "@angular/compiler": "^22.0.0",
+    "@angular/core": "^22.0.0",
+    "@angular/forms": "^22.0.0",
+    "@angular/material": "^22.0.0",
+    "@angular/platform-browser": "^22.0.0",
+    "@angular/platform-browser-dynamic": "^22.0.0",
+    "@angular/router": "^22.0.0",
+    "@clerk/clerk-js": "^6.14.0",
     "d3-sankey": "^0.12.3",
     "leaflet": "^1.9.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.6.0",
-    "zone.js": "~0.16.2"
+    "zone.js": "^0.16.2"
   },
   "devDependencies": {
-    "@analogjs/vite-plugin-angular": "^2.5.0",
-    "@analogjs/vitest-angular": "^2.5.0",
-    "@angular/build": "^21.2.10",
-    "@angular/cli": "^21.2.10",
-    "@angular/compiler-cli": "^21.2.12",
-    "@emnapi/core": "^1.10.0",
-    "@emnapi/runtime": "^1.10.0",
+    "@analogjs/vite-plugin-angular": "^2.6.0",
+    "@analogjs/vitest-angular": "^2.6.0",
+    "@angular/build": "^22.0.0",
+    "@angular/cli": "^22.0.0",
+    "@angular/compiler-cli": "^22.0.0",
+    "@emnapi/core": "^1.11.0",
+    "@emnapi/runtime": "^1.11.0",
     "@types/d3-sankey": "^0.12.5",
     "@types/leaflet": "^1.9.21",
-    "@types/node": "^25.7.0",
+    "@types/node": "^25.9.2",
     "jsdom": "^29.1.1",
-    "tsx": "^4.21.0",
-    "typescript": "~5.9.3",
-    "vitest": "^4.1.6"
+    "tsx": "^4.22.4",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "ws": "^8.21.0"
   }
 }

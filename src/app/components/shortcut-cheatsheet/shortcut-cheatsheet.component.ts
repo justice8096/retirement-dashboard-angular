@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, HostListener } from '@angular/core';
+import { Component, EventEmitter, Output, HostListener, ChangeDetectionStrategy } from '@angular/core';
 
 /**
  * Keyboard shortcut cheatsheet — opened with `?`, closed with Esc or click-outside.
@@ -55,6 +55,7 @@ import { Component, EventEmitter, Output, HostListener } from '@angular/core';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .backdrop {
       position: fixed;

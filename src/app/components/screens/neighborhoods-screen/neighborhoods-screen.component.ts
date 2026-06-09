@@ -1,6 +1,7 @@
 import {
   Component, inject, signal, computed, OnInit, OnDestroy,
   ElementRef, viewChild, AfterViewInit, effect,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { NavigationService } from '@services/navigation.service';
@@ -29,6 +30,7 @@ L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, ic
   standalone: true,
   imports: [SourceTooltipComponent],
   templateUrl: './neighborhoods-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./neighborhoods-screen.component.scss'],
 })
 export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDestroy {

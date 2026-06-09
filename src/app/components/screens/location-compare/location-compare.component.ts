@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
@@ -14,6 +14,7 @@ import { LocationFull, COST_CATEGORIES, bulletText } from '@models/api.model';
   standalone: true,
   imports: [MatButtonModule],
   templateUrl: './location-compare.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./location-compare.component.scss'],
 })
 export class LocationCompareComponent implements OnInit {

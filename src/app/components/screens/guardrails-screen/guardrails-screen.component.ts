@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '@services/api.service';
 import { LocationService } from '@services/location.service';
@@ -45,6 +45,7 @@ interface ProjectionRow {
   standalone: true,
   imports: [FormsModule, NumericInputDirective],
   templateUrl: './guardrails-screen.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./guardrails-screen.component.scss'],
 })
 export class GuardrailsScreenComponent implements OnInit {

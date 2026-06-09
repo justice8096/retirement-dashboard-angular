@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { NavigationService } from '@services/navigation.service';
 import { ApiService } from '@services/api.service';
@@ -93,6 +93,7 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .liv-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }

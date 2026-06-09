@@ -1,4 +1,4 @@
-import { Component, Input, computed, signal } from '@angular/core';
+import { Component, Input, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 
 /**
  * Concrete tiles visual (Dashboard Dyscalculia F-004).
@@ -22,6 +22,7 @@ import { Component, Input, computed, signal } from '@angular/core';
       <p class="tile-legend">{{ legend() }}</p>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .concrete-tiles { display: flex; flex-direction: column; gap: 8px; }
     .tile-grid {

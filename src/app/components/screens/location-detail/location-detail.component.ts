@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -8,6 +8,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
   standalone: true,
   imports: [MatButtonModule],
   templateUrl: './location-detail.component.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./location-detail.component.scss'],
 })
 export class LocationDetailComponent {
