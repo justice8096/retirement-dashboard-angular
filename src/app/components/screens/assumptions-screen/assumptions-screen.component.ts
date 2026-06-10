@@ -122,6 +122,12 @@ export class AssumptionsScreenComponent implements OnInit {
     this.financialDirty.set(true);
   }
 
+  /** Mark the income composition / ACA-assumptions block dirty so Save enables.
+   *  The template appends this to each income/strategy/regime/need binding. */
+  markIncomeDirty(): void {
+    this.financialDirty.set(true);
+  }
+
   private emptyProfile(): HouseholdProfile {
     return {
       id: '',
@@ -309,6 +315,8 @@ export class AssumptionsScreenComponent implements OnInit {
             mortgageMonthlyPayment: this.mortgageMonthlyPayment(),
             mortgageEndYear: this.mortgageEndYear(),
             transitionYearExtraIncome: this.healthcare.transitionYearExtraIncome(),
+            // Income composition + ACA assumptions (now persisted).
+            ...this.healthcare.incomeSavePayload(),
           })
         : of(null),
     }).subscribe({

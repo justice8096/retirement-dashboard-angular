@@ -145,4 +145,23 @@ describe('HealthcareService.decideConsistent', () => {
     const sticker = svc.unsubsidizedMonthly(loc(2_000));
     expect(sticker).toBe(2_050);
   });
+
+  it('incomeSavePayload captures the composition + ACA assumptions for persistence', () => {
+    svc.income.set({
+      traditionalAnnual: 50_000, rothAnnual: 10_000, taxableBrokerageAnnual: 0,
+      taxableBrokerageTaxablePct: 0.5, pensionAnnual: 0, ssAnnual: 30_000, filingStatus: 'single',
+    });
+    svc.totalAnnualNeed.set(90_000);
+    svc.apportionStrategy.set('magi-targeted');
+    svc.subsidyRegime.set('cliff');
+    svc.firstYearUnsubsidized.set(false);
+    const p = svc.incomeSavePayload();
+    expect(p.traditionalAnnual).toBe(50_000);
+    expect(p.ssAnnual).toBe(30_000);
+    expect(p.totalAnnualNeed).toBe(90_000);
+    expect(p.apportionStrategy).toBe('magi-targeted');
+    expect(p.subsidyRegime).toBe('cliff');
+    expect(p.filingStatus).toBe('single');
+    expect(p.firstYearUnsubsidized).toBe(false);
+  });
 });

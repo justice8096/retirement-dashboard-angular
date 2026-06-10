@@ -49,6 +49,24 @@ export interface FinancialSettings {
    *  bump in sim year 0 only — severance, unused PTO, final-year
    *  bonuses, year-of-retirement RMDs. 0 = no transition spike. */
   transitionYearExtraIncome?: number;
+
+  // ─── Income composition + ACA assumptions (Assumptions screen) ────
+  // Persisted so the income split / Total Annual Need / subsidy regime survive
+  // reload and keep the healthcare/MAGI numbers stable. Dollar amounts are
+  // encrypted at rest on the api.
+  traditionalAnnual?: number;
+  rothAnnual?: number;
+  taxableBrokerageAnnual?: number;
+  pensionAnnual?: number;
+  ssAnnual?: number;
+  totalAnnualNeed?: number;
+  /** Fraction (0..1) of taxable-brokerage withdrawals counted as taxable. */
+  taxableBrokerageTaxablePct?: number;
+  filingStatus?: 'single' | 'joint';
+  apportionStrategy?: 'manual' | 'proportional' | 'tax-efficient' | 'magi-targeted';
+  subsidyRegime?: 'cliff' | 'enhanced';
+  firstYearUnsubsidized?: boolean;
+
   updatedAt: string;
 }
 
