@@ -374,6 +374,17 @@ export class HealthcareService {
   }
 
   /**
+   * Unsubsidized monthly healthcare for a location under the current household
+   * (full ACA sticker for pre-65 adults, Medicare cost for 65+). Priced by
+   * passing an above-cliff MAGI so no subsidy applies. Used to size the MAGI
+   * that forces year-0 sticker pricing under the enhanced regime too, where the
+   * cliff is ignored and premiums cap at `magi × capPct`.
+   */
+  unsubsidizedMonthly(location: LocationFull): number {
+    return this.decideWithMagi(location, Number.POSITIVE_INFINITY).monthlyCost;
+  }
+
+  /**
    * Self-consistent healthcare + income-tax + MAGI for a location, via
    * fixed-point iteration. See `docs/ACA-MAGI-CONSISTENCY.md`.
    *
@@ -404,7 +415,9 @@ export class HealthcareService {
       const decision = this.decideWithMagi(location, magi);
       // Brackets apply to AGI (incl. the taxable portion of Social Security),
       // not taxableBase — computeIncomeTax subtracts the standard deduction.
-      const monthlyTax = this.taxSvc.computeIncomeTax(location, this.computeMagi(cur).agi).monthlyTax;
+      // The transition spike (W-2 / severance / final-year RMDs) is ordinary
+      // taxable income, so it belongs in the tax base too, not just MAGI.
+      const monthlyTax = this.taxSvc.computeIncomeTax(location, this.computeMagi(cur).agi + extraIncome).monthlyTax;
       return { ...decision, monthlyTax, solveIterations: 0 };
     }
 
@@ -448,7 +461,9 @@ export class HealthcareService {
       decision = this.decideWithMagi(location, magi);
       const nextHealthcare = decision.monthlyCost;
       // AGI (incl. taxable SS), not taxableBase — see manual branch above.
-      const nextTax = this.taxSvc.computeIncomeTax(location, m.agi).monthlyTax;
+      // Transition spike is ordinary taxable income — include it in the tax
+      // base, mirroring its inclusion in `magi` above (Codex P2 on #153).
+      const nextTax = this.taxSvc.computeIncomeTax(location, m.agi + extraIncome).monthlyTax;
       const converged = Math.abs(nextHealthcare - healthcareMonthly) < 1
         && Math.abs(nextTax - taxMonthly) < 1;
       healthcareMonthly = nextHealthcare;

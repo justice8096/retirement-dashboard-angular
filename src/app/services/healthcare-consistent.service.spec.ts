@@ -124,4 +124,25 @@ describe('HealthcareService.decideConsistent', () => {
     const d = svc.decideConsistent(loc(2_000));
     expect(d.monthlyTax!).toBeGreaterThan(0);
   });
+
+  it('transition income raises the tax base, not just MAGI (Codex P2 #153)', () => {
+    // Manual mode, modest steady AGI (~$28k, below the standard deduction → $0
+    // tax). A $100k first-year W-2/RMD spike pushes AGI into the brackets, so
+    // the transition tax must exceed the steady tax.
+    svc.apportionStrategy.set('manual');
+    svc.income.set({
+      traditionalAnnual: 28_000, rothAnnual: 0, taxableBrokerageAnnual: 0,
+      taxableBrokerageTaxablePct: 0.5, pensionAnnual: 0, ssAnnual: 0, filingStatus: 'joint',
+    });
+    svc.transitionYearExtraIncome.set(100_000);
+    const steady = svc.decideConsistent(loc(2_000));
+    const transition = svc.decideConsistent(loc(2_000), { transition: true });
+    expect(transition.monthlyTax!).toBeGreaterThan(steady.monthlyTax!);
+  });
+
+  it('unsubsidizedMonthly returns the full sticker (supports enhanced-regime year 0)', () => {
+    // Pre-Medicare household → unsubsidized = the 2-adult ACA benchmark.
+    const sticker = svc.unsubsidizedMonthly(loc(2_000));
+    expect(sticker).toBe(2_050);
+  });
 });
