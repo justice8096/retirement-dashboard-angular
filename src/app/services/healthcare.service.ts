@@ -1,6 +1,7 @@
 import { Injectable, inject, computed, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { LocationService } from './location.service';
+import { TaxService } from './tax.service';
 import { HouseholdProfile, LocationFull, FinancialSettings } from '@models/api.model';
 import {
   fpl2026 as fplForHousehold,
@@ -58,6 +59,14 @@ export interface HealthcareDecision {
   fplPct?: number;
   /** True when MAGI is above the 400% FPL cliff under cliff-regime. */
   aboveFplCliff?: boolean;
+  /**
+   * Monthly income tax at the converged draw — populated by `decideConsistent`
+   * (the self-consistent need→MAGI→healthcare+tax solver). Undefined on the
+   * legacy `decide` / `decideForLocation` fixed-MAGI paths.
+   */
+  monthlyTax?: number;
+  /** Number of fixed-point iterations `decideConsistent` ran (diagnostic). */
+  solveIterations?: number;
 }
 
 /**
@@ -108,6 +117,7 @@ export interface MagiResult {
 export class HealthcareService {
   private readonly api = inject(ApiService);
   private readonly loc = inject(LocationService);
+  private readonly taxSvc = inject(TaxService);
 
   readonly household = signal<HouseholdProfile | null>(null);
   readonly financial = signal<FinancialSettings | null>(null);
@@ -137,6 +147,18 @@ export class HealthcareService {
   readonly transitionMagi = computed(() =>
     this.magi().magiForAca + this.transitionYearExtraIncome()
   );
+
+  /**
+   * When true (default), the first projection year is modeled as ACA-
+   * UNSUBSIDIZED. ACA subsidies are based on estimated current-year MAGI
+   * reconciled at tax time — and a mid-year retiree's actual first-year MAGI
+   * usually includes pre-retirement wages / severance / final-year RMDs above
+   * the 400% FPL cliff. Defaulting year 0 to unsubsidized avoids crediting a
+   * subsidy that reconciliation would claw back. The user overrides by entering
+   * a genuinely-low `transitionYearExtraIncome` (none) and unsetting this, or
+   * leaves it on. See docs/ACA-MAGI-CONSISTENCY.md.
+   */
+  readonly firstYearUnsubsidized = signal<boolean>(true);
 
   /**
    * Applicable-percentage under the cliff regime. Exposed so callers (e.g.
@@ -348,32 +370,99 @@ export class HealthcareService {
    * behavior — the user has explicit control).
    */
   decideForLocation(location: LocationFull, opts?: { transition?: boolean }): HealthcareDecision {
-    const strategy = this.apportionStrategy();
+    return this.decideConsistent(location, opts);
+  }
+
+  /**
+   * Self-consistent healthcare + income-tax + MAGI for a location, via
+   * fixed-point iteration. See `docs/ACA-MAGI-CONSISTENCY.md`.
+   *
+   * The household's annual draw must cover non-healthcare costs PLUS the real
+   * healthcare premium PLUS income tax. That draw determines MAGI, which in
+   * turn determines whether ACA is subsidized (MAGI ≤ 400% FPL cliff) and how
+   * much tax is owed — a circular relationship. We seed at the UNSUBSIDIZED
+   * premium (the conservative bound) and iterate to a fixed point: if the real
+   * draw clears the cliff, healthcare stays unsubsidized and it's already
+   * consistent; otherwise the MAGI-capped subsidized premium converges
+   * monotonically downward. Per location, because cheaper places need smaller
+   * draws → lower MAGI → may genuinely qualify where pricier ones don't.
+   *
+   * `manual` apportion mode: the user controls the income composition directly,
+   * so MAGI is fixed — we don't re-derive draws, just price healthcare + tax at
+   * the stated MAGI (with the optional transition-year spike).
+   *
+   * Returns the `HealthcareDecision` augmented with `monthlyTax` and
+   * `solveIterations`.
+   */
+  decideConsistent(location: LocationFull, opts?: { transition?: boolean }): HealthcareDecision {
     const extraIncome = opts?.transition ? this.transitionYearExtraIncome() : 0;
+    const strategy = this.apportionStrategy();
+    const cur = this.income();
+
     if (strategy === 'manual') {
-      return this.decideWithMagi(location, this.magi().magiForAca + extraIncome);
+      const magi = this.magi().magiForAca + extraIncome;
+      const decision = this.decideWithMagi(location, magi);
+      // Brackets apply to AGI (incl. the taxable portion of Social Security),
+      // not taxableBase — computeIncomeTax subtracts the standard deduction.
+      const monthlyTax = this.taxSvc.computeIncomeTax(location, this.computeMagi(cur).agi).monthlyTax;
+      return { ...decision, monthlyTax, solveIterations: 0 };
     }
 
-    const nonHealthcare = this.loc.nonHealthcareBaseMonthly(location);
-    const storedHealthcare = location.monthlyCosts?.['healthcare']?.typical ?? 0;
-    const locationAnnualNeed = (nonHealthcare + storedHealthcare) * 12;
-    const cur = this.income();
-    const residual = Math.max(0, locationAnnualNeed - cur.ssAnnual - cur.pensionAnnual);
+    const nonHealthcareMonthly = this.loc.nonHealthcareBaseMonthly(location);
     const f = this.financial();
     const balances = {
       traditional: Number(f?.traditionalBalance) || 0,
       roth: Number(f?.rothBalance) || 0,
       taxable: Number(f?.taxableBalance) || 0,
     };
-    const { trad, roth, tax } = this.apportion(residual, strategy, balances);
-    const locationBreakdown: IncomeBreakdown = {
-      ...cur,
-      traditionalAnnual: Math.round(trad),
-      rothAnnual: Math.round(roth),
-      taxableBrokerageAnnual: Math.round(tax),
+    // magi-targeted draws buffer trad+taxable under the cliff via Roth — pass
+    // the same ceiling/baseline `applyApportionment` uses, else the strategy
+    // silently degrades to tax-efficient ordering inside the loop.
+    const magiOpts = strategy === 'magi-targeted'
+      ? { magiCeiling: this.magiCliffCeiling(), magiBaseline: cur.ssAnnual + cur.pensionAnnual }
+      : undefined;
+
+    // Seed at the unsubsidized premium: pass an above-cliff MAGI so
+    // `decideWithMagi` returns the full sticker (Medicare adults priced at
+    // their Medicare cost, ACA adults at the full benchmark).
+    let decision = this.decideWithMagi(location, Number.POSITIVE_INFINITY);
+    let healthcareMonthly = decision.monthlyCost;
+    let taxMonthly = 0;
+    let magi = decision.magiUsed;
+    let iterations = 0;
+
+    const MAX_ITERS = 12;
+    for (let i = 0; i < MAX_ITERS; i++) {
+      iterations = i + 1;
+      const needAnnual = (nonHealthcareMonthly + healthcareMonthly + taxMonthly) * 12;
+      const residual = Math.max(0, needAnnual - cur.ssAnnual - cur.pensionAnnual);
+      const { trad, roth, tax } = this.apportion(residual, strategy, balances, magiOpts);
+      const breakdown: IncomeBreakdown = {
+        ...cur,
+        traditionalAnnual: Math.round(trad),
+        rothAnnual: Math.round(roth),
+        taxableBrokerageAnnual: Math.round(tax),
+      };
+      const m = this.computeMagi(breakdown);
+      magi = m.magiForAca + extraIncome;
+      decision = this.decideWithMagi(location, magi);
+      const nextHealthcare = decision.monthlyCost;
+      // AGI (incl. taxable SS), not taxableBase — see manual branch above.
+      const nextTax = this.taxSvc.computeIncomeTax(location, m.agi).monthlyTax;
+      const converged = Math.abs(nextHealthcare - healthcareMonthly) < 1
+        && Math.abs(nextTax - taxMonthly) < 1;
+      healthcareMonthly = nextHealthcare;
+      taxMonthly = nextTax;
+      if (converged) break;
+    }
+
+    return {
+      ...decision,
+      monthlyCost: healthcareMonthly,
+      magiUsed: magi,
+      monthlyTax: taxMonthly,
+      solveIterations: iterations,
     };
-    const locationMagi = this.computeMagi(locationBreakdown).magiForAca + extraIncome;
-    return this.decideWithMagi(location, locationMagi);
   }
 
   /** Effective monthly healthcare cost for a given location under current household + income. */

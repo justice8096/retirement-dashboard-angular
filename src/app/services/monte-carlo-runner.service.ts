@@ -51,6 +51,18 @@ export class MonteCarloRunnerService {
     setTimeout(() => {
       try {
         const s = this.state;
+
+        // Self-consistent per-location MAGI (need incl. real healthcare + tax
+        // → draw → MAGI → subsidy). Computed for the sim's primary location so
+        // the simulation and the Compare table agree by construction — the
+        // kernel applies the same cliff formula to whatever magiAnnual we pass.
+        // See docs/ACA-MAGI-CONSISTENCY.md.
+        const planLoc = s.selectedLoc();
+        const steadyMagi = planLoc
+          ? this.healthcare.decideConsistent(planLoc).magiUsed
+          : this.healthcare.magi().magiForAca;
+        const transitionMagi = this.computeTransitionMagi(planLoc, steadyMagi);
+
         const result = runMonteCarlo({
           portfolio: s.portfolio(),
           monthlyIncome: s.ssMonthly() + s.monthlyIncome(),
@@ -109,10 +121,8 @@ export class MonteCarloRunnerService {
           fxShockPct: s.fxShockEnabled() ? s.fxShockPct() / 100 : undefined,
           adultBirthYears: s.adults().map(m => m.birthYear),
           simStartYear: s.household()?.planningStartYear ?? new Date().getFullYear(),
-          magiAnnual: this.healthcare.magi().magiForAca,
-          transitionMagiAnnual: this.healthcare.transitionYearExtraIncome() > 0
-            ? this.healthcare.transitionMagi()
-            : undefined,
+          magiAnnual: steadyMagi,
+          transitionMagiAnnual: transitionMagi,
           subsidyRegime: this.healthcare.subsidyRegime(),
           spouseDeathYear: s.spouseDeathEnabled() ? s.spouseDeathYear() : undefined,
           survivorMonthlyIncome: s.spouseDeathEnabled() ? s.survivorMonthlyIncome() : undefined,
@@ -159,6 +169,27 @@ export class MonteCarloRunnerService {
     }, 30);
   }
 
+  /**
+   * Year-0 (transition) MAGI for the kernel. Three cases, in priority order:
+   *   1. User entered a first-year income spike → steady + spike (consistent).
+   *   2. Otherwise, `firstYearUnsubsidized` (default on) → push year-0 MAGI just
+   *      over the cliff so the first year prices ACA at the unsubsidized sticker
+   *      (mid-year retiree's actual MAGI usually clears the cliff).
+   *   3. Else → undefined: year 0 behaves like steady state.
+   * See docs/ACA-MAGI-CONSISTENCY.md.
+   */
+  private computeTransitionMagi(planLoc: LocationFull | null, steadyMagi: number): number | undefined {
+    if (this.healthcare.transitionYearExtraIncome() > 0) {
+      return planLoc
+        ? this.healthcare.decideConsistent(planLoc, { transition: true }).magiUsed
+        : this.healthcare.transitionMagi();
+    }
+    if (this.healthcare.firstYearUnsubsidized()) {
+      return Math.max(steadyMagi, this.healthcare.magiCliffCeiling() + 1);
+    }
+    return undefined;
+  }
+
   /** Build one kernel-ready segment for a given location. Includes the richer
    *  healthcare/tax breakdown so the sim can swap ACA → Medicare per year. */
   private buildSegmentForLocation(loc: LocationFull, fromYear: number, moveCostUSD?: number) {
@@ -170,10 +201,12 @@ export class MonteCarloRunnerService {
       ?? loc.healthcare?.acaMarketplace?.benchmarkSilverMonthly2Adult ?? 0;
     const foreignHealthcareMonthly = monthlyCosts['healthcare']?.typical ?? 0;
     const acaSubsidyCapPct = loc.healthcare?.acaMarketplace?.premiumCapPctOfIncome ?? 0.085;
-    // Income tax: bracket-based using shared annualIncome — this matches the
-    // Compare/Taxes screens so all views stay consistent.
-    const tax = this.taxSvc.computeIncomeTax(loc, this.loc.annualIncome());
-    const monthlyIncomeTax = tax.monthlyTax;
+    // Self-consistent per-location values: the income tax + steady ACA MAGI
+    // are computed on THIS location's actual draw (costs + real healthcare +
+    // tax), so each segment reprices ACA against where you'd actually be
+    // living — and the sim agrees with Compare for the moved-to location.
+    const consistent = this.healthcare.decideConsistent(loc);
+    const monthlyIncomeTax = consistent.monthlyTax ?? this.taxSvc.computeIncomeTax(loc, this.loc.annualIncome()).monthlyTax;
     return {
       fromYear,
       baseCost: nonHealthcareBase + monthlyIncomeTax + medicareMonthly, // legacy fallback
@@ -187,6 +220,7 @@ export class MonteCarloRunnerService {
       acaSubsidyCapPct,
       foreignHealthcareMonthly,
       isUS,
+      magiAnnual: consistent.magiUsed,
     };
   }
 
