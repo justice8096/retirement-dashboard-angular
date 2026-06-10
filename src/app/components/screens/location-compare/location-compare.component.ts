@@ -51,6 +51,12 @@ export class LocationCompareComponent implements OnInit {
         transition: this.viewYear() === 'transition',
       });
       const bundle = this.tax.totalWithIncomeTax(city, { healthcareMonthly: decision.monthlyCost });
+      // Use the income tax from the self-consistent solve (`decideConsistent`)
+      // — it's computed on the *actual per-location draw* that funds this city's
+      // costs + healthcare, so it matches the healthcare row's MAGI. Falls back
+      // to the global-income tax only on the legacy fixed-MAGI path (manual mode
+      // still returns a `monthlyTax`, so the fallback is effectively unused).
+      const consistentTax = decision.monthlyTax ?? bundle.monthlyTax;
 
       // Compute "if fully subsidized" + "worst-case penalty" under CLIFF
       // regime (2026 reality). Two scenarios side-by-side:
@@ -98,8 +104,10 @@ export class LocationCompareComponent implements OnInit {
 
       map.set(city.id, {
         decision,
-        totalWithTax: bundle.total,
-        monthlyTax: bundle.monthlyTax,
+        // baseMonthly already carries the consistent healthcare cost (passed in
+        // above); swap the global tax for the per-location consistent tax.
+        totalWithTax: bundle.baseMonthly + consistentTax,
+        monthlyTax: consistentTax,
         totalIfSubsidized: bundleIfSubsidized.total,
         subsidizedHealthcareMonthly: subsidizedMonthly,
         cliffPenaltyMonthly,
