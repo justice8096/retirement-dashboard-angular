@@ -239,12 +239,64 @@ export class HealthcareService {
       },
     });
     this.api.getFinancial().subscribe({
-      next: (f) => { this.financial.set(f); settle(); },
+      next: (f) => { this.financial.set(f); this.restoreFromFinancial(f); settle(); },
       error: (err) => {
         console.warn('HealthcareService: financial fetch failed; auto-apportionment disabled.', err);
         settle();
       },
     });
+  }
+
+  /** True once a persisted income composition has been restored, so the
+   *  household seed (targetAnnualIncome) doesn't clobber it regardless of which
+   *  fetch resolves first. */
+  private incomeRestored = false;
+
+  /**
+   * Restore the persisted income composition + ACA assumptions from
+   * FinancialSettings. Assumption fields (strategy/regime/flag) always apply;
+   * the income split + Total Annual Need only override the household seed when
+   * the user actually saved one (any annual $ > 0), so a fresh user still gets
+   * the targetAnnualIncome-derived default.
+   */
+  private restoreFromFinancial(f: FinancialSettings): void {
+    if (f.apportionStrategy) this.apportionStrategy.set(f.apportionStrategy);
+    if (f.subsidyRegime) this.subsidyRegime.set(f.subsidyRegime);
+    if (typeof f.firstYearUnsubsidized === 'boolean') this.firstYearUnsubsidized.set(f.firstYearUnsubsidized);
+
+    const amounts = [f.traditionalAnnual, f.rothAnnual, f.taxableBrokerageAnnual, f.pensionAnnual, f.ssAnnual];
+    const hasComposition = amounts.some(v => (Number(v) || 0) > 0);
+    if (hasComposition) {
+      this.income.set({
+        traditionalAnnual: Number(f.traditionalAnnual) || 0,
+        rothAnnual: Number(f.rothAnnual) || 0,
+        taxableBrokerageAnnual: Number(f.taxableBrokerageAnnual) || 0,
+        taxableBrokerageTaxablePct: f.taxableBrokerageTaxablePct ?? 0.5,
+        pensionAnnual: Number(f.pensionAnnual) || 0,
+        ssAnnual: Number(f.ssAnnual) || 0,
+        filingStatus: f.filingStatus ?? 'joint',
+      });
+      this.incomeRestored = true;
+    }
+    if (Number(f.totalAnnualNeed) > 0) this.totalAnnualNeed.set(Number(f.totalAnnualNeed));
+  }
+
+  /** The income/ACA assumptions as a flat object for the financial PUT payload. */
+  incomeSavePayload(): Partial<FinancialSettings> {
+    const i = this.income();
+    return {
+      traditionalAnnual: i.traditionalAnnual,
+      rothAnnual: i.rothAnnual,
+      taxableBrokerageAnnual: i.taxableBrokerageAnnual,
+      taxableBrokerageTaxablePct: i.taxableBrokerageTaxablePct,
+      pensionAnnual: i.pensionAnnual,
+      ssAnnual: i.ssAnnual,
+      filingStatus: i.filingStatus,
+      totalAnnualNeed: this.totalAnnualNeed(),
+      apportionStrategy: this.apportionStrategy() as FinancialSettings['apportionStrategy'],
+      subsidyRegime: this.subsidyRegime(),
+      firstYearUnsubsidized: this.firstYearUnsubsidized(),
+    };
   }
 
   /**
@@ -305,6 +357,9 @@ export class HealthcareService {
    *   - Filing status: 'joint' if 2+ adults, else 'single'
    */
   private seedIncomeFromHousehold(h: HouseholdProfile): void {
+    // A persisted composition (restored from FinancialSettings) wins over the
+    // targetAnnualIncome seed, regardless of which fetch resolved first.
+    if (this.incomeRestored) return;
     const adults = (h.members ?? []).filter(m => m.role !== 'dependent');
     const ssAnnual = adults.reduce((s, m) => s + (Number(m.ssPia) || 0), 0) * 12;
     const target = Number(h.targetAnnualIncome) || this.loc.annualIncome();

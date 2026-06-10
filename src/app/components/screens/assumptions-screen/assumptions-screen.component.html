@@ -398,13 +398,13 @@
                   <input appNumeric="currency" class="field-input" step="1000"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.totalAnnualNeed()"
-                    (ngModelChange)="healthcare.totalAnnualNeed.set(+$event)" />
+                    (ngModelChange)="healthcare.totalAnnualNeed.set(+$event); markIncomeDirty()" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Apportion Strategy</span>
                   <select class="field-input"
                     [ngModel]="healthcare.apportionStrategy()"
-                    (ngModelChange)="healthcare.apportionStrategy.set($event)">
+                    (ngModelChange)="healthcare.apportionStrategy.set($event); markIncomeDirty()">
                     <option value="manual">Manual — I'll enter buckets below</option>
                     <option value="proportional">Proportional to balances</option>
                     <option value="tax-efficient">Tax-efficient (taxable → trad → Roth)</option>
@@ -414,7 +414,7 @@
                 <div class="field compact hc-apply-wrap">
                   <button mat-stroked-button class="hc-apply-btn"
                     [disabled]="healthcare.apportionStrategy() === 'manual'"
-                    (click)="healthcare.applyApportionment()">
+                    (click)="healthcare.applyApportionment(); markIncomeDirty()">
                     Fill buckets below
                   </button>
                 </div>
@@ -430,41 +430,41 @@
                   <input appNumeric="currency" class="field-input" step="1000"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().traditionalAnnual"
-                    (ngModelChange)="healthcare.patchIncome({ traditionalAnnual: +$event })" />
+                    (ngModelChange)="healthcare.patchIncome({ traditionalAnnual: +$event }); markIncomeDirty()" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Roth 401k / IRA ($)</span>
                   <input appNumeric="currency" class="field-input" step="1000"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().rothAnnual"
-                    (ngModelChange)="healthcare.patchIncome({ rothAnnual: +$event })" />
+                    (ngModelChange)="healthcare.patchIncome({ rothAnnual: +$event }); markIncomeDirty()" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Taxable brokerage ($)</span>
                   <input appNumeric="currency" class="field-input" step="1000"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().taxableBrokerageAnnual"
-                    (ngModelChange)="healthcare.patchIncome({ taxableBrokerageAnnual: +$event })" />
+                    (ngModelChange)="healthcare.patchIncome({ taxableBrokerageAnnual: +$event }); markIncomeDirty()" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Social Security ($/yr)</span>
                   <input appNumeric="currency" class="field-input" step="500"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().ssAnnual"
-                    (ngModelChange)="healthcare.patchIncome({ ssAnnual: +$event })" />
+                    (ngModelChange)="healthcare.patchIncome({ ssAnnual: +$event }); markIncomeDirty()" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Pension / other taxable ($)</span>
                   <input appNumeric="currency" class="field-input" step="500"
                     [class]="dyscalculia.numberSpacingClass()"
                     [ngModel]="healthcare.income().pensionAnnual"
-                    (ngModelChange)="healthcare.patchIncome({ pensionAnnual: +$event })" />
+                    (ngModelChange)="healthcare.patchIncome({ pensionAnnual: +$event }); markIncomeDirty()" />
                 </label>
                 <label class="field compact">
                   <span class="field-label">Filing status</span>
                   <select class="field-input"
                     [ngModel]="healthcare.income().filingStatus"
-                    (ngModelChange)="healthcare.patchIncome({ filingStatus: $event })">
+                    (ngModelChange)="healthcare.patchIncome({ filingStatus: $event }); markIncomeDirty()">
                     <option value="joint">Married filing jointly</option>
                     <option value="single">Single</option>
                   </select>
@@ -565,7 +565,7 @@
                 <label class="field compact">
                   <select class="field-input"
                     [ngModel]="healthcare.subsidyRegime()"
-                    (ngModelChange)="healthcare.subsidyRegime.set($event)">
+                    (ngModelChange)="healthcare.subsidyRegime.set($event); markIncomeDirty()">
                     <option value="cliff">Cliff rules (current for 2026)</option>
                     <option value="enhanced">Enhanced rules (if Congress extends them)</option>
                   </select>
