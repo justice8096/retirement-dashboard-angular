@@ -185,7 +185,18 @@ export class MonteCarloRunnerService {
         : this.healthcare.transitionMagi();
     }
     if (this.healthcare.firstYearUnsubsidized()) {
-      return Math.max(steadyMagi, this.healthcare.magiCliffCeiling() + 1);
+      const cliffMagi = this.healthcare.magiCliffCeiling() + 1;
+      // Under the ENHANCED regime the kernel ignores the cliff and caps
+      // premiums at `magi × capPct`, so a MAGI just above the cliff is still
+      // subsidized. To actually price year 0 at the sticker, MAGI must be large
+      // enough that `capPct × MAGI ≥ unsubsidized annual premium` (Codex P2 #153).
+      if (planLoc && this.healthcare.subsidyRegime() === 'enhanced') {
+        const capPct = planLoc.healthcare?.acaMarketplace?.premiumCapPctOfIncome ?? 0.085;
+        const unsubAnnual = this.healthcare.unsubsidizedMonthly(planLoc) * 12;
+        const enhancedMagi = capPct > 0 ? unsubAnnual / capPct + 1 : cliffMagi;
+        return Math.max(steadyMagi, cliffMagi, enhancedMagi);
+      }
+      return Math.max(steadyMagi, cliffMagi);
     }
     return undefined;
   }

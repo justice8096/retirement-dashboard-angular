@@ -162,8 +162,13 @@ export function statsForRange(startYear: number, endYear: number): {
 /**
  * Bootstrap-sample a single year's (return, inflation) from history. Keeps the
  * two series paired so return/inflation correlation is preserved.
+ *
+ * Accepts the caller's RNG so seeded runs are reproducible — without it the
+ * bootstrap draw would use `Math.random()` and break the `seededRandom`
+ * determinism guarantee for `returnMode: 'bootstrap'`. Defaults to
+ * `Math.random` for legacy callers.
  */
-export function bootstrapYear(): { ret: number; inf: number } {
-  const row = HISTORICAL_RETURNS[Math.floor(Math.random() * HISTORICAL_RETURNS.length)];
+export function bootstrapYear(rand: () => number = Math.random): { ret: number; inf: number } {
+  const row = HISTORICAL_RETURNS[Math.floor(rand() * HISTORICAL_RETURNS.length)];
   return { ret: row.sp500, inf: row.cpi };
 }

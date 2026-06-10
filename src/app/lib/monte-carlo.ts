@@ -860,7 +860,7 @@ function sampleYear(
 ): { ret: number; inf: number } {
   switch (mode) {
     case 'bootstrap': {
-      return bootstrapYear();
+      return bootstrapYear(rand);
     }
 
     case 'regime': {
