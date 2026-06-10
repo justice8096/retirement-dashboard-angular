@@ -110,6 +110,14 @@ export interface LocationMove {
   foreignHealthcareMonthly?: number;
   /** True if this is a US location — drives Medicare eligibility. */
   isUS?: boolean;
+  /**
+   * Self-consistent steady-state ACA MAGI for THIS segment's location (set by
+   * the runner via `decideConsistent`). The kernel uses it for the segment's
+   * subsidy calc instead of the global `magiAnnual`, so a move to a cheaper /
+   * pricier city reprices ACA against the moved-to location's own draw. Year 0
+   * still uses `transitionMagiAnnual`. Undefined → fall back to global.
+   */
+  magiAnnual?: number;
 }
 
 export interface RegimeConfig {
@@ -747,9 +755,14 @@ function segmentCostAtYear(m: LocationMove, y: number, p: MonteCarloParams, surv
       // years (#31 priority 5) — the per-year distribution from a SECURE Act
       // 10-year drain spikes MAGI in the drain window, lowering the ACA
       // subsidy cap below.
+      // Per-segment MAGI: after a move, the ACA subsidy must reflect the
+      // active location's own self-consistent draw (a cheaper city needs
+      // smaller withdrawals → lower MAGI → may qualify where the prior one
+      // didn't). `m.magiAnnual` is set per segment by the runner; falls back
+      // to the global `p.magiAnnual`. Year 0 still uses the transition spike.
       const baseMagi = (y === 0 && p.transitionMagiAnnual != null)
         ? p.transitionMagiAnnual
-        : (p.magiAnnual ?? 0);
+        : (m.magiAnnual ?? p.magiAnnual ?? 0);
       const magi = baseMagi + magiAugment;
       const regime = p.subsidyRegime ?? 'enhanced';
 

@@ -201,10 +201,12 @@ export class MonteCarloRunnerService {
       ?? loc.healthcare?.acaMarketplace?.benchmarkSilverMonthly2Adult ?? 0;
     const foreignHealthcareMonthly = monthlyCosts['healthcare']?.typical ?? 0;
     const acaSubsidyCapPct = loc.healthcare?.acaMarketplace?.premiumCapPctOfIncome ?? 0.085;
-    // Income tax: bracket-based using shared annualIncome — this matches the
-    // Compare/Taxes screens so all views stay consistent.
-    const tax = this.taxSvc.computeIncomeTax(loc, this.loc.annualIncome());
-    const monthlyIncomeTax = tax.monthlyTax;
+    // Self-consistent per-location values: the income tax + steady ACA MAGI
+    // are computed on THIS location's actual draw (costs + real healthcare +
+    // tax), so each segment reprices ACA against where you'd actually be
+    // living — and the sim agrees with Compare for the moved-to location.
+    const consistent = this.healthcare.decideConsistent(loc);
+    const monthlyIncomeTax = consistent.monthlyTax ?? this.taxSvc.computeIncomeTax(loc, this.loc.annualIncome()).monthlyTax;
     return {
       fromYear,
       baseCost: nonHealthcareBase + monthlyIncomeTax + medicareMonthly, // legacy fallback
@@ -218,6 +220,7 @@ export class MonteCarloRunnerService {
       acaSubsidyCapPct,
       foreignHealthcareMonthly,
       isUS,
+      magiAnnual: consistent.magiUsed,
     };
   }
 

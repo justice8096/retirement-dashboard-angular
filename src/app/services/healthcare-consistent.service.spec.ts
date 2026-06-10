@@ -111,4 +111,17 @@ describe('HealthcareService.decideConsistent', () => {
   it('first-year-unsubsidized defaults on', () => {
     expect(svc.firstYearUnsubsidized()).toBe(true);
   });
+
+  it('income tax includes the taxable portion of Social Security (Codex P2)', () => {
+    // $30k traditional + $40k SS, MFJ. Provisional income makes ~$14.1k of SS
+    // taxable → AGI ≈ $44.1k, above the $32.2k standard deduction → tax > 0.
+    // On the old `taxableBase` ($30k, below the deduction) it would be $0.
+    svc.apportionStrategy.set('manual');
+    svc.income.set({
+      traditionalAnnual: 30_000, rothAnnual: 0, taxableBrokerageAnnual: 0,
+      taxableBrokerageTaxablePct: 0.5, pensionAnnual: 0, ssAnnual: 40_000, filingStatus: 'joint',
+    });
+    const d = svc.decideConsistent(loc(2_000));
+    expect(d.monthlyTax!).toBeGreaterThan(0);
+  });
 });

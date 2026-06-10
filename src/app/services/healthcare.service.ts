@@ -402,7 +402,9 @@ export class HealthcareService {
     if (strategy === 'manual') {
       const magi = this.magi().magiForAca + extraIncome;
       const decision = this.decideWithMagi(location, magi);
-      const monthlyTax = this.taxSvc.computeIncomeTax(location, this.computeMagi(cur).taxableBase).monthlyTax;
+      // Brackets apply to AGI (incl. the taxable portion of Social Security),
+      // not taxableBase — computeIncomeTax subtracts the standard deduction.
+      const monthlyTax = this.taxSvc.computeIncomeTax(location, this.computeMagi(cur).agi).monthlyTax;
       return { ...decision, monthlyTax, solveIterations: 0 };
     }
 
@@ -445,7 +447,8 @@ export class HealthcareService {
       magi = m.magiForAca + extraIncome;
       decision = this.decideWithMagi(location, magi);
       const nextHealthcare = decision.monthlyCost;
-      const nextTax = this.taxSvc.computeIncomeTax(location, m.taxableBase).monthlyTax;
+      // AGI (incl. taxable SS), not taxableBase — see manual branch above.
+      const nextTax = this.taxSvc.computeIncomeTax(location, m.agi).monthlyTax;
       const converged = Math.abs(nextHealthcare - healthcareMonthly) < 1
         && Math.abs(nextTax - taxMonthly) < 1;
       healthcareMonthly = nextHealthcare;
