@@ -11,6 +11,7 @@ import {
   LocalInfoSupplement, Scenario, bulletText,
 } from '@models/api.model';
 import { escYaml as yamlStr } from '@app/lib/text-escape';
+import { toCsv } from '@app/lib/csv';
 import {
   FIRE_WITHDRAWAL_RATE,
   GUARDRAIL_FLOOR_RATE as GUARDRAIL_FLOOR,
@@ -52,6 +53,13 @@ export class ReportScreenComponent {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly lastDownloaded = signal<{ filename: string; bytes: number; sections: number; locations: number } | null>(null);
+
+  // ─── CSV exports (A4 parity port #4) ───────────────────────────────
+  // Independent of the Markdown report's loading/error state above so the
+  // two export families never block each other mid-download.
+  readonly csvLoading = signal<'locations' | 'taxes' | 'scenario' | null>(null);
+  readonly csvError = signal<string | null>(null);
+  readonly lastCsvDownload = signal<{ filename: string; rows: number } | null>(null);
 
   readonly selectedCount = computed(() => this.loc.selectedIds().size);
   readonly selectedNamesPreview = computed(() => {
@@ -124,12 +132,98 @@ export class ReportScreenComponent {
       },
     });
   }
+
+  // ─── CSV exports (A4 parity port #4) ───────────────────────────────
+  // Ports the retired React DataExportTab's three CSVs. The React tab always
+  // dumped its whole in-memory location list (no selection concept existed
+  // there); "Location Costs" and "Tax Comparison" mirror that scope using
+  // `fullLocations()`. "Scenario Projection" mirrors React's single
+  // dropdown-selected location using the first currently-selected location
+  // from Locations → Overview instead, since this screen has no separate
+  // location picker of its own.
+
+  downloadLocationCostsCsv(): void {
+    this.csvError.set(null);
+    this.csvLoading.set('locations');
+    try {
+      const locations = this.loc.fullLocations();
+      if (!locations.length) {
+        throw new Error("Location data isn't loaded yet — visit Locations → Overview first.");
+      }
+      const csv = buildLocationCostsCsv(locations);
+      const filename = 'location-costs.csv';
+      downloadCsv(filename, csv);
+      this.lastCsvDownload.set({ filename, rows: locations.length });
+    } catch (e) {
+      this.csvError.set((e as Error).message || 'Export failed.');
+    } finally {
+      this.csvLoading.set(null);
+    }
+  }
+
+  downloadTaxComparisonCsv(): void {
+    this.csvError.set(null);
+    this.csvLoading.set('taxes');
+    try {
+      const locations = this.loc.fullLocations();
+      if (!locations.length) {
+        throw new Error("Location data isn't loaded yet — visit Locations → Overview first.");
+      }
+      const csv = buildTaxComparisonCsv(locations);
+      const filename = 'tax-comparison.csv';
+      downloadCsv(filename, csv);
+      this.lastCsvDownload.set({ filename, rows: locations.length });
+    } catch (e) {
+      this.csvError.set((e as Error).message || 'Export failed.');
+    } finally {
+      this.csvLoading.set(null);
+    }
+  }
+
+  downloadScenarioProjectionCsv(): void {
+    this.csvError.set(null);
+    if (this.selectedCount() === 0) {
+      this.csvError.set('No locations selected. Pick at least one on Locations → Overview.');
+      return;
+    }
+    const ids = this.loc.selectedIds();
+    const location = this.loc.fullLocations().find(l => ids.has(l.id));
+    if (!location) {
+      this.csvError.set("Selected location isn't loaded yet — refresh Overview and try again.");
+      return;
+    }
+    this.csvLoading.set('scenario');
+    forkJoin({
+      household: this.api.getHousehold().pipe(catchError(() => of(null))),
+      financial: this.api.getFinancial().pipe(catchError(() => of(null))),
+    }).subscribe({
+      next: ({ household, financial }) => {
+        try {
+          const csv = buildScenarioProjectionCsv(location, household, financial);
+          const filename = `scenario-projection-${slugifyForFilename(location.name)}.csv`;
+          downloadCsv(filename, csv);
+          this.lastCsvDownload.set({ filename, rows: 36 });
+        } catch (e) {
+          this.csvError.set((e as Error).message || 'Failed to build scenario CSV.');
+        } finally {
+          this.csvLoading.set(null);
+        }
+      },
+      error: (err) => {
+        this.csvLoading.set(null);
+        this.csvError.set(err?.message ?? 'Fetch failed.');
+      },
+    });
+  }
 }
 
-/** Trigger a browser download of a text blob. Uses an anchor with `download`
- *  attribute — no deps. Revokes the object URL on next tick. */
-function downloadText(filename: string, content: string): void {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+/** Trigger a browser download of a text blob via an anchor with a
+ *  `download` attribute — no deps. Revokes the object URL on next tick.
+ *  Shared by the Markdown report and the CSV exports below; each caller
+ *  supplies its own MIME type so the browser's Save dialog and any
+ *  double-click-to-open behavior stay correct per format. */
+function downloadBlob(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -138,6 +232,163 @@ function downloadText(filename: string, content: string): void {
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+function downloadText(filename: string, content: string): void {
+  downloadBlob(filename, content, 'text/markdown;charset=utf-8');
+}
+
+/** No UTF-8 BOM — matches the retired React dashboard's
+ *  `new Blob([csv], { type: 'text/csv' })`, which never prefixed one. */
+function downloadCsv(filename: string, content: string): void {
+  downloadBlob(filename, content, 'text/csv;charset=utf-8');
+}
+
+/** Filesystem-safe filename fragment from a location name — same
+ *  replacement the React tab used (`name.replace(/[^a-z0-9]/gi, '-')`). */
+function slugifyForFilename(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '-');
+}
+
+/** Round to 2 decimal places — used for percentage display in the tax
+ *  comparison CSV, matching the React tab's rounding. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * CSV #1: Location Cost Comparison. Ports React's `handleExportLocationCosts`.
+ * React scope was "every location in the app's in-memory store" (it had no
+ * per-screen selection concept); this mirrors that using `fullLocations()`
+ * rather than the Overview selection, so this CSV isn't gated on picking
+ * anything on the Locations screen.
+ *
+ * Column deviation: React's "Total Monthly"/"Total Annual" came from
+ * `getTypicalMonthly(loc, housingPrefs)`, a client-side recompute that
+ * adjusted for gig-internet/accessible/parking/new-construction housing
+ * toggles. This screen doesn't have those toggles wired in (they live on
+ * the Housing screen, not fetched here), so `monthlyCostTotal` — the
+ * backend-computed canonical total already used everywhere else in this
+ * app (Overview's sort field, cost cards, etc.) — stands in instead.
+ */
+export function buildLocationCostsCsv(locations: LocationFull[]): string {
+  const headers = [
+    'Name', 'Country', 'Currency', 'Rent', 'Groceries', 'Healthcare',
+    'Transportation', 'Entertainment', 'Utilities', 'Total Monthly',
+    'Total Annual', 'Safety Rating', 'Internet Speed',
+  ];
+  const rows = locations.map(loc => {
+    const monthly = loc.monthlyCostTotal ?? 0;
+    return [
+      loc.name,
+      loc.country || 'N/A',
+      loc.currency || 'USD',
+      Math.round(loc.monthlyCosts?.rent?.typical || 0),
+      Math.round(loc.monthlyCosts?.groceries?.typical || 0),
+      Math.round(loc.monthlyCosts?.healthcare?.typical || 0),
+      Math.round(loc.monthlyCosts?.transportation?.typical || 0),
+      Math.round(loc.monthlyCosts?.entertainment?.typical || 0),
+      Math.round(loc.monthlyCosts?.utilities?.typical || 0),
+      Math.round(monthly),
+      Math.round(monthly * 12),
+      loc.lifestyle?.safetyRating ?? 'N/A',
+      loc.lifestyle?.internetSpeed ?? 'N/A',
+    ];
+  });
+  return toCsv(headers, rows);
+}
+
+/**
+ * CSV #2: Tax Comparison. Ports React's `handleExportTaxes` field-for-field,
+ * including its quirk of literally repeating Total Tax in the "Effective
+ * Rate" column (React never applied deductions/brackets there — just summed
+ * three flat rates) — preserved here rather than "fixed" so the port stays a
+ * faithful 1:1 translation rather than a silent behavior change.
+ *
+ * Field mapping: React's `stateIncomeTax.rate` and `socialCharges.rate` map
+ * onto this app's `stateIncomeTax.rate` (same shape) and flat
+ * `socialChargesRate` (this app models social charges as a top-level rate
+ * rather than a nested object).
+ */
+export function buildTaxComparisonCsv(locations: LocationFull[]): string {
+  const headers = ['Name', 'Country', 'Federal Tax', 'State Tax', 'Social Charges', 'Total Tax', 'Effective Rate'];
+  const rows = locations.map(loc => {
+    const taxes = loc.taxes ?? {};
+    const fedRate = taxes.federalIncomeTax?.brackets?.[0]?.rate ?? 0;
+    const stateRate = taxes.stateIncomeTax?.rate ?? 0;
+    const socialRate = taxes.socialChargesRate ?? 0;
+    const federal = round2(fedRate * 100);
+    const state = round2(stateRate * 100);
+    const social = round2(socialRate * 100);
+    const total = round2((fedRate + stateRate + socialRate) * 100);
+    return [loc.name, loc.country || 'N/A', `${federal}%`, `${state}%`, `${social}%`, `${total}%`, `${total}%`];
+  });
+  return toCsv(headers, rows);
+}
+
+/**
+ * CSV #3: Scenario Projection (35-year deterministic projection for one
+ * location). Ports React's `handleExportScenario` formula unchanged,
+ * including its hardcoded 7% nominal return / 3% inflation — React's own
+ * "Export Information" footer documented these as fixed assumptions
+ * independent of whatever the user had set on the Assumptions tab, so this
+ * keeps the same fixed-formula behavior rather than wiring in
+ * `financial.expectedReturn`/`expectedInflation` (that would be a behavior
+ * change, not a port).
+ *
+ * Scope deviation: React's `brochureLocation` came from a dropdown local to
+ * the export tab (`LocationSelect`). This screen doesn't have that picker,
+ * so the first currently-selected location from Locations → Overview is
+ * used instead — the caller is responsible for erroring out before calling
+ * this when nothing is selected.
+ *
+ * `baseCost` deviation: React used `getTypicalMonthly(loc, housingPrefs)`
+ * (adjusted for housing toggles not available here); this uses
+ * `monthlyCostTotal`, same substitution as the Location Costs CSV.
+ *
+ * Throws if the household has no primary member (age can't be computed) —
+ * React always had a birth year from its assumptions store; this app's
+ * household profile may not have one set up yet.
+ */
+export function buildScenarioProjectionCsv(
+  location: LocationFull,
+  household: HouseholdProfile | null,
+  financial: FinancialSettings | null,
+): string {
+  const primary = household?.members.find(m => m.role === 'primary') ?? null;
+  if (!primary) {
+    throw new Error('No primary household member found — set up the household on Assumptions first.');
+  }
+
+  const headers = ['Year', 'Age', 'Portfolio', 'Annual Spending', 'Net Return', 'Inflation'];
+  const currentYear = new Date().getFullYear();
+  const primaryAge = currentYear - primary.birthYear;
+  const baseCost = (location.monthlyCostTotal ?? 0) * 12;
+
+  const rows: (string | number)[][] = [];
+  let portfolio = Number(financial?.portfolioBalance) || 0;
+
+  for (let year = 0; year <= 35; year++) {
+    const projYear = currentYear + year;
+    const age = primaryAge + year;
+    const inflation = Math.pow(1.03, year);
+    const projectedSpending = baseCost * inflation;
+    const netReturn = portfolio * 0.07;
+    const newPortfolio = portfolio + netReturn - projectedSpending;
+
+    rows.push([
+      projYear,
+      age,
+      Math.round(newPortfolio),
+      Math.round(projectedSpending),
+      Math.round(netReturn),
+      Math.round(inflation * 100) / 100,
+    ]);
+
+    portfolio = newPortfolio;
+  }
+
+  return toCsv(headers, rows);
 }
 
 /** Assembles the full Markdown document. Pure function — no side effects,

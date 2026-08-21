@@ -28,6 +28,9 @@
     .generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .generate-btn:hover:not(:disabled) { filter: brightness(1.1); }
 
+    .csv-btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .csv-btn { flex: 1 1 200px; }
+
     .warn-block, .error-block, .ok-block {
       padding: 12px 14px; border-radius: 8px; font-size: 13px;
       line-height: var(--prose-line-height, 1.5);
