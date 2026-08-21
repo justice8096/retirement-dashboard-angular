@@ -14,6 +14,18 @@ WORKDIR /app
 # fails to reconcile the lock file. Dependency landed in PR #113 (Vitest +
 # Analog test infra); the Dockerfile didn't get the corresponding update.
 COPY package.json package-lock.json .npmrc ./
+
+# package.json depends on "@retirement/shared": "file:../retirement-api/shared"
+# (Monte Carlo engine consolidation, B4). WORKDIR is /app, so that relative
+# specifier resolves to /retirement-api/shared inside the build container —
+# populate it via a BuildKit additional build context named `shared-src`
+# before `npm ci` runs (npm needs the target to exist to create the link).
+# Compose supplies this context (see retirement-api/docker-compose.yml,
+# `dashboard` service, additional_contexts: { shared-src: ./shared }).
+# For a standalone `docker build` outside compose, pass it explicitly:
+#   docker build --build-context shared-src=../retirement-api/shared .
+COPY --from=shared-src . /retirement-api/shared
+
 RUN npm ci
 
 # ─── Stage 2: Angular production build ────────────────────────────────────
