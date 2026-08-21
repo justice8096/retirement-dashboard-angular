@@ -113,22 +113,25 @@
                     [ngModel]="member.ssFra ?? 67"
                     (ngModelChange)="patchMember(i, { ssFra: +$event || null })" />
                 </label>
-                <label class="field compact">
-                  <span class="field-label">SS Claim Age (years)</span>
-                  <input appNumeric="age" class="field-input" min="62" max="70"
-                    [ngModel]="member.ssClaimAge ?? 67"
-                    (ngModelChange)="patchMember(i, { ssClaimAge: +$event || null })" />
-                </label>
-                <label class="field compact">
-                  <span class="field-label">+ Months (0–11)</span>
-                  <input appNumeric="age" class="field-input" min="0" max="11"
-                    [ngModel]="member.ssClaimAgeMonths ?? 0"
-                    (ngModelChange)="patchMember(i, { ssClaimAgeMonths: clampMonths(+$event) })" />
+                <div class="field compact" role="group" aria-label="SS Claim Age">
+                  <span class="field-label">SS Claim Age</span>
+                  <div class="claim-age-pair">
+                    <input appNumeric="age" class="field-input" min="62" max="70"
+                      aria-label="Claim age, years"
+                      [ngModel]="member.ssClaimAge ?? 67"
+                      (ngModelChange)="patchMember(i, { ssClaimAge: +$event || null })" />
+                    <span class="claim-age-unit">yr</span>
+                    <input appNumeric="age" class="field-input" min="0" max="11"
+                      aria-label="Claim age, additional months (0 to 11)"
+                      [ngModel]="member.ssClaimAgeMonths ?? 0"
+                      (ngModelChange)="patchMember(i, { ssClaimAgeMonths: clampMonths(+$event) })" />
+                    <span class="claim-age-unit">mo</span>
+                  </div>
                   <span class="field-echo">
                     claims at {{ claimAgeLabel(member) }}
                     · {{ fmtMonthly(estimateBenefit(member)) }}/mo
                   </span>
-                </label>
+                </div>
               </div>
               <button class="remove-btn" (click)="removeMember(i)" aria-label="Remove">×</button>
             </div>

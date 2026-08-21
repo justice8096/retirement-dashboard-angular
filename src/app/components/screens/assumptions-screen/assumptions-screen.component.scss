@@ -22,6 +22,12 @@
     }
     .field-input:focus { border-color: var(--dark-amber); }
     .field-range { width: 100%; accent-color: var(--dark-amber); }
+    // Years + months inputs presented as one "SS Claim Age" unit.
+    .claim-age-pair {
+      display: flex; align-items: center; gap: 6px;
+      .field-input { width: 3.5em; min-width: 0; }
+    }
+    .claim-age-unit { font-size: 11px; color: var(--dark-text-muted); }
     .field-echo {
       font-size: 11px; color: var(--dark-text-muted);
       font-variant-numeric: tabular-nums;
