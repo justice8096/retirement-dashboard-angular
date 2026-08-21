@@ -250,11 +250,24 @@ export class LocationService {
     return PET_COST_CATEGORY_KEYS.reduce((sum, key) => sum + (costs[key]?.typical ?? 0), 0);
   }
 
-  /** Baseline monthly cost of a catalog location in today's USD (sum of monthlyCosts). */
-  locMonthlyCost(locId: string): number {
+  /**
+   * Baseline monthly cost of a catalog location in today's USD — the sum of
+   * monthlyCosts with exactly ONE healthcare figure counted:
+   * `healthcarePreMedicare` (ACA pricing) while the household is
+   * pre-Medicare, the Medicare-era `healthcare` category once everyone is
+   * 65+. Locations without a healthcarePreMedicare figure (most non-US)
+   * always use `healthcare`. Previously this summed BOTH healthcare
+   * variants plus the seed taxes category, which overstated the Location
+   * Schedule versus the Costs/Compare screens.
+   */
+  locMonthlyCost(locId: string, medicareHousehold = false): number {
     const l = this.fullLocations().find(x => x.id === locId);
     if (!l) return 0;
-    return Object.values(l.monthlyCosts ?? {}).reduce((s, c) => s + (c?.typical ?? 0), 0);
+    const costs = (l.monthlyCosts ?? {}) as Partial<Record<string, CostRange>>;
+    const hasPre = (costs['healthcarePreMedicare']?.typical ?? 0) > 0;
+    const excluded = (medicareHousehold || !hasPre) ? 'healthcarePreMedicare' : 'healthcare';
+    return Object.entries(costs)
+      .reduce((s, [key, c]) => (key === excluded ? s : s + (c?.typical ?? 0)), 0);
   }
 
   /** Weighted per-category inflation for a location (decimal, e.g. 0.025). */
@@ -271,8 +284,8 @@ export class LocationService {
    * baseline by the target location's own weighted inflation rate.
    * Deterministic preview; actual MC runs sample per year.
    */
-  locMonthlyCostAtYear(locId: string, year: number): number {
-    const today = this.locMonthlyCost(locId);
+  locMonthlyCostAtYear(locId: string, year: number, medicareHousehold = false): number {
+    const today = this.locMonthlyCost(locId, medicareHousehold);
     const rate = this.locInflationRate(locId);
     const factor = Math.pow(1 + rate, Math.max(0, year));
     return today * factor;
