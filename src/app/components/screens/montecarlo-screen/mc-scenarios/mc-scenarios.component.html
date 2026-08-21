@@ -492,6 +492,68 @@
 </div>
 
 
+<!-- Pets & dependents cost curves -->
+@if ((state.household()?.pets?.length ?? 0) > 0 || state.dependents().length > 0) {
+  <div class="card">
+    <h3 class="card-title">Pets &amp; Dependents</h3>
+    <p class="card-sub">
+      Model pet and dependent costs year by year instead of forever. Pet costs
+      follow each pet's age — higher in senior years, ending at the expected
+      lifespan — using each location's pet care, daycare, and grooming costs.
+      Dependent costs stop when a child reaches the age you choose; supported
+      adults are covered for the whole plan.
+    </p>
+
+    @if ((state.household()?.pets?.length ?? 0) > 0) {
+      <label class="param death-toggle">
+        <input type="checkbox"
+          [checked]="state.petCurveEnabled()"
+          (change)="state.petCurveEnabled.set(!state.petCurveEnabled())" />
+        <span>Model pet costs by age (replaces the flat pet cost line)</span>
+      </label>
+      @if (state.petCurveEnabled()) {
+        <label class="param death-toggle">
+          <input type="checkbox"
+            [checked]="state.replacePets()"
+            (change)="state.replacePets.set(!state.replacePets())" />
+          <span>Replace pets when they pass (costs continue at the base rate)</span>
+        </label>
+        <ul class="param-hint">
+          @for (p of petSummaries(); track p.label) {
+            <li>{{ p.label }}</li>
+          }
+        </ul>
+      }
+    }
+
+    @if (state.dependents().length > 0) {
+      <label class="param death-toggle">
+        <input type="checkbox"
+          [checked]="state.dependentCurveEnabled()"
+          (change)="state.dependentCurveEnabled.set(!state.dependentCurveEnabled())" />
+        <span>Model dependent costs until they leave the household</span>
+      </label>
+      @if (state.dependentCurveEnabled()) {
+        <div class="death-grid">
+          <label class="param">
+            <span class="param-label">Cost per Dependent ($/mo)</span>
+            <input appNumeric="currency" class="param-input" [class]="dyscalculia.numberSpacingClass()"
+              [ngModel]="state.dependentMonthlyCost()" (ngModelChange)="state.dependentMonthlyCost.set($event)" />
+            <span class="param-hint" [class]="dyscalculia.numberSpacingClass()">{{ fmt(state.dependentMonthlyCost() * 12, '/yr') }} per dependent</span>
+          </label>
+          <label class="param">
+            <span class="param-label">Support Children Until Age</span>
+            <input appNumeric="age" class="param-input" min="16" max="30"
+              [ngModel]="state.childSupportUntilAge()" (ngModelChange)="state.childSupportUntilAge.set(+$event)" />
+            <span class="param-hint">Adult dependents are supported for the whole plan.</span>
+          </label>
+        </div>
+      }
+    }
+  </div>
+}
+
+
 <!-- Spouse-death scenario (deterministic) -->
 @if (state.adults().length >= 1) {
   <div class="card death-card">
