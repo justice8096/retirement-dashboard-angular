@@ -580,6 +580,31 @@ export interface MonteCarloParams {
   medicareMonthlyByYear?: (number | undefined)[];
 
   /**
+   * Per-year household pet cost — annual USD in today's dollars, index =
+   * sim year. Sparse: missing / undefined / non-positive entries deduct
+   * nothing. Inflated by accumulated inflation (cumInfl) at deduction
+   * time — USD baseline with NO per-trial FX, same convention as
+   * ltcCostPerYearUSD and rental cash flows. Built by `buildPetCostByYear`
+   * (household-costs.ts) from household pets (birth year + expected
+   * lifespan) and the active location's petCare/petDaycare/petGrooming
+   * monthly costs.
+   *
+   * IMPORTANT: when supplying this, the caller must EXCLUDE the pet cost
+   * categories from segment baseCost — the curve replaces the flat
+   * inclusion (otherwise pets double-count). Absent → no code path
+   * executes (byte-identical legacy behavior).
+   */
+  petCostByYear?: number[];
+
+  /**
+   * Per-year dependent (children / adult dependents) cost — annual USD in
+   * today's dollars. Purely additive: the flat baseCost never included
+   * dependent-specific costs. Same sparse + cumInfl semantics as
+   * petCostByYear. Built by `buildDependentCostByYear`.
+   */
+  dependentCostByYear?: number[];
+
+  /**
    * Optional rental property portfolio (Todo #34, Stage 4b of #29).
    *
    * For each year in horizon the kernel pre-computes Schedule E aggregates
@@ -1440,6 +1465,16 @@ export function runMonteCarlo(p: MonteCarloParams): MonteCarloResult {
       if (mortgageMonthlyPayment > 0 && y < mortgageEndYear) {
         bal -= mortgageMonthlyPayment * 12;
       }
+
+      // Per-year pet / dependent cost curves — annual USD in today's
+      // dollars scaled by cumInfl. USD baseline, no per-trial FX (same
+      // convention as the LTC / rental lines). Sparse: missing or
+      // non-positive entries deduct nothing, so legacy callers (both
+      // fields absent) never enter this branch.
+      const householdExtraAnnual =
+        Math.max(0, p.petCostByYear?.[y] ?? 0) +
+        Math.max(0, p.dependentCostByYear?.[y] ?? 0);
+      if (householdExtraAnnual > 0) bal -= householdExtraAnnual * cumInfl;
 
       // Late-pass dispatch (#31 step 2a + priority 2) — handles event
       // kinds whose effect is a balance mutation AFTER the year's
