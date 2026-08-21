@@ -122,8 +122,6 @@ export class HeaderComponent {
   readonly auth = inject(AuthService);
 
   signOut(): void {
-    this.auth.signOut().catch((err: unknown) => {
-      console.error('Sign out failed', err);
-    });
+    this.auth.signOut();
   }
 }
