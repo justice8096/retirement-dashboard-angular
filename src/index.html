@@ -5,12 +5,12 @@
   <title>Retirement Planning Dashboard</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- CSP allows Clerk auth (script-src + frame-src + connect-src for *.clerk.accounts.dev
-       and *.clerk.com), tile imagery for the Locations Map, and OpenDyslexic at jsdelivr.
-       Same-origin /api/* is reverse-proxied by nginx, so the prior split-origin localhost
-       entries are no longer needed. frame-ancestors is ignored when delivered via <meta> —
-       enforce it as an HTTP header in nginx if iframing protection matters. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.openstreetmap.org https://*.basemaps.cartocdn.com https://img.clerk.com; connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://challenges.cloudflare.com; frame-src https://*.clerk.accounts.dev https://*.clerk.com https://*.clerk.dev https://challenges.cloudflare.com; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'">
+  <!-- CSP allows tile imagery for the Locations Map, OpenDyslexic at jsdelivr, and the
+       split-origin dev API (connect-src http://localhost:3000 — prod reverse-proxies
+       same-origin /api/* via nginx, so 'self' covers it there). Clerk entries removed
+       2026-08-21 with the switch to local auth. frame-ancestors is ignored when delivered
+       via <meta> — enforce it as an HTTP header in nginx if iframing protection matters. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://*.openstreetmap.org https://*.basemaps.cartocdn.com; connect-src 'self' http://localhost:3000; worker-src 'self' blob:; base-uri 'self'; form-action 'self'; object-src 'none'">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>

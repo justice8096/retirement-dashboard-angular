@@ -12,6 +12,8 @@ export interface HouseholdMember {
   ssPia: number | null;
   ssFra: number | null;
   ssClaimAge: number | null;
+  /** Months past ssClaimAge (0-11) — claim at 67y4m = ssClaimAge 67 + 4. */
+  ssClaimAgeMonths: number;
   sortOrder: number;
 }
 

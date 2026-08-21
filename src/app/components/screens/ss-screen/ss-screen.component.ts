@@ -5,6 +5,7 @@ import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HouseholdProfile, HouseholdMember } from '@models/api.model';
 import { calcSSBenefit, calcSpousalBenefit } from '@retirement/shared';
+import { formatClaimAge } from '@app/lib/social-security';
 
 const CLAIM_AGE_MIN = 62;
 const CLAIM_AGE_MAX = 70;
@@ -46,6 +47,10 @@ const CLAIM_AGE_MAX = 70;
               <div class="field">
                 <label class="field-label">FRA</label>
                 <div class="field-value">{{ member.ssFra ?? '—' }}</div>
+              </div>
+              <div class="field">
+                <label class="field-label">Claim Age</label>
+                <div class="field-value">{{ claimAgeLabel(member) }}</div>
               </div>
               <div class="field">
                 <label class="field-label">Birth Year</label>
@@ -304,6 +309,13 @@ export class SsScreenComponent implements OnInit {
     if (age === m.ssFra) return `Claim at age ${age}, your full retirement age`;
     if (age < (m.ssFra ?? 67)) return `Claim at age ${age}, before full retirement age`;
     return `Claim at age ${age}, after full retirement age`;
+  }
+
+  /** Plain-language display of the member's *persisted* claim age (years +
+   *  months, set on the Assumptions screen) — distinct from the slider's
+   *  local exploration state above. */
+  claimAgeLabel(m: HouseholdMember): string {
+    return formatClaimAge(m.ssClaimAge, m.ssClaimAgeMonths);
   }
 
   fmt(amount: number): string {

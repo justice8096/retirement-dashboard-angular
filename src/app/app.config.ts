@@ -5,7 +5,7 @@ import {
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { AuthService } from '@services/auth.service';
-import { clerkAuthInterceptor } from './interceptors/clerk-auth.interceptor';
+import { authInterceptor } from './interceptors/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -13,11 +13,11 @@ export const appConfig: ApplicationConfig = {
     provideAnimationsAsync(),
     provideHttpClient(
       withFetch(),
-      withInterceptors([clerkAuthInterceptor]),
+      withInterceptors([authInterceptor]),
     ),
-    // Boot Clerk before the first component renders. AuthService.init()
-    // resolves once the SDK has done its initial handshake — the app
-    // shell then renders either the sign-in screen or the dashboard.
+    // Restore any stored local-auth session before the first component
+    // renders — the app shell then shows either the sign-in form or the
+    // dashboard. Synchronous (localStorage read); no SDK handshake.
     provideAppInitializer(() => inject(AuthService).init()),
   ],
 };

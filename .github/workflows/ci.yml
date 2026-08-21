@@ -147,8 +147,15 @@ jobs:
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:
           # subject-path is resolved from $GITHUB_WORKSPACE, not the job's
-          # working-directory default — must be rda-relative.
-          subject-path: rda/dist/retirement-dashboard/**/*.{js,css,html,map}
+          # working-directory default — must be rda-relative. Also,
+          # actions/glob has no brace expansion — {js,css,html} silently
+          # matched nothing (the job failed on every main push since the
+          # Angular 22 upgrade moved output under browser/). One pattern
+          # per line instead.
+          subject-path: |
+            rda/dist/retirement-dashboard/**/*.js
+            rda/dist/retirement-dashboard/**/*.css
+            rda/dist/retirement-dashboard/**/*.html
 
   security-audit:
     runs-on: ubuntu-latest

@@ -73,6 +73,20 @@ export class McScenariosComponent {
   /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */
   protected todayYear(): number { return new Date().getFullYear(); }
 
+  /** True when EVERY adult has reached Medicare age (65) by sim year
+   *  `fromYear` — i.e., the youngest adult decides. Chooses which single
+   *  healthcare figure a Location Schedule row displays (ACA pricing while
+   *  anyone is under 65, Medicare pricing after). Falls back to ACA
+   *  pricing when no household birth years are configured, matching
+   *  HealthcareService's 2-adults-pre-Medicare fallback. */
+  protected rowMedicare(fromYear: number): boolean {
+    const adults = this.state.adults();
+    if (!adults.length) return false;
+    const startYear = this.state.household()?.planningStartYear ?? this.todayYear();
+    const youngestBirthYear = Math.max(...adults.map(a => a.birthYear));
+    return (startYear + fromYear) - youngestBirthYear >= 65;
+  }
+
   /** Plain-language per-pet summary for the Pets & Dependents card
    *  ("Luna (dog): costs modeled through 2034, senior rates from 2031"). */
   protected readonly petSummaries = computed(() => {

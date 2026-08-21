@@ -46,11 +46,15 @@
       </label>
       <div class="tl-cost-col">
         <span class="tl-cost" [class]="dyscalculia.numberSpacingClass()">
-          {{ fmt(loc.locMonthlyCost(move.locationId), '/mo') }}
+          {{ fmt(loc.locMonthlyCost(move.locationId, rowMedicare(move.fromYear)), '/mo') }}
+        </span>
+        <span class="tl-cost-proj">
+          {{ rowMedicare(move.fromYear) ? 'Medicare pricing' : 'ACA pricing' }}
+          — youngest adult {{ rowMedicare(move.fromYear) ? '65+' : 'under 65' }} at year {{ move.fromYear }}
         </span>
         <span class="tl-cost-proj" [class]="dyscalculia.numberSpacingClass()"
               title="Projected using this location's weighted per-category inflation ({{ (loc.locInflationRate(move.locationId) * 100).toFixed(1) }}%)">
-          {{ fmt(loc.locMonthlyCostAtYear(move.locationId, move.fromYear), '/mo') }} &#64; y{{ move.fromYear }}
+          {{ fmt(loc.locMonthlyCostAtYear(move.locationId, move.fromYear, rowMedicare(move.fromYear)), '/mo') }} &#64; y{{ move.fromYear }}
           ({{ (loc.locInflationRate(move.locationId) * 100).toFixed(1) }}%)
         </span>
       </div>

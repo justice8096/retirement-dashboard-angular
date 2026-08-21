@@ -138,7 +138,7 @@ export class AppComponent implements OnInit {
   readonly scrollProgress = signal(0);
 
   constructor() {
-    // React to auth state once Clerk has finished its initial handshake.
+    // React to auth state once the stored session has been restored.
     // Signed out → 'auth' phase (sign-in screen). Signed in → fall back to
     // the previous phase, or 'onboarding' on first sign-in. We never
     // override 'dashboard' downward to 'onboarding' on a signal flip.

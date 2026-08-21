@@ -8,6 +8,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { RentalIncomeService } from '@services/rental-income.service';
 import { aggregateRentalIncome } from '@retirement/shared/engine/rental-income.js';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
+import { estimateBenefitAtClaim } from '@app/lib/social-security';
 import {
   FinancialSettings, HouseholdProfile, HouseholdMember, LocationFull,
 } from '@models/api.model';
@@ -18,20 +19,6 @@ import {
 const CHART_W = 960;
 const CHART_H = 520;
 
-/** SS benefit at the chosen claim age — matches estimateBenefitAtClaim in
- *  montecarlo-screen and ss-screen so all three surfaces agree. */
-function estimateBenefitAtClaim(m: HouseholdMember): number {
-  const pia = Number(m.ssPia) || 0;
-  if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
-  const diff = m.ssClaimAge - m.ssFra;
-  if (diff === 0) return pia;
-  if (diff > 0) return Math.round(pia * (1 + diff * 0.08));
-  const yearsEarly = Math.abs(diff);
-  const reduction = yearsEarly <= 3
-    ? yearsEarly * 0.0667
-    : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
-  return Math.round(pia * (1 - reduction));
-}
 
 type NodeKind = 'income' | 'pool' | 'taxes' | 'afterTax' | 'expense' | 'surplus' | 'drawdown';
 

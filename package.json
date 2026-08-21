@@ -26,7 +26,6 @@
     "@angular/platform-browser": "^22.0.0",
     "@angular/platform-browser-dynamic": "^22.0.0",
     "@angular/router": "^22.0.0",
-    "@clerk/clerk-js": "^6.14.0",
     "@retirement/shared": "file:../retirement-api/shared",
     "d3-sankey": "^0.12.3",
     "leaflet": "^1.9.4",
@@ -51,6 +50,7 @@
     "vitest": "^4.1.8"
   },
   "overrides": {
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "oxc-parser": "0.142.0"
   }
 }
