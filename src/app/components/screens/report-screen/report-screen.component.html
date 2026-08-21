@@ -63,13 +63,14 @@
         <p class="header-sub" style="margin: 0 0 12px;">
           Spreadsheet-friendly data, for pivot tables and side-by-side comparisons rather than
           reading straight through. Location Costs and Tax Comparison cover every location in the
-          catalog; Scenario Projection needs at least one location selected below.
+          catalog; Scenario Projection uses the Selection above, so it needs at least one
+          location checked on Locations → Overview.
         </p>
         <div class="csv-btn-row">
           <button
             class="generate-btn csv-btn"
             [disabled]="csvLoading() !== null"
-            [attr.aria-label]="'Download location-costs.csv — cost breakdown for every location'"
+            aria-label="Download location-costs.csv — cost breakdown for every location"
             (click)="downloadLocationCostsCsv()"
           >
             @if (csvLoading() === 'locations') { Exporting… } @else { ⬇ location-costs.csv }
@@ -77,7 +78,7 @@
           <button
             class="generate-btn csv-btn"
             [disabled]="csvLoading() !== null"
-            [attr.aria-label]="'Download tax-comparison.csv — federal, state, and social tax rates by location'"
+            aria-label="Download tax-comparison.csv — federal, state, and social tax rates by location"
             (click)="downloadTaxComparisonCsv()"
           >
             @if (csvLoading() === 'taxes') { Exporting… } @else { ⬇ tax-comparison.csv }
@@ -85,7 +86,7 @@
           <button
             class="generate-btn csv-btn"
             [disabled]="csvLoading() !== null || selectedCount() === 0"
-            [attr.aria-label]="'Download scenario-projection.csv — 35-year portfolio projection for the selected location'"
+            aria-label="Download scenario-projection.csv — 35-year portfolio projection for the selected location"
             (click)="downloadScenarioProjectionCsv()"
           >
             @if (csvLoading() === 'scenario') { Exporting… } @else { ⬇ scenario-projection.csv }
