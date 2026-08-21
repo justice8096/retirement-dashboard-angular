@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, OnDestroy, inject, signal } from '@angular/core';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { HealthcareService } from '@services/healthcare.service';
@@ -6,9 +6,12 @@ import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { RentalIncomeService } from '@services/rental-income.service';
 import { LocationFull } from '@models/api.model';
 import { runMonteCarlo } from '@retirement/shared/engine/monte-carlo.js';
+import type { MonteCarloParams } from '@retirement/shared/engine/monte-carlo.js';
 import { aggregateRentalIncome } from '@retirement/shared/engine/rental-income.js';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
 import { buildPetCostByYear, buildDependentCostByYear } from '@retirement/shared/engine/household-costs.js';
+import { buildWorkerRequest } from '@app/lib/monte-carlo-worker-protocol';
+import type { MonteCarloWorkerResponse } from '@app/lib/monte-carlo-worker-protocol';
 
 /**
  * Orchestrates a Monte Carlo simulation run: assembles the kernel-ready
@@ -22,9 +25,17 @@ import { buildPetCostByYear, buildDependentCostByYear } from '@retirement/shared
  * Phase 2c of the god-component split (audit follow-up #1). Lifts the
  * runSimulation method off the parent component so the parent can be a
  * thin orchestrator that just bootstraps API loads.
+ *
+ * A4 parity port #2: the kernel now runs in a dedicated Web Worker
+ * (`workers/monte-carlo.worker.ts`) instead of synchronously inside a
+ * `setTimeout`, so a large `runs`/`years` configuration no longer
+ * freezes input, scrolling, and animation for the run's duration. The
+ * synchronous path is kept as a private fallback (`runSync`) for
+ * environments without `Worker` (SSR, jsdom-based unit tests) — same
+ * kernel call, same params-building code, just on the main thread.
  */
 @Injectable()
-export class MonteCarloRunnerService {
+export class MonteCarloRunnerService implements OnDestroy {
   private readonly state = inject(MonteCarloStateService);
   private readonly loc = inject(LocationService);
   private readonly taxSvc = inject(TaxService);
@@ -34,6 +45,17 @@ export class MonteCarloRunnerService {
   /** True while the kernel is executing. Templates bind to this for the
    *  Run-button label / disable state. */
   readonly running = signal(false);
+
+  /** The in-flight worker, if any. Cleared once its run settles (message
+   *  or error) or is superseded by a newer run(). */
+  private worker: Worker | null = null;
+
+  /** Monotonic id for the current run. Bumped on every run() call.
+   *  A worker/sync result is only applied if its captured token still
+   *  matches — the standard trick for making sure a stale result from a
+   *  superseded run can never clobber a newer one, now that a run can
+   *  outlive the synchronous call stack that started it. */
+  private runToken = 0;
 
   /** Kick off a simulation. Mutates state.results and state.simDirty when
    *  the kernel completes. No-op when fin or selectedLoc is missing. */
@@ -47,137 +69,232 @@ export class MonteCarloRunnerService {
     // should re-derive from the new location's category-weighted average).
     this.state.syncInflationFromLocation();
 
+    // A re-run while one is already in flight supersedes it: terminate the
+    // stale worker right away (frees the CPU instead of waiting out its
+    // full duration) and bump the token so even a message already in
+    // flight from the old worker gets ignored when it arrives.
+    this.terminateActiveWorker();
+    const token = ++this.runToken;
+
     this.running.set(true);
-    // Defer to next tick so the "Running..." label renders before the CPU loop.
+    // Defer to next tick so the "Running..." label renders before we
+    // build params and dispatch to the worker (or run synchronously).
     setTimeout(() => {
+      if (token !== this.runToken) return; // superseded before we even started
+
+      let params: MonteCarloParams;
       try {
-        const s = this.state;
-
-        // Self-consistent per-location MAGI (need incl. real healthcare + tax
-        // → draw → MAGI → subsidy). Computed for the sim's primary location so
-        // the simulation and the Compare table agree by construction — the
-        // kernel applies the same cliff formula to whatever magiAnnual we pass.
-        // See docs/ACA-MAGI-CONSISTENCY.md.
-        const planLoc = s.selectedLoc();
-        const steadyMagi = planLoc
-          ? this.healthcare.decideConsistent(planLoc).magiUsed
-          : this.healthcare.magi().magiForAca;
-        const transitionMagi = this.computeTransitionMagi(planLoc, steadyMagi);
-
-        // Pets & dependents cost curves — built before the params object so
-        // segment building (which excludes flat pet categories when the pet
-        // curve is on) and the kernel arrays stay consistent for this run.
-        const householdCurves = this.buildHouseholdCostCurves(s.years());
-
-        const result = runMonteCarlo({
-          portfolio: s.portfolio(),
-          monthlyIncome: s.ssMonthly() + s.monthlyIncome(),
-          baseCost: s.baseCost(),
-          isForeign: s.isForeign(),
-          fxDrift: s.fxDrift() / 100,
-          runs: s.runs(),
-          years: s.years(),
-          meanReturn: s.meanReturn() / 100,
-          volReturn: s.volatility() / 100,
-          meanInflation: s.meanInflation() / 100,
-          volInflation: s.inflVol() / 100,
-          currVol: s.currVol() / 100,
-          incGrowth: s.incGrowth() / 100,
-          returnMode: s.returnMode(),
-          historicalStartYear: s.historicalStartYear(),
-          moveSchedule: this.buildSchedule(),
-          oneTimeExpenses: s.oneTimeExpensesEnabled()
-            ? s.oneTimeExpenses().map(e => ({
-                year: e.year,
-                amountUSD: e.amountUSD,
-                label: e.label || undefined,
-                inflate: e.inflate,
-              }))
-            : undefined,
-          oneTimeIncomes: s.oneTimeIncomesEnabled()
-            ? s.oneTimeIncomes().map(e => ({
-                year: e.year,
-                amountUSD: e.amountUSD,
-                label: e.label || undefined,
-                inflate: e.inflate,
-              }))
-            : undefined,
-          // Inherited traditional IRA + property sales — both routed
-          // through the unified `lifeEvents` channel.
-          //   - inheritedIRA: SECURE Act 10-year drain (#31 priority 5)
-          //   - propertySale: Sec 1250 recapture + LTCG (Todo #35)
-          // `compileLifeEvents` passes them through to the kernel
-          // verbatim; per-kind dispatchers handle the math.
-          lifeEvents: this.buildLifeEvents(),
-          ltcSelfInsureEnabled: s.ltcMode() === 'self-insure' || s.ltcMode() === 'both',
-          ltcProbability: s.ltcProbability() / 100,
-          ltcCostPerYearUSD: s.ltcCostPerYearUSD(),
-          ltcDurationYears: s.ltcDurationYears(),
-          ltcStartAgeMin: s.ltcStartAgeMin(),
-          ltcStartAgeMax: s.ltcStartAgeMax(),
-          // Medicaid spend-down (Todo #21 Slice B) — gated on self-insure
-          // mode since the clamp only matters when there's a real LTC drain.
-          medicaidSpendDownEnabled: (s.ltcMode() === 'self-insure' || s.ltcMode() === 'both')
-            && s.medicaidSpendDownEnabled(),
-          medicaidAssetThresholdUSD: s.medicaidAssetThresholdUSD(),
-          ltcInsuranceMonthly: (s.ltcMode() === 'insurance' || s.ltcMode() === 'both')
-            ? s.ltcInsuranceMonthly() : 0,
-          ltcInsuranceStartAge: s.ltcInsuranceStartAge(),
-          fxShockYear: s.fxShockEnabled() ? s.fxShockYear() : undefined,
-          fxShockPct: s.fxShockEnabled() ? s.fxShockPct() / 100 : undefined,
-          adultBirthYears: s.adults().map(m => m.birthYear),
-          simStartYear: s.household()?.planningStartYear ?? new Date().getFullYear(),
-          magiAnnual: steadyMagi,
-          transitionMagiAnnual: transitionMagi,
-          subsidyRegime: this.healthcare.subsidyRegime(),
-          spouseDeathYear: s.spouseDeathEnabled() ? s.spouseDeathYear() : undefined,
-          survivorMonthlyIncome: s.spouseDeathEnabled() ? s.survivorMonthlyIncome() : undefined,
-          survivorCostRatio: s.spouseDeathEnabled() ? s.survivorCostRatio() / 100 : undefined,
-          survivorMonthlyIncomeTax: s.spouseDeathEnabled() ? s.survivorMonthlyIncomeTax() : undefined,
-          survivorMedicareMonthly: s.spouseDeathEnabled() ? s.survivorMonthlyMedicare() : undefined,
-          survivorBirthYear: s.spouseDeathEnabled() ? (s.survivorBirthYear() ?? undefined) : undefined,
-          survivorStepUpBenefitUSD: s.spouseDeathEnabled() ? s.survivorStepUpBenefitUSD() : undefined,
-          partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
-          partTimeEndYear: s.partTimeEndYear(),
-          // Rental Schedule E income (Todo #34, Stage 4b of #29). Pass-through
-          // to the kernel which pre-computes per-year cash + taxable arrays
-          // and applies them in the year loop. Empty array (no properties
-          // configured) is byte-identical to a legacy run.
-          rentalProperties: this.rental.properties(),
-          // Filing status for LTCG bracket lookup on propertySale events
-          // (Todo #35). Two-adult households → MFJ; single-adult → single.
-          propertySaleFilingStatus: s.adults().length >= 2 ? 'mfj' : 'single',
-          // Primary-residence mortgage (Todo #28). Read directly from
-          // FinancialSettings — no separate state signal needed since
-          // these are simple scalars (unlike the rental array). Both
-          // 0 = no mortgage, dormant kernel path.
-          mortgageMonthlyPayment: Number(f.mortgageMonthlyPayment) || 0,
-          mortgageEndYear: Number(f.mortgageEndYear) || 0,
-          inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
-          medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
-          // Per-year pet / dependent cost curves (annual USD, today's $).
-          // The pet curve replaces the flat pet categories excluded from
-          // each segment's nonHealthcareBase above.
-          petCostByYear: householdCurves.petCostByYear,
-          dependentCostByYear: householdCurves.dependentCostByYear,
-          survivorRelocate: this.buildSurvivorRelocate(),
-          regime: {
-            bullMean: s.regimeBullMean() / 100,
-            bullVol: s.regimeBullVol() / 100,
-            bearMean: s.regimeBearMean() / 100,
-            bearVol: s.regimeBearVol() / 100,
-            pBullToBear: s.regimeBullToBear() / 100,
-            pBearToBull: s.regimeBearToBull() / 100,
-          },
-        });
-        s.results.set(result);
-        s.simDirty.set(false);
-        // McResultsComponent watches state.results() and resets its
-        // calm-mode reveal step (F-006) via an effect.
-      } finally {
+        params = this.buildParams(f);
+      } catch (err) {
         this.running.set(false);
+        throw err;
       }
+
+      if (typeof Worker === 'undefined') {
+        // SSR / test environments (jsdom has no Worker global) — run the
+        // exact same kernel call synchronously on the main thread, same
+        // as this service did before the worker port.
+        this.runSync(params, token);
+        return;
+      }
+      this.runInWorker(params, token);
     }, 30);
+  }
+
+  /** Component-scoped service — terminate any in-flight worker when the
+   *  screen is torn down rather than leaving it to finish unobserved. */
+  ngOnDestroy(): void {
+    this.terminateActiveWorker();
+  }
+
+  private terminateActiveWorker(): void {
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+  }
+
+  /** Synchronous fallback — same kernel call the worker makes, on the
+   *  main thread. Kept private so both paths are exercised by whichever
+   *  environment (tests exercise this one; browsers exercise the worker). */
+  private runSync(params: MonteCarloParams, token: number): void {
+    try {
+      const result = runMonteCarlo(params);
+      if (token !== this.runToken) return; // superseded while running
+      this.state.results.set(result);
+      this.state.simDirty.set(false);
+    } finally {
+      if (token === this.runToken) this.running.set(false);
+    }
+  }
+
+  private runInWorker(params: MonteCarloParams, token: number): void {
+    const worker = new Worker(new URL('../workers/monte-carlo.worker', import.meta.url), { type: 'module' });
+    this.worker = worker;
+
+    const settle = (): void => {
+      if (this.worker === worker) this.worker = null;
+      worker.terminate();
+    };
+
+    worker.onmessage = (e: MessageEvent<MonteCarloWorkerResponse>) => {
+      settle();
+      if (token !== this.runToken) return; // stale — a newer run() superseded this one
+      if ('error' in e.data && e.data.error != null) {
+        // No dedicated error signal exists in this service today — the
+        // pre-worker code let a thrown error propagate as an uncaught
+        // exception (console-logged, `running` still reset via
+        // `finally`). Mirror that: log it, reset `running`, leave
+        // `state.results` untouched (matches "only set on success").
+        console.error('Monte Carlo worker error:', e.data.error);
+      } else if (e.data.result) {
+        this.state.results.set(e.data.result);
+        this.state.simDirty.set(false);
+      }
+      this.running.set(false);
+    };
+
+    worker.onerror = (err: ErrorEvent) => {
+      settle();
+      if (token !== this.runToken) return;
+      console.error('Monte Carlo worker error:', err.message || err);
+      this.running.set(false);
+    };
+
+    worker.postMessage(buildWorkerRequest(params));
+  }
+
+  /** Assembles the kernel-ready params object from current state. Shared
+   *  by both the worker path (posted via buildWorkerRequest) and the
+   *  synchronous fallback — the exact same object either runs in-process
+   *  or crosses the worker boundary.
+   *
+   *  `f` is the FinancialSettings snapshot `run()` captured (and null-
+   *  checked) before scheduling this call — same closure-capture timing
+   *  as the pre-worker code, not re-read from state here. */
+  private buildParams(f: NonNullable<ReturnType<MonteCarloStateService['fin']>>): MonteCarloParams {
+    const s = this.state;
+
+    // Self-consistent per-location MAGI (need incl. real healthcare + tax
+    // → draw → MAGI → subsidy). Computed for the sim's primary location so
+    // the simulation and the Compare table agree by construction — the
+    // kernel applies the same cliff formula to whatever magiAnnual we pass.
+    // See docs/ACA-MAGI-CONSISTENCY.md.
+    const planLoc = s.selectedLoc();
+    const steadyMagi = planLoc
+      ? this.healthcare.decideConsistent(planLoc).magiUsed
+      : this.healthcare.magi().magiForAca;
+    const transitionMagi = this.computeTransitionMagi(planLoc, steadyMagi);
+
+    // Pets & dependents cost curves — built before the params object so
+    // segment building (which excludes flat pet categories when the pet
+    // curve is on) and the kernel arrays stay consistent for this run.
+    const householdCurves = this.buildHouseholdCostCurves(s.years());
+
+    return {
+      portfolio: s.portfolio(),
+      monthlyIncome: s.ssMonthly() + s.monthlyIncome(),
+      baseCost: s.baseCost(),
+      isForeign: s.isForeign(),
+      fxDrift: s.fxDrift() / 100,
+      runs: s.runs(),
+      years: s.years(),
+      meanReturn: s.meanReturn() / 100,
+      volReturn: s.volatility() / 100,
+      meanInflation: s.meanInflation() / 100,
+      volInflation: s.inflVol() / 100,
+      currVol: s.currVol() / 100,
+      incGrowth: s.incGrowth() / 100,
+      returnMode: s.returnMode(),
+      historicalStartYear: s.historicalStartYear(),
+      moveSchedule: this.buildSchedule(),
+      oneTimeExpenses: s.oneTimeExpensesEnabled()
+        ? s.oneTimeExpenses().map(e => ({
+            year: e.year,
+            amountUSD: e.amountUSD,
+            label: e.label || undefined,
+            inflate: e.inflate,
+          }))
+        : undefined,
+      oneTimeIncomes: s.oneTimeIncomesEnabled()
+        ? s.oneTimeIncomes().map(e => ({
+            year: e.year,
+            amountUSD: e.amountUSD,
+            label: e.label || undefined,
+            inflate: e.inflate,
+          }))
+        : undefined,
+      // Inherited traditional IRA + property sales — both routed
+      // through the unified `lifeEvents` channel.
+      //   - inheritedIRA: SECURE Act 10-year drain (#31 priority 5)
+      //   - propertySale: Sec 1250 recapture + LTCG (Todo #35)
+      // `compileLifeEvents` passes them through to the kernel
+      // verbatim; per-kind dispatchers handle the math.
+      lifeEvents: this.buildLifeEvents(),
+      ltcSelfInsureEnabled: s.ltcMode() === 'self-insure' || s.ltcMode() === 'both',
+      ltcProbability: s.ltcProbability() / 100,
+      ltcCostPerYearUSD: s.ltcCostPerYearUSD(),
+      ltcDurationYears: s.ltcDurationYears(),
+      ltcStartAgeMin: s.ltcStartAgeMin(),
+      ltcStartAgeMax: s.ltcStartAgeMax(),
+      // Medicaid spend-down (Todo #21 Slice B) — gated on self-insure
+      // mode since the clamp only matters when there's a real LTC drain.
+      medicaidSpendDownEnabled: (s.ltcMode() === 'self-insure' || s.ltcMode() === 'both')
+        && s.medicaidSpendDownEnabled(),
+      medicaidAssetThresholdUSD: s.medicaidAssetThresholdUSD(),
+      ltcInsuranceMonthly: (s.ltcMode() === 'insurance' || s.ltcMode() === 'both')
+        ? s.ltcInsuranceMonthly() : 0,
+      ltcInsuranceStartAge: s.ltcInsuranceStartAge(),
+      fxShockYear: s.fxShockEnabled() ? s.fxShockYear() : undefined,
+      fxShockPct: s.fxShockEnabled() ? s.fxShockPct() / 100 : undefined,
+      adultBirthYears: s.adults().map(m => m.birthYear),
+      simStartYear: s.household()?.planningStartYear ?? new Date().getFullYear(),
+      magiAnnual: steadyMagi,
+      transitionMagiAnnual: transitionMagi,
+      subsidyRegime: this.healthcare.subsidyRegime(),
+      spouseDeathYear: s.spouseDeathEnabled() ? s.spouseDeathYear() : undefined,
+      survivorMonthlyIncome: s.spouseDeathEnabled() ? s.survivorMonthlyIncome() : undefined,
+      survivorCostRatio: s.spouseDeathEnabled() ? s.survivorCostRatio() / 100 : undefined,
+      survivorMonthlyIncomeTax: s.spouseDeathEnabled() ? s.survivorMonthlyIncomeTax() : undefined,
+      survivorMedicareMonthly: s.spouseDeathEnabled() ? s.survivorMonthlyMedicare() : undefined,
+      survivorBirthYear: s.spouseDeathEnabled() ? (s.survivorBirthYear() ?? undefined) : undefined,
+      survivorStepUpBenefitUSD: s.spouseDeathEnabled() ? s.survivorStepUpBenefitUSD() : undefined,
+      partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
+      partTimeEndYear: s.partTimeEndYear(),
+      // Rental Schedule E income (Todo #34, Stage 4b of #29). Pass-through
+      // to the kernel which pre-computes per-year cash + taxable arrays
+      // and applies them in the year loop. Empty array (no properties
+      // configured) is byte-identical to a legacy run.
+      rentalProperties: this.rental.properties(),
+      // Filing status for LTCG bracket lookup on propertySale events
+      // (Todo #35). Two-adult households → MFJ; single-adult → single.
+      propertySaleFilingStatus: s.adults().length >= 2 ? 'mfj' : 'single',
+      // Primary-residence mortgage (Todo #28). Read directly from
+      // FinancialSettings — no separate state signal needed since
+      // these are simple scalars (unlike the rental array). Both
+      // 0 = no mortgage, dormant kernel path.
+      mortgageMonthlyPayment: Number(f.mortgageMonthlyPayment) || 0,
+      mortgageEndYear: Number(f.mortgageEndYear) || 0,
+      inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
+      medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
+      // Per-year pet / dependent cost curves (annual USD, today's $).
+      // The pet curve replaces the flat pet categories excluded from
+      // each segment's nonHealthcareBase above.
+      petCostByYear: householdCurves.petCostByYear,
+      dependentCostByYear: householdCurves.dependentCostByYear,
+      survivorRelocate: this.buildSurvivorRelocate(),
+      regime: {
+        bullMean: s.regimeBullMean() / 100,
+        bullVol: s.regimeBullVol() / 100,
+        bearMean: s.regimeBearMean() / 100,
+        bearVol: s.regimeBearVol() / 100,
+        pBullToBear: s.regimeBullToBear() / 100,
+        pBearToBull: s.regimeBearToBull() / 100,
+      },
+    };
+    // McResultsComponent watches state.results() and resets its calm-mode
+    // reveal step (F-006) via an effect once state.results is set by
+    // whichever path (worker or sync fallback) completes the run.
   }
 
   /**
