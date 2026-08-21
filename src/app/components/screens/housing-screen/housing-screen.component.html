@@ -1,0 +1,59 @@
+<div class="housing-screen">
+  <div class="card">
+    <h3 class="section-title">Adjust Rent</h3>
+    <p class="section-sub">
+      Override a location's rent budget to see how it changes your Monte Carlo
+      results, location comparisons, and reports.
+    </p>
+
+    @if (loc.overridesError(); as err) {
+      <div class="status-msg error">{{ err }}</div>
+    }
+
+    @if (!rows().length) {
+      <p class="hint">
+        Select cities on the
+        <button class="link-btn" (click)="goToOverview()">Overview</button>
+        tab to adjust their rent here.
+      </p>
+    } @else {
+      <div class="rent-rows">
+        @for (row of rows(); track row.id) {
+          <div class="rent-row" [class.is-override]="row.isOverridden">
+            <div class="rent-row-name">
+              {{ row.name }}
+              @if (row.isOverridden) {
+                <span class="override-badge">Custom</span>
+              }
+            </div>
+            <div class="rent-row-controls">
+              <span class="dollar-sign">$</span>
+              <input type="number" appNumeric="currency" class="rent-input"
+                [attr.aria-label]="row.name + ' rent override'"
+                [ngModel]="row.value"
+                (ngModelChange)="updateRent(row.id, $event)" />
+              <span class="per-mo">/mo</span>
+              @if (row.isOverridden) {
+                <button mat-stroked-button class="clear-btn" (click)="clearRent(row.id)">
+                  Reset to default ({{ fmt(row.defaultValue) }})
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="controls-row">
+        @if (loc.overridesSaving()) {
+          <span class="save-status">Saving…</span>
+        } @else if (loc.overridesDirty()) {
+          <span class="save-status pending">Unsaved changes — saving shortly</span>
+        } @else if (loc.overridesLoaded()) {
+          <span class="save-status saved">All changes saved</span>
+        }
+      </div>
+    }
+  </div>
+
+  <app-cost-detail costKey="rent" />
+</div>

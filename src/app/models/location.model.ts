@@ -133,6 +133,24 @@ export interface LocationFull {
 
 export type SupplementType = 'neighborhoods' | 'services' | 'inclusion' | 'detailed-costs' | 'local-info';
 
+/**
+ * One row from `GET /api/me/locations/overrides` — a persisted per-user
+ * override of a base location's fields (A4 parity port #5, editable rent).
+ * Mirrors the retired React `useAppStore.baseLocationOverrides` + the
+ * `UserLocationOverride` Prisma model (`retirement-api/prisma/schema.prisma`).
+ * `overrides` is stored as arbitrary JSON server-side; the housing screen
+ * only ever writes/reads the `monthlyCosts.rent.typical` shape.
+ */
+export interface LocationOverrideRow {
+  id: string;
+  userId: string;
+  baseLocationId: string;
+  baseLocationVersion: number;
+  overrides: { monthlyCosts?: { rent?: Partial<CostRange> } } & Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /* ─── Cost category metadata ─────────────────────────────────────── */
 export interface CostCategoryMeta {
   key: string;

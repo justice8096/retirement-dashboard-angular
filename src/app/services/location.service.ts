@@ -1,11 +1,18 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { of } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import {
   LocationSummary, LocationFull, LocationQuery, MonthlyCosts, CostRange, COST_CATEGORIES, DetailedCosts,
-  NeighborhoodsSupplement, Neighborhood, SupplementType,
+  NeighborhoodsSupplement, Neighborhood, SupplementType, LocationOverrideRow,
 } from '@models/api.model';
 import { weightedInflationFromLocation } from '@retirement/shared/engine/monte-carlo.js';
 import { PET_COST_CATEGORY_KEYS } from '@retirement/shared/engine/household-costs.js';
+
+/** Debounced save delay for a rent-override edit, in ms — matches the
+ *  retired React `useApiSync`'s `SAVE_DEBOUNCE_MS` (2s) for the same
+ *  `baseLocationOverrides` writes. */
+const OVERRIDE_SAVE_DEBOUNCE_MS = 2000;
 
 export type SortField = 'name' | 'monthlyCostTotal' | 'country';
 export type SortDir = 'asc' | 'desc';
@@ -16,11 +23,33 @@ export class LocationService {
 
   /* ─── State ─────────────────────────────────────────────────────── */
   readonly locations = signal<LocationSummary[]>([]);
-  readonly fullLocations = signal<LocationFull[]>([]);
-  readonly selectedLocation = signal<LocationFull | null>(null);
+  /** Raw catalog data as served by the API — never patched with overrides.
+   *  Read `fullLocations()` below for the override-aware version; this stays
+   *  private so nothing accidentally bypasses the patch. */
+  private readonly rawFullLocations = signal<LocationFull[]>([]);
+  private readonly rawSelectedLocation = signal<LocationFull | null>(null);
   readonly selectedIds = signal<Set<string>>(new Set());
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+
+  /* ─── Rent overrides (A4 parity port #5) ───────────────────────────
+   * Per-location rent override, keyed by location id, in the same USD
+   * "today" units as `monthlyCosts.rent.typical`. Mirrors the retired
+   * React `useAppStore.setBaseOverride` mechanism: patching the canonical
+   * location object itself (see `fullLocations` below) so every existing
+   * downstream reader — MonteCarloStateService.baseCost, location-compare,
+   * report-screen, cost-detail's comparison chart — sees the override with
+   * zero extra wiring, exactly as the single Zustand store did in React. */
+  readonly rentOverrides = signal<Record<string, number>>({});
+  readonly overridesLoaded = signal(false);
+  readonly overridesSaving = signal(false);
+  readonly overridesDirty = signal(false);
+  readonly overridesError = signal<string | null>(null);
+  private readonly overrideSaveTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+  /** Count of in-flight override PUT/DELETE requests — lets `overridesDirty`
+   *  / `overridesSaving` stay accurate when multiple locations are edited
+   *  within the same debounce window (each location debounces independently). */
+  private overrideSavesInFlight = 0;
 
   /* Filters */
   readonly searchTerm = signal('');
@@ -112,6 +141,45 @@ export class LocationService {
     const ids = this.selectedIds();
     return this.locations().filter(l => ids.has(l.id));
   });
+
+  /**
+   * Every full location the API has served, patched with any active rent
+   * override. This is THE single choke point every cost screen, the
+   * comparison chart, and MonteCarloStateService.baseCost read through —
+   * patching here means an override propagates everywhere the catalog
+   * value used to appear, without touching those consumers.
+   */
+  readonly fullLocations = computed<LocationFull[]>(() => {
+    const overrides = this.rentOverrides();
+    const raw = this.rawFullLocations();
+    if (!Object.keys(overrides).length) return raw;
+    return raw.map(l => this.withRentOverride(l, overrides[l.id]));
+  });
+
+  /** Single-location detail fetch (`selectLocation`), also override-aware
+   *  so a location-detail view stays consistent with every other screen. */
+  readonly selectedLocation = computed<LocationFull | null>(() => {
+    const l = this.rawSelectedLocation();
+    if (!l) return null;
+    return this.withRentOverride(l, this.rentOverrides()[l.id]);
+  });
+
+  /** Returns `loc` unchanged when there's no override for it; otherwise a
+   *  shallow copy with `monthlyCosts.rent.typical` replaced — every other
+   *  rent field (min/max/annualInflation/sources) is preserved from the
+   *  catalog, matching the retired React `setBaseOverride` call in
+   *  `HousingTab.saveEdit`. */
+  private withRentOverride(loc: LocationFull, overrideTypical: number | undefined): LocationFull {
+    if (overrideTypical == null) return loc;
+    const rent = loc.monthlyCosts?.rent;
+    return {
+      ...loc,
+      monthlyCosts: {
+        ...loc.monthlyCosts,
+        rent: { ...(rent ?? { min: 0, max: 0, typical: 0 }), typical: overrideTypical },
+      },
+    };
+  }
 
   /**
    * Full-detail locations filtered by Overview selection. When no selection is
@@ -250,6 +318,12 @@ export class LocationService {
     return PET_COST_CATEGORY_KEYS.reduce((sum, key) => sum + (costs[key]?.typical ?? 0), 0);
   }
 
+  /** A location's catalog (un-overridden) typical rent — used by the
+   *  housing screen to show what "Reset to default" reverts to. */
+  catalogRent(locId: string): number {
+    return this.rawFullLocations().find(l => l.id === locId)?.monthlyCosts?.rent?.typical ?? 0;
+  }
+
   /** Baseline monthly cost of a catalog location in today's USD (sum of monthlyCosts). */
   locMonthlyCost(locId: string): number {
     const l = this.fullLocations().find(x => x.id === locId);
@@ -297,9 +371,9 @@ export class LocationService {
   }
 
   loadFull(): void {
-    if (this.fullLocations().length) return;
+    if (this.rawFullLocations().length) return;
     this.api.getLocations({ fields: 'full', limit: 200 }).subscribe({
-      next: (res) => this.fullLocations.set(res.data as LocationFull[]),
+      next: (res) => this.rawFullLocations.set(res.data as LocationFull[]),
       error: (err) => console.warn('LocationService: full locations fetch failed.', err),
     });
   }
@@ -324,7 +398,7 @@ export class LocationService {
     this.loading.set(true);
     this.api.getLocation(id).subscribe({
       next: (loc) => {
-        this.selectedLocation.set(loc);
+        this.rawSelectedLocation.set(loc);
         this.loading.set(false);
       },
       error: (err) => {
@@ -335,7 +409,128 @@ export class LocationService {
   }
 
   clearSelection(): void {
-    this.selectedLocation.set(null);
+    this.rawSelectedLocation.set(null);
+  }
+
+  /* ─── Rent override actions (A4 parity port #5) ────────────────── */
+
+  /** One-shot fetch of this user's persisted rent overrides. Idempotent —
+   *  safe to call from every housing-screen visit's `ngOnInit`. For an
+   *  anonymous user the API 401s; that's treated the same as "no overrides
+   *  yet" and edits stay session-only, matching `GroceriesService.load`'s
+   *  graceful-degradation pattern. */
+  loadRentOverrides(): void {
+    if (this.overridesLoaded()) return;
+    this.api.getLocationOverrides().pipe(
+      tap((rows: LocationOverrideRow[]) => {
+        const map: Record<string, number> = {};
+        for (const row of rows) {
+          const typical = row.overrides?.monthlyCosts?.rent?.typical;
+          if (typeof typical === 'number' && typical >= 0) map[row.baseLocationId] = typical;
+        }
+        this.rentOverrides.set(map);
+        this.overridesLoaded.set(true);
+      }),
+      catchError((err) => {
+        console.warn('LocationService: rent overrides fetch failed; using session-only overrides.', err);
+        this.overridesLoaded.set(true);
+        return of(null);
+      }),
+    ).subscribe();
+  }
+
+  /** Sets (or replaces) the rent override for one location and schedules a
+   *  debounced server save. The override is visible everywhere immediately
+   *  (it's a signal update); only the persistence round-trip is deferred. */
+  setRentOverride(locId: string, typicalRent: number): void {
+    this.rentOverrides.update(m => ({ ...m, [locId]: typicalRent }));
+    this.scheduleOverrideSave(locId);
+  }
+
+  /** Clears a location's rent override — reverts every downstream reader
+   *  to the catalog default immediately, and deletes the persisted row
+   *  (mirrors React's UX, which had no explicit reset button, plus the
+   *  app's `GroceriesService.resetDefaults` convention of an explicit
+   *  clear-to-default affordance). */
+  clearRentOverride(locId: string): void {
+    if (!(locId in this.rentOverrides())) return;
+    this.rentOverrides.update(m => {
+      const next = { ...m };
+      delete next[locId];
+      return next;
+    });
+    if (this.overrideSaveTimers[locId]) {
+      clearTimeout(this.overrideSaveTimers[locId]);
+      delete this.overrideSaveTimers[locId];
+    }
+    this.overridesDirty.set(true);
+    this.beginOverrideSave();
+    this.api.deleteLocationOverride(locId).pipe(
+      tap(() => this.endOverrideSave()),
+      catchError((err) => {
+        console.warn(`LocationService: failed to clear rent override for ${locId}.`, err);
+        this.overridesError.set('Failed to clear the rent override on the server. It is cleared locally for this session.');
+        this.endOverrideSave();
+        return of(null);
+      }),
+    ).subscribe();
+  }
+
+  /** Flushes any pending debounced override saves immediately. Call from a
+   *  screen's `ngOnDestroy` so quick navigation never drops the last few
+   *  seconds of edits (mirrors `GroceriesService.flush`). */
+  flushRentOverrides(): void {
+    for (const locId of Object.keys(this.overrideSaveTimers)) {
+      clearTimeout(this.overrideSaveTimers[locId]);
+      delete this.overrideSaveTimers[locId];
+      this.saveRentOverrideNow(locId);
+    }
+  }
+
+  private scheduleOverrideSave(locId: string): void {
+    this.overridesDirty.set(true);
+    if (this.overrideSaveTimers[locId]) clearTimeout(this.overrideSaveTimers[locId]);
+    this.overrideSaveTimers[locId] = setTimeout(() => {
+      delete this.overrideSaveTimers[locId];
+      this.saveRentOverrideNow(locId);
+    }, OVERRIDE_SAVE_DEBOUNCE_MS);
+  }
+
+  private saveRentOverrideNow(locId: string): void {
+    const typical = this.rentOverrides()[locId];
+    if (typical == null) return;
+    this.beginOverrideSave();
+    const rent = this.rawFullLocations().find(l => l.id === locId)?.monthlyCosts?.rent;
+    this.api.saveLocationOverride(locId, {
+      monthlyCosts: { rent: { ...(rent ?? { min: 0, max: 0, typical: 0 }), typical } },
+    }).pipe(
+      tap(() => this.endOverrideSave()),
+      catchError((err) => {
+        console.warn(`LocationService: failed to save rent override for ${locId}.`, err);
+        this.overridesError.set('Failed to save your rent override to the server. It is kept for this session only — try again shortly.');
+        this.endOverrideSave();
+        return of(null);
+      }),
+    ).subscribe();
+  }
+
+  /** Marks a save in flight — `overridesSaving` stays true while at least
+   *  one location's PUT/DELETE is outstanding. */
+  private beginOverrideSave(): void {
+    this.overrideSavesInFlight++;
+    this.overridesSaving.set(true);
+  }
+
+  /** Un-marks one in-flight save. `overridesDirty`/`overridesSaving` only
+   *  drop back to false once every debounce timer AND every in-flight
+   *  request has settled — accurate even when several locations are edited
+   *  within the same debounce window. */
+  private endOverrideSave(): void {
+    this.overrideSavesInFlight = Math.max(0, this.overrideSavesInFlight - 1);
+    this.overridesSaving.set(this.overrideSavesInFlight > 0);
+    if (this.overrideSavesInFlight === 0 && Object.keys(this.overrideSaveTimers).length === 0) {
+      this.overridesDirty.set(false);
+    }
   }
 
   toggleLocation(id: string): void {

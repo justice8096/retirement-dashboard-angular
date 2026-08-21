@@ -21,6 +21,7 @@ import {
   ContributionProgress,
   BrokerageFees,
   GroceryData,
+  LocationOverrideRow,
 } from '@models/api.model';
 
 @Injectable({ providedIn: 'root' })
@@ -149,6 +150,29 @@ export class ApiService {
    *  are present in `data`; the route's schema treats both as optional). */
   saveGroceries(data: Partial<GroceryData>): Observable<GroceryData> {
     return this.http.put<GroceryData>(`${this.base}/me/groceries`, data);
+  }
+
+  /* ─── Location Overrides ────────────────────────────────────────── */
+
+  /** GET /me/locations/overrides — every persisted override row for the
+   *  signed-in user (A4 parity port #5, editable rent). Empty array for a
+   *  user with none. See retirement-api `src/routes/custom-locations.ts`. */
+  getLocationOverrides(): Observable<LocationOverrideRow[]> {
+    return this.http.get<LocationOverrideRow[]>(`${this.base}/me/locations/overrides`);
+  }
+
+  /** PUT /me/locations/overrides — upserts the override for one base
+   *  location. `overrides` is merged wholesale server-side; callers pass
+   *  the full partial-location shape they want stored (here always
+   *  `{ monthlyCosts: { rent: {...} } }`), matching the retired React
+   *  `api.overrides.save` / `setBaseOverride` contract exactly. */
+  saveLocationOverride(baseLocationId: string, overrides: Record<string, unknown>): Observable<LocationOverrideRow> {
+    return this.http.put<LocationOverrideRow>(`${this.base}/me/locations/overrides`, { baseLocationId, overrides });
+  }
+
+  /** DELETE /me/locations/overrides/:baseLocationId — clears a persisted override. */
+  deleteLocationOverride(baseLocationId: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.base}/me/locations/overrides/${baseLocationId}`);
   }
 
   /* ─── Scenarios ─────────────────────────────────────────────────── */
