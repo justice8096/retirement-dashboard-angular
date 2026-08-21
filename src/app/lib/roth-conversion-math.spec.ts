@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FED_BRACKETS_2026_SINGLE } from '@retirement/shared/engine/tax-sources.js';
+import { FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026 } from '@retirement/shared/engine/tax-sources.js';
 import { conversionBracketBreakdown, buildDepletionSchedule } from './roth-conversion-math';
 
 /**
@@ -60,6 +60,36 @@ describe('conversionBracketBreakdown', () => {
       { min: 0, max: 12_400, rate: 0.10, amount: 5_000, tax: 500 },
     ]);
     expect(result.totalTax).toBe(500);
+  });
+
+  it('nets a leftover standard deduction against the conversion itself, not just against other income (regression)', () => {
+    // Flagship early-retiree bridge scenario: no other income yet, converting
+    // in a low/no-income year. otherIncome=0 is well below the $16,100 single
+    // deduction, so `baseline` clamps to 0 — but the LEFTOVER deduction
+    // ($16,100) must still offset the conversion, leaving only $3,900
+    // actually taxable (all inside the first 10% bracket).
+    const result = conversionBracketBreakdown(0, 20_000, FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026.single);
+
+    expect(result.chunks).toEqual([
+      { min: 0, max: 12_400, rate: 0.10, amount: 3_900, tax: 390 },
+    ]);
+    expect(result.totalTax).toBe(390);
+    expect(result.marginalRate).toBe(0.10);
+  });
+
+  it('nets a partially-used standard deduction against the conversion when other income is below it (regression)', () => {
+    // otherIncome=10,000 is still below the $16,100 deduction, leaving
+    // $6,100 of deduction unused. That leftover offsets the conversion:
+    // taxable = 10,000 + 20,000 - 16,100 = 13,900, spanning the 10% and
+    // 12% brackets.
+    const result = conversionBracketBreakdown(10_000, 20_000, FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026.single);
+
+    expect(result.chunks).toEqual([
+      { min: 0, max: 12_400, rate: 0.10, amount: 12_400, tax: 1_240 },
+      { min: 12_400, max: 50_400, rate: 0.12, amount: 1_500, tax: 180 },
+    ]);
+    expect(result.totalTax).toBeCloseTo(1_420, 2);
+    expect(result.marginalRate).toBe(0.12);
   });
 });
 

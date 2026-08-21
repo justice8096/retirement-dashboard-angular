@@ -78,7 +78,14 @@ export function conversionBracketBreakdown(
   let marginalRate = 0;
 
   if (conversion > 0) {
-    const top = baseline + conversion;
+    // NOT `baseline + conversion` — when otherIncome < standardDeduction,
+    // the leftover deduction must offset the conversion itself, not just
+    // vanish at the baseline floor. E.g. otherIncome=0, deduction=16100,
+    // conversion=20000: baseline clamps to 0, but only $3,900 is actually
+    // taxable (20000 - 16100), not the full $20,000. This is the flagship
+    // early-retiree bridge scenario (converting in a low/no-income year),
+    // so getting the deduction applied to the conversion itself matters.
+    const top = Math.max(0, otherIncome + conversion - standardDeduction);
     for (const b of brackets) {
       const bMax = b.max ?? Infinity;
       const overlapStart = Math.max(baseline, b.min);
