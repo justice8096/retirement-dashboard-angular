@@ -86,7 +86,7 @@
           <button
             class="generate-btn csv-btn"
             [disabled]="csvLoading() !== null || selectedCount() === 0"
-            aria-label="Download scenario-projection.csv — 35-year portfolio projection for the selected location"
+            aria-label="Download scenario projection CSV (named after the selected location) — 35-year portfolio projection"
             (click)="downloadScenarioProjectionCsv()"
           >
             @if (csvLoading() === 'scenario') { Exporting… } @else { ⬇ scenario-projection.csv }
