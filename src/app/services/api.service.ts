@@ -20,6 +20,7 @@ import {
   Contribution,
   ContributionProgress,
   BrokerageFees,
+  GroceryData,
 } from '@models/api.model';
 
 @Injectable({ providedIn: 'root' })
@@ -133,6 +134,21 @@ export class ApiService {
 
   updatePreferences(data: Record<string, unknown>): Observable<void> {
     return this.http.patch<void>(`${this.base}/me/preferences`, data);
+  }
+
+  /* ─── Groceries ──────────────────────────────────────────────────── */
+
+  /** GET /me/groceries — per-item overrides + saved shopping lists.
+   *  Server returns `{ overrides: {}, lists: {} }` for a user with no
+   *  saved data yet (never 404s). See retirement-api `src/routes/groceries.ts`. */
+  getGroceries(): Observable<GroceryData> {
+    return this.http.get<GroceryData>(`${this.base}/me/groceries`);
+  }
+
+  /** PUT /me/groceries — full replace of overrides/lists (whichever keys
+   *  are present in `data`; the route's schema treats both as optional). */
+  saveGroceries(data: Partial<GroceryData>): Observable<GroceryData> {
+    return this.http.put<GroceryData>(`${this.base}/me/groceries`, data);
   }
 
   /* ─── Scenarios ─────────────────────────────────────────────────── */

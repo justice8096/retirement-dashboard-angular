@@ -1,0 +1,157 @@
+<div class="groc-screen">
+  <div class="screen-header">
+    <span class="header-icon">🛒</span>
+    <div>
+      <h2 class="header-title">Groceries</h2>
+      <p class="header-sub">Fine-tune grocery item costs and quantities, and save shopping lists</p>
+    </div>
+  </div>
+
+  @if (groceries.error(); as err) {
+    <div class="status-msg error">{{ err }}</div>
+  }
+
+  @if (!selectedCities().length) {
+    <div class="empty-state">
+      <div class="empty-icon">📍</div>
+      <p>Select cities on the
+        <button class="link-btn" (click)="goToOverview()">Overview</button>
+        tab using the checkboxes, then come back to browse their grocery items.
+      </p>
+    </div>
+  } @else {
+    <!-- City tabs from selection -->
+    <div class="city-tabs">
+      @for (city of selectedCities(); track city.id) {
+        <button class="city-tab"
+          [class.active]="groceries.activeLocationId() === city.id"
+          (click)="selectCity(city.id)">
+          {{ city.name }}
+        </button>
+      }
+    </div>
+
+    @if (!groceries.catalogLoaded()) {
+      <div class="status-msg">Loading grocery items…</div>
+    } @else if (!groceries.activeCatalog().length) {
+      <!-- Fallback: no per-item catalog for this location -->
+      <div class="fallback-card">
+        <div class="fb-icon">🛒 🥦</div>
+        <p class="fb-title">Detailed grocery item data is not yet available for this location.</p>
+        @if (activeLoc()?.monthlyCosts?.groceries; as g) {
+          <div class="fb-budget">
+            <span class="fb-label">Estimated monthly grocery budget</span>
+            <span class="fb-value">{{ fmt(g.typical) }}</span>
+            <span class="fb-range">{{ fmt(g.min) }} – {{ fmt(g.max) }}</span>
+          </div>
+        }
+      </div>
+    } @else {
+      <!-- Totals -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Monthly Total</div>
+          <div class="stat-value" [class]="dyscalculia.numberSpacingClass()">{{ fmt(groceries.monthlyTotal()) }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Weekly Equivalent</div>
+          <div class="stat-value" [class]="dyscalculia.numberSpacingClass()">{{ fmt(groceries.weeklyTotal()) }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Annual Total</div>
+          <div class="stat-value" [class]="dyscalculia.numberSpacingClass()">{{ fmt(groceries.annualTotal()) }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Items Included</div>
+          <div class="stat-value" [class]="dyscalculia.numberSpacingClass()">{{ groceries.enabledItemCount() }} / {{ groceries.workingItems().length }}</div>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <button mat-stroked-button (click)="groceries.resetDefaults()">Reset to Defaults</button>
+        <button mat-stroked-button (click)="saveCurrentList()">💾 Save Current List</button>
+        @if (groceries.saving()) {
+          <span class="save-status">Saving…</span>
+        } @else if (groceries.dirty()) {
+          <span class="save-status pending">Unsaved changes — saving shortly</span>
+        } @else if (groceries.loaded()) {
+          <span class="save-status saved">All changes saved</span>
+        }
+      </div>
+
+      <!-- Item tables, grouped by category -->
+      @for (cat of groceries.itemsByCategory(); track cat.id) {
+        <div class="card">
+          <h3 class="cat-title">{{ cat.name }} — {{ fmt(groceries.categoryTotals()[cat.id] ?? 0) }}/month</h3>
+          <div class="table-scroll">
+            <table class="item-table">
+              <thead>
+                <tr>
+                  <th scope="col" class="col-toggle"></th>
+                  <th scope="col">Item</th>
+                  <th scope="col" class="col-qty">Qty</th>
+                  <th scope="col">Unit</th>
+                  <th scope="col" class="col-cost">Monthly Cost</th>
+                  <th scope="col">For</th>
+                  <th scope="col">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of cat.items; track item.key) {
+                  <tr [class.disabled-row]="!item.enabled">
+                    <td>
+                      <input type="checkbox"
+                        [checked]="item.enabled"
+                        [attr.aria-label]="'Include ' + item.name"
+                        (change)="toggleItem(item)" />
+                    </td>
+                    <td class="item-name">{{ item.name }}</td>
+                    <td>
+                      <input type="number" appNumeric="age" class="qty-input" step="0.5" min="0"
+                        [attr.aria-label]="item.name + ' quantity'"
+                        [ngModel]="item.quantity"
+                        (ngModelChange)="updateQuantity(item, $event)" />
+                    </td>
+                    <td class="item-unit">{{ item.unit || '—' }}</td>
+                    <td>
+                      <input type="number" appNumeric="currency" class="cost-input" step="0.5" min="0"
+                        [attr.aria-label]="item.name + ' monthly cost'"
+                        [ngModel]="item.monthlyCost"
+                        (ngModelChange)="updateCost(item, $event)" />
+                    </td>
+                    <td><span class="for-whom-badge" [class]="'fw-' + item.forWhom">{{ item.forWhom }}</span></td>
+                    <td class="item-notes">{{ item.notes }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+
+      <!-- Saved shopping lists -->
+      <div class="card">
+        <h3 class="cat-title">Saved Shopping Lists</h3>
+        @if (!groceries.sortedLists().length) {
+          <p class="hint">No saved lists yet. Click &quot;Save Current List&quot; above to save your current item selections.</p>
+        } @else {
+          @for (row of groceries.sortedLists(); track row.id) {
+            <div class="list-row">
+              <div class="list-info">
+                <div class="list-name">{{ row.list.name }}</div>
+                <div class="list-meta">
+                  {{ row.list.itemCount }} items — {{ fmt(row.list.monthlyTotal) }}/mo — {{ row.list.createdAt | date:'mediumDate' }}
+                </div>
+              </div>
+              <div class="list-actions">
+                <button mat-stroked-button class="list-btn" (click)="loadList(row.id)">Load</button>
+                <button mat-stroked-button class="list-btn" (click)="renameList(row.id, row.list.name)">Rename</button>
+                <button mat-stroked-button class="list-btn" color="warn" (click)="deleteList(row.id)">Delete</button>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    }
+  }
+</div>

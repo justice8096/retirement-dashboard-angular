@@ -201,7 +201,7 @@ export interface DetailedCosts {
     sources: Source[];
   };
   groceries?: {
-    categories: { name: string; items: { item: string; price: number }[] }[];
+    categories: GroceryCatalogCategory[];
   };
   housing?: {
     propertyType: string;
@@ -235,8 +235,31 @@ export interface DetailedCosts {
     discounts: { category: string; discount: string }[];
   };
   groceryStores?: {
-    stores: { name: string; type: string; priceLevel: string }[];
+    stores: { name: string; type: string; website?: string; notes?: string }[];
   };
+}
+
+/**
+ * One catalog item within a location's `detailed-costs.json` grocery
+ * category — the per-location price catalog that `GroceriesService`
+ * layers user overrides on top of. `monthlyCost` is the location's
+ * baseline price; `forWhom` matches the retired React dashboard's
+ * household-attribution tag ('adults' | 'dog' | 'cat' | 'shared', though
+ * the field is a free string since seed data isn't enum-constrained).
+ */
+export interface GroceryCatalogItem {
+  name: string;
+  monthlyCost: number;
+  quantity: number;
+  unit?: string;
+  forWhom?: string;
+  notes?: string;
+}
+
+export interface GroceryCatalogCategory {
+  id: string;
+  name: string;
+  items: GroceryCatalogItem[];
 }
 
 export interface LocationQuery {
