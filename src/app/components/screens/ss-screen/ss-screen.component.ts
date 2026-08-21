@@ -289,10 +289,12 @@ export class SsScreenComponent implements OnInit {
    *  spouse's own PIA). Returns 0 for a single-person household or a
    *  primary-role member. */
   spousalTopUpFor(m: HouseholdMember): number {
-    if (m.role !== 'spouse' || !m.ssFra) return 0;
+    // Guard on the member's own PIA too: a spouse with FRA entered but PIA
+    // still blank must not receive a phantom full top-up in the total.
+    if (m.role !== 'spouse' || !m.ssFra || m.ssPia == null) return 0;
     const primary = this.household()?.members.find(x => x.role === 'primary');
     if (!primary?.ssPia) return 0;
-    return calcSpousalBenefit(primary.ssPia, m.ssPia ?? 0, m.ssFra, this.exploreAgeFor(m));
+    return calcSpousalBenefit(primary.ssPia, m.ssPia, m.ssFra, this.exploreAgeFor(m));
   }
 
   /** Plain-language `aria-valuetext` for the claim-age slider — read out
