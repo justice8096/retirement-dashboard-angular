@@ -4,7 +4,7 @@ import {
   LocationSummary, LocationFull, LocationQuery, MonthlyCosts, CostRange, COST_CATEGORIES, DetailedCosts,
   NeighborhoodsSupplement, Neighborhood, SupplementType,
 } from '@models/api.model';
-import { weightedInflationFromLocation } from '@app/lib/monte-carlo';
+import { weightedInflationFromLocation } from '@retirement/shared/engine/monte-carlo.js';
 
 export type SortField = 'name' | 'monthlyCostTotal' | 'country';
 export type SortDir = 'asc' | 'desc';

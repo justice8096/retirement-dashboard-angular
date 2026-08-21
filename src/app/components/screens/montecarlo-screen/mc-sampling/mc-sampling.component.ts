@@ -2,7 +2,7 @@ import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
-import { HISTORICAL_PRESETS, statsForRange } from '@app/data/historical-returns';
+import { HISTORICAL_PRESETS, statsForRange } from '@retirement/shared/engine/historical-returns.js';
 
 /**
  * Monte Carlo "Historical & Cycles" sub-component. Owns the sampling-mode

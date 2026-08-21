@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Pure-function tests for `src/app/lib/aca-constants.ts`. Covers:
+ * Pure-function tests for `@retirement/shared/engine/aca-constants.ts`. Covers:
  *   - fpl2026: HHS 2026 Federal Poverty Level computation
  *   - applicablePctCliff2026: Rev Proc 2025-25 ACA applicable-pct ladder
  *
@@ -13,7 +13,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import acaConstants from '../src/app/lib/aca-constants';
+import * as acaConstants from '@retirement/shared/engine/aca-constants.js';
 
 const {
   fpl2026,

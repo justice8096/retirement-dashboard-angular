@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Pure-function tests for `src/app/lib/monte-carlo.ts`. Covers the helpers
+ * Pure-function tests for `@retirement/shared/engine/monte-carlo.ts`. Covers the helpers
  * the kernel depends on but that aren't called per-trial:
  *   - weightedInflationFromLocation: cost-weighted CPI from per-category data
  *   - inflationBreakdownFromLocation: structured per-category breakdown for UI
@@ -15,7 +15,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import mc from '../src/app/lib/monte-carlo';
+import * as mc from '@retirement/shared/engine/monte-carlo.js';
 
 const {
   weightedInflationFromLocation,
@@ -622,9 +622,9 @@ test('runMonteCarlo: foreign segment ignores medicareMonthlyByYear override', ()
 
 // ─── rental-income helpers (Todo #29 Stage 1) ───────────────────────────
 
-import rental from '../src/app/lib/rental-income';
-import taxSources from '../src/app/lib/tax-sources';
-import type { RentalProperty, ScheduleEBreakdown, RentalAggregate } from '../src/app/lib/rental-income';
+import * as rental from '@retirement/shared/engine/rental-income.js';
+import * as taxSources from '@retirement/shared/engine/tax-sources.js';
+import type { RentalProperty, ScheduleEBreakdown, RentalAggregate } from '@retirement/shared/engine/rental-income.js';
 
 const {
   straightLineDepreciation,

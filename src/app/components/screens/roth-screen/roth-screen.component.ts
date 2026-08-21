@@ -10,7 +10,7 @@ import {
   ltcgHarvestingSummary,
   LTCG_BRACKETS_2026_SOURCES,
   type LtcgFilingStatus,
-} from '../../../lib/tax-sources';
+} from '@retirement/shared/engine/tax-sources.js';
 
 @Component({
   selector: 'app-roth-screen',
@@ -93,7 +93,7 @@ import {
         <!-- LTCG harvesting advisor (#27) — sibling tax-bracket optimization
              to Roth conversions. Surfaces "realize LTCG at 0%" headroom for
              early retirees in the taxable-drawdown phase. Pure helper math
-             from lib/tax-sources.ts; no API call. -->
+             from @retirement/shared/engine/tax-sources.js; no API call. -->
         <div class="planner-card">
           <h3 class="card-title">
             Tax-Free LTCG Harvesting (0% bracket)

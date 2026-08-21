@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { DyscalculiaService } from '@services/dyscalculia.service';
-import type { MonteCarloResult } from '@app/lib/monte-carlo';
+import type { MonteCarloResult } from '@retirement/shared/engine/monte-carlo.js';
 
 /**
  * Snapshot of every Monte Carlo input the UI captures at save time. Mirrors

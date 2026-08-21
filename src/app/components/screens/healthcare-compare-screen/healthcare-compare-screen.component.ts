@@ -4,7 +4,7 @@ import { LocationService } from '@services/location.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { LocationFull } from '@models/api.model';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
-import { ACA_PCT_SOURCES_2026, FPL_SOURCES_2026 } from '../../../lib/aca-constants';
+import { ACA_PCT_SOURCES_2026, FPL_SOURCES_2026 } from '@retirement/shared/engine/aca-constants.js';
 
 interface Metric {
   loc: LocationFull;

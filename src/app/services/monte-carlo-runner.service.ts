@@ -5,8 +5,8 @@ import { HealthcareService } from '@services/healthcare.service';
 import { MonteCarloStateService } from '@services/monte-carlo-state.service';
 import { RentalIncomeService } from '@services/rental-income.service';
 import { LocationFull } from '@models/api.model';
-import { runMonteCarlo } from '@app/lib/monte-carlo';
-import { aggregateRentalIncome } from '@app/lib/rental-income';
+import { runMonteCarlo } from '@retirement/shared/engine/monte-carlo.js';
+import { aggregateRentalIncome } from '@retirement/shared/engine/rental-income.js';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
 
 /**
@@ -243,7 +243,7 @@ export class MonteCarloRunnerService {
    *  callers and tests stay byte-identical when nothing is configured. */
   private buildLifeEvents() {
     const s = this.state;
-    const events: import('@app/lib/monte-carlo').LifeEvent[] = [];
+    const events: import('@retirement/shared/engine/monte-carlo.js').LifeEvent[] = [];
     if (s.inheritedIRAsEnabled()) {
       for (const e of s.inheritedIRAs()) {
         events.push({

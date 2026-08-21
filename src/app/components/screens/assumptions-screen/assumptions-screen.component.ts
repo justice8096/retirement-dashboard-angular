@@ -14,7 +14,7 @@ import {
   HouseholdProfile, HouseholdMember, HouseholdPet,
   MemberRole, DependentType, PetType,
 } from '@models/api.model';
-import type { RentalProperty } from '@app/lib/rental-income';
+import type { RentalProperty } from '@retirement/shared/engine/rental-income.js';
 
 type MemberDraft = Partial<HouseholdMember> & { birthYear: number; role: MemberRole };
 type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };

@@ -8,7 +8,7 @@ import { ApiService } from '@services/api.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { HouseholdProfile } from '@models/api.model';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
-import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '../../../lib/tax-sources';
+import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '@retirement/shared/engine/tax-sources.js';
 
 @Component({
   selector: 'app-taxes-screen',

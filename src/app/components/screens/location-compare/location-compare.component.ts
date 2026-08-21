@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { NavigationService } from '@services/navigation.service';
-import { fpl2026 } from '@app/lib/aca-constants';
+import { fpl2026 } from '@retirement/shared/engine/aca-constants.js';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { CurrencyFormatService } from '@services/currency-format.service';
 import { HealthcareService } from '@services/healthcare.service';

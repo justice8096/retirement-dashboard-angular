@@ -6,7 +6,7 @@ import {
 } from '@angular/common/http/testing';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { RentalIncomeService } from './rental-income.service';
-import type { RentalProperty } from '@app/lib/rental-income';
+import type { RentalProperty } from '@retirement/shared/engine/rental-income.js';
 
 /**
  * Vitest spec for the rental-income service load/save round-trip

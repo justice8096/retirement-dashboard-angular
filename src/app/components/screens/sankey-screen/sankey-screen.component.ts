@@ -6,7 +6,7 @@ import { LocationService } from '@services/location.service';
 import { TaxService } from '@services/tax.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { RentalIncomeService } from '@services/rental-income.service';
-import { aggregateRentalIncome } from '@app/lib/rental-income';
+import { aggregateRentalIncome } from '@retirement/shared/engine/rental-income.js';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import {
   FinancialSettings, HouseholdProfile, HouseholdMember, LocationFull,

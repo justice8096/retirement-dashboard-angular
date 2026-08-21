@@ -13,12 +13,12 @@ import {
   weightedInflationFromLocation,
   inflationBreakdownFromLocation,
   type InflationBreakdown,
-} from '@app/lib/monte-carlo';
-import { HISTORICAL_PRESETS, HISTORICAL_RETURNS } from '@app/data/historical-returns';
+} from '@retirement/shared/engine/monte-carlo.js';
+import { HISTORICAL_PRESETS, HISTORICAL_RETURNS } from '@retirement/shared/engine/historical-returns.js';
 import {
   SS_CUT_SOURCES, RMD_AGE_SOURCES,
   FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026,
-} from '@app/lib/tax-sources';
+} from '@retirement/shared/engine/tax-sources.js';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
 
 const PATH_CHART_W = 640;
@@ -289,7 +289,7 @@ export class MonteCarloStateService {
    *
    * The kernel applies the same logic per-trial with FX volatility on
    * the exemption — see MonteCarloParams.inheritanceTaxByYear in
-   * lib/monte-carlo.ts. The preview here uses today's $ at year-0 FX,
+   * @retirement/shared/engine/monte-carlo.ts. The preview here uses today's $ at year-0 FX,
    * so the on-screen number is a baseline estimate.
    */
   readonly survivorInheritanceTaxHit = computed(() => {

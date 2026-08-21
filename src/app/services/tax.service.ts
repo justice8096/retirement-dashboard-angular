@@ -1,7 +1,7 @@
 import { Injectable, inject, computed } from '@angular/core';
 import { LocationService } from './location.service';
 import { LocationFull, IncomeTaxTable, COST_CATEGORIES } from '@models/api.model';
-import { FED_BRACKETS_2026_MFJ, FED_STD_DEDUCTION_2026 } from '../lib/tax-sources';
+import { FED_BRACKETS_2026_MFJ, FED_STD_DEDUCTION_2026 } from '@retirement/shared/engine/tax-sources.js';
 
 /** US-state location heuristic — drives the shared 2026-MFJ federal fallback
  *  when the seed doesn't ship location-level federal brackets (most don't). */

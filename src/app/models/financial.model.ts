@@ -1,6 +1,6 @@
 export type RetirementPath = 'traditional' | 'fire' | 'explore';
 
-import type { RentalProperty } from '@app/lib/rental-income';
+import type { RentalProperty } from '@retirement/shared/engine/rental-income.js';
 
 export interface FinancialSettings {
   portfolioBalance: number;

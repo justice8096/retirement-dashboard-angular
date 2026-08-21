@@ -6,7 +6,7 @@ import {
   RentalAggregate,
   aggregateRentalIncome,
   defaultRentalProperty,
-} from '@app/lib/rental-income';
+} from '@retirement/shared/engine/rental-income.js';
 
 /**
  * Persistent state for the rental-property portfolio (Todos #29 + #36).

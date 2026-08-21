@@ -6,7 +6,7 @@ import { HouseholdProfile, LocationFull, FinancialSettings } from '@models/api.m
 import {
   fpl2026 as fplForHousehold,
   applicablePctCliff2026 as applicablePctCliff,
-} from '../lib/aca-constants';
+} from '@retirement/shared/engine/aca-constants.js';
 import { apportion as apportionPure, ApportionStrategy as PureApportionStrategy } from '../lib/apportion';
 
 export type ApportionStrategy = PureApportionStrategy;
@@ -21,7 +21,7 @@ export type ApportionStrategy = PureApportionStrategy;
  *                  no cliff. Expired Dec 31 2025; awaiting any new
  *                  extension.
  *
- * All constants + math live in `src/app/lib/aca-constants.ts` so the
+ * All constants + math live in `@retirement/shared/engine/aca-constants.ts` so the
  * per-year cost step in Monte Carlo can reuse them without duplication.
  */
 export type SubsidyRegime = 'cliff' | 'enhanced';
