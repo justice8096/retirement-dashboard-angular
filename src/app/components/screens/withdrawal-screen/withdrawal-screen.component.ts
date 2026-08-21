@@ -22,7 +22,11 @@ import {
  *  (Dashboard Dyscalculia F-007) — reuses `/api/glossary` entries rather
  *  than redefining descriptions inline. `fixed`/`constant` both map to the
  *  general safe-withdrawal-rate entry; there's no dedicated glossary term
- *  for "constant percentage" specifically. */
+ *  for "constant percentage" specifically. `cape` has no glossary entry at
+ *  all yet (the API's `/api/glossary` route doesn't define one) — mapped
+ *  here anyway so it picks one up automatically if the glossary ever adds
+ *  it; `strategyDescription()` below falls back to `CAPE_FALLBACK_DESC` in
+ *  the meantime. */
 const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
   fixed: 'safe_withdrawal_rate',
   constant: 'safe_withdrawal_rate',
@@ -30,7 +34,15 @@ const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
   vpw: 'vpw',
   bucket: 'bucket_strategy',
   'floor-ceiling': 'floor_ceiling',
+  cape: 'cape',
 };
+
+/** Fallback description for CAPE only, used until `/api/glossary` defines a
+ *  `cape` term. Text matches the retired React `WithdrawalTab.tsx`'s own
+ *  inline description for this strategy, since that's the only existing
+ *  plain-language source for it. */
+const CAPE_FALLBACK_DESC =
+  'Withdrawal rate adjusts based on the Shiller CAPE ratio — higher market valuations mean lower withdrawal rates.';
 
 @Component({
   selector: 'app-withdrawal-screen',
@@ -157,7 +169,7 @@ const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
         <div class="compare-header">
           <h3 class="card-title">Compare Withdrawal Strategies</h3>
           <p class="card-sub">
-            Explore how the six strategies above the API supports would play out for you.
+            Explore how all seven strategies would play out for you.
             This calculator is exploratory only — it doesn't change your saved strategy above.
           </p>
         </div>
@@ -165,9 +177,9 @@ const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
         <div class="card note">
           <span class="note-icon">ⓘ</span>
           <span>
-            A CAPE-based (Shiller PE) strategy was compared in the retired prototype this
-            screen replaces, but isn't available here: the withdrawal math library this app
-            calls doesn't implement it, and the saved-strategy API doesn't support it either.
+            CAPE (Shiller PE) can be compared here, but can't yet be saved as your
+            strategy of record above — the saved-strategy API doesn't have a CAPE
+            option yet, even though the comparison math now supports it.
           </span>
         </div>
 
@@ -331,6 +343,32 @@ const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
                   [ngModel]="floorMaxDiscretionaryRatePct()" (ngModelChange)="floorMaxDiscretionaryRatePct.set($event)" />
                 <span class="param-hint">Ceiling on discretionary spending as a share of portfolio.</span>
               </label>
+            </div>
+          }
+          @if (focusStrategy() === 'cape') {
+            <div class="param-grid knob-grid">
+              <label class="param">
+                <span class="param-label">CAPE Ratio (Shiller PE)</span>
+                <input appNumeric="rate" class="param-input" min="10" max="50" step="1"
+                  [ngModel]="capeRatio()" (ngModelChange)="capeRatio.set($event)" />
+                <span class="param-hint">10 = cheap market, 30 = long-run average, 50 = expensive.</span>
+              </label>
+              <label class="param">
+                <span class="param-label">CAPE Multiplier</span>
+                <input appNumeric="rate" class="param-input" min="0.1" max="1" step="0.05"
+                  [ngModel]="capeMultiplier()" (ngModelChange)="capeMultiplier.set($event)" />
+                <span class="param-hint">Weight applied to 1 / CAPE ratio.</span>
+              </label>
+              <label class="param">
+                <span class="param-label">Fixed Component</span>
+                <input appNumeric="percent" class="param-input"
+                  [ngModel]="capeFixedComponentPct()" (ngModelChange)="capeFixedComponentPct.set($event)" />
+                <span class="param-hint">Added on top of the CAPE-derived rate.</span>
+              </label>
+              <div class="knob-note">
+                Computed rate: {{ pctLabel(capeComputedRawRate()) }}, clamped between
+                {{ pctLabel(knobs().capeFloorRate) }} and {{ pctLabel(knobs().capeCeilingRate) }}.
+              </div>
             </div>
           }
         </div>
@@ -520,6 +558,15 @@ export class WithdrawalScreenComponent implements OnInit {
   readonly floorDiscretionaryBudget = signal(DEFAULT_KNOBS.floorDiscretionaryBudget);
   readonly floorMaxDiscretionaryRatePct = signal(DEFAULT_KNOBS.floorMaxDiscretionaryRate * 100);
 
+  // CAPE knobs. `capeRatio`/`capeMultiplier` match the retired React
+  // `WithdrawalTab.tsx`'s own slider ranges (10-50 / 0.1-1.0) and aren't
+  // rate-like enough for appNumeric="percent" — `appNumeric="rate"` fits
+  // both. Floor/ceiling rates aren't exposed as knobs, matching React (no
+  // UI control there either — just a computed-rate hint text).
+  readonly capeRatio = signal(DEFAULT_KNOBS.capeRatio);
+  readonly capeMultiplier = signal(DEFAULT_KNOBS.capeMultiplier);
+  readonly capeFixedComponentPct = signal(DEFAULT_KNOBS.capeFixedComponent * 100);
+
   readonly focusStrategy = signal<ComparisonStrategy>('fixed');
 
   readonly knobs = computed<StrategyKnobs>(() => ({
@@ -536,7 +583,19 @@ export class WithdrawalScreenComponent implements OnInit {
     floorEssentialSpending: this.floorEssentialSpending(),
     floorDiscretionaryBudget: this.floorDiscretionaryBudget(),
     floorMaxDiscretionaryRate: this.floorMaxDiscretionaryRatePct() / 100,
+    capeRatio: this.capeRatio(),
+    capeMultiplier: this.capeMultiplier(),
+    capeFixedComponent: this.capeFixedComponentPct() / 100,
+    capeFloorRate: DEFAULT_KNOBS.capeFloorRate,
+    capeCeilingRate: DEFAULT_KNOBS.capeCeilingRate,
   }));
+
+  /** Unclamped CAPE rate, for the "computed rate" hint text — mirrors the
+   *  retired React `WithdrawalTab.tsx`'s own preview line, computed the
+   *  same way `calcCAPEWithdrawal` does internally. */
+  readonly capeComputedRawRate = computed(
+    () => (1 / this.capeRatio()) * this.capeMultiplier() + this.capeFixedComponentPct() / 100,
+  );
 
   private readonly commonInput = computed(() => ({
     initialPortfolio: this.initialPortfolio(),
@@ -628,7 +687,9 @@ export class WithdrawalScreenComponent implements OnInit {
   }
 
   strategyDescription(s: ComparisonStrategy): string {
-    return this.glossary.find(STRATEGY_GLOSSARY_KEY[s])?.plain ?? STRATEGY_LABELS[s];
+    const glossaryText = this.glossary.find(STRATEGY_GLOSSARY_KEY[s])?.plain;
+    if (glossaryText) return glossaryText;
+    return s === 'cape' ? CAPE_FALLBACK_DESC : STRATEGY_LABELS[s];
   }
 
   fmt(amount: number): string {

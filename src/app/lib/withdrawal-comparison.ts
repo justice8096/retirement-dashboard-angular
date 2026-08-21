@@ -5,6 +5,7 @@ import {
   calcVPWWithdrawal,
   calcBucketWithdrawal,
   calcFloorCeilingWithdrawal,
+  calcCAPEWithdrawal,
 } from '@retirement/shared/withdrawalStrategies.js';
 
 /**
@@ -22,13 +23,20 @@ import {
  * Strategy-set note: the A4 audit's deep-check line (`a4-parity-gaps.md`
  * row for WithdrawalStrategyTab/WithdrawalTab) says `WithdrawalTab` "compares
  * 7 methods... side by side", including `calcCAPEWithdrawal`. That function
- * does not exist in `retirement-api/shared/withdrawalStrategies.js` (the
- * package this app's `@retirement/shared` resolves to, per package.json) —
- * only in a divergent copy that lives under `retirement-dashboard/shared/`
- * that this app never depended on. The API's own persisted-strategy schema
- * (`retirement-api/src/routes/withdrawal.ts` `STRATEGY_TYPES`) also omits
- * `cape`. CAPE is therefore excluded from this port rather than re-implemented
- * locally — see the withdrawal-screen component's UI note.
+ * originally only existed in a divergent copy of this package under
+ * `retirement-dashboard/shared/` that this app never depended on (its
+ * `package.json` resolves `@retirement/shared` to `retirement-api/shared`,
+ * which lacked the export) — it has since been ported into the canonical
+ * `retirement-api/shared/withdrawalStrategies.js` (see that package's
+ * `feat(shared): port calcCAPEWithdrawal...` commit), so all 7 strategies
+ * are now available here, called the same way as the other six.
+ *
+ * Note the API's persisted-strategy schema (`retirement-api/src/routes/
+ * withdrawal.ts` `STRATEGY_TYPES`) still omits `'cape'` — a user can compare
+ * it here but can't yet save it as their strategy of record. That's fine
+ * for this exploratory comparison (see the "no save-back" note below), but
+ * worth tracking separately if `/api/me/withdrawal` should grow a `cape`
+ * strategy type.
  *
  * Bug fix vs. the retired React source: `WithdrawalTab.tsx`'s strategy
  * switch had no `case 'guardrails'` at all — selecting the guardrails card
@@ -52,10 +60,13 @@ export type ComparisonStrategy =
   | 'guardrails'
   | 'vpw'
   | 'bucket'
-  | 'floor-ceiling';
+  | 'floor-ceiling'
+  | 'cape';
 
-/** All strategies this comparison supports, in display order. Matches the
- *  persisted `WithdrawalStrategy.strategyType` union exactly (no `cape`). */
+/** All strategies this comparison supports, in display order. The first
+ *  six match the persisted `WithdrawalStrategy.strategyType` union exactly;
+ *  `cape` does not (see the file header note) — comparable here, but not
+ *  yet save-able as the user's strategy of record. */
 export const COMPARISON_STRATEGIES: ComparisonStrategy[] = [
   'fixed',
   'constant',
@@ -63,6 +74,7 @@ export const COMPARISON_STRATEGIES: ComparisonStrategy[] = [
   'vpw',
   'bucket',
   'floor-ceiling',
+  'cape',
 ];
 
 /** Plain-language card labels — fallback text when the glossary hasn't
@@ -75,6 +87,7 @@ export const STRATEGY_LABELS: Record<ComparisonStrategy, string> = {
   vpw: 'Variable Percentage (VPW)',
   bucket: 'Bucket Strategy',
   'floor-ceiling': 'Floor & Ceiling',
+  cape: 'CAPE-Based (Shiller PE)',
 };
 
 /** Every strategy-specific knob this comparison exposes. Rate fields are
@@ -103,6 +116,16 @@ export interface StrategyKnobs {
   floorEssentialSpending: number;
   floorDiscretionaryBudget: number;
   floorMaxDiscretionaryRate: number;
+  /** Shiller CAPE (cyclically-adjusted P/E) ratio input. */
+  capeRatio: number;
+  /** Weight applied to 1/capeRatio in the CAPE rate formula. */
+  capeMultiplier: number;
+  /** Constant added to the CAPE-derived rate, decimal fraction. */
+  capeFixedComponent: number;
+  /** Minimum CAPE withdrawal rate, decimal fraction. */
+  capeFloorRate: number;
+  /** Maximum CAPE withdrawal rate, decimal fraction. */
+  capeCeilingRate: number;
 }
 
 /** Default knobs — one-to-one with the retired React `WithdrawalTab.tsx`'s
@@ -122,6 +145,11 @@ export const DEFAULT_KNOBS: StrategyKnobs = {
   floorEssentialSpending: 50_000,
   floorDiscretionaryBudget: 30_000,
   floorMaxDiscretionaryRate: 0.05,
+  capeRatio: 30,
+  capeMultiplier: 0.5,
+  capeFixedComponent: 0.015,
+  capeFloorRate: 0.02,
+  capeCeilingRate: 0.06,
 };
 
 /** Annual return-rate assumption per bucket (cash / bonds / growth) —
@@ -274,6 +302,18 @@ export function projectStrategy(input: ProjectionInput): StrategyProjection {
           discretionaryBudget: knobs.floorDiscretionaryBudget,
           currentPortfolio: portfolio,
           maxDiscretionaryRate: knobs.floorMaxDiscretionaryRate,
+        });
+        withdrawal = r.amount;
+        break;
+      }
+      case 'cape': {
+        const r = calcCAPEWithdrawal({
+          currentPortfolio: portfolio,
+          capeRatio: knobs.capeRatio,
+          capeMultiplier: knobs.capeMultiplier,
+          fixedComponent: knobs.capeFixedComponent,
+          floorRate: knobs.capeFloorRate,
+          ceilingRate: knobs.capeCeilingRate,
         });
         withdrawal = r.amount;
         break;

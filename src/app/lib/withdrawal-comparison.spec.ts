@@ -9,11 +9,12 @@ import {
 
 /**
  * A4 parity port #10 (multi-strategy withdrawal comparison + year-by-year
- * projection). Pins down year-1 withdrawal for each of the six strategies
- * against hand-computed values, using the shared library's own documented
- * behavior (`@retirement/shared/withdrawalStrategies.js` / its `.d.ts`) —
- * not re-derived math. CAPE is excluded — see `withdrawal-comparison.ts`'s
- * header comment for why.
+ * projection). Pins down year-1 withdrawal for each of the seven strategies
+ * (including CAPE, now that `calcCAPEWithdrawal` has been ported into the
+ * canonical `retirement-api/shared/withdrawalStrategies.js` — see that
+ * package's `feat(shared): port calcCAPEWithdrawal...` commit) against
+ * hand-computed values, using the shared library's own documented behavior
+ * — not re-derived math.
  */
 
 describe('compareStrategies — year-1 withdrawal per strategy', () => {
@@ -28,7 +29,7 @@ describe('compareStrategies — year-1 withdrawal per strategy', () => {
     knobs: DEFAULT_KNOBS,
   };
 
-  it('compares all 6 strategies (no cape) and matches hand-computed year-1 withdrawals', () => {
+  it('compares all 7 strategies and matches hand-computed year-1 withdrawals', () => {
     const results = compareStrategies(COMPARISON_STRATEGIES, base);
     const byStrategy = Object.fromEntries(results.map((r) => [r.strategy, r]));
 
@@ -55,15 +56,41 @@ describe('compareStrategies — year-1 withdrawal per strategy', () => {
     // discretionary = min(30,000, 1,000,000*0.05=50,000) = 30,000;
     // total = 20,000 + 30,000 = 50,000.
     expect(byStrategy['floor-ceiling']!.year1Withdrawal).toBeCloseTo(50_000, 6);
+
+    // cape (DEFAULT_KNOBS: capeRatio=30, capeMultiplier=0.5, fixedComponent=0.015):
+    // rawRate = (1/30)*0.5 + 0.015 = 0.016667 + 0.015 = 0.031667 (unclamped,
+    // within the default [0.02, 0.06] band). amount = 1,000,000 * 0.031667.
+    expect(byStrategy['cape']!.year1Withdrawal).toBeCloseTo(31_666.67, 1);
   });
 
   it('produces one row per requested strategy, all sized to the same horizon', () => {
     const results = compareStrategies(COMPARISON_STRATEGIES, base);
-    expect(results).toHaveLength(6);
-    expect(results.map((r) => r.strategy)).not.toContain('cape');
+    expect(results).toHaveLength(7);
+    expect(results.map((r) => r.strategy)).toContain('cape');
     for (const r of results) {
       expect(r.rows).toHaveLength(5);
     }
+  });
+});
+
+describe('projectStrategy — CAPE strategy', () => {
+  it('clamps to the ceiling when a low CAPE ratio implies a higher raw rate', () => {
+    // rawRate = (1/8)*0.5 + 0.015 = 0.0625 + 0.015 = 0.0775 -> clamped to
+    // the default ceiling of 0.06. amount = 500,000 * 0.06 = 30,000.
+    const result = projectStrategy({
+      strategy: 'cape',
+      initialPortfolio: 500_000,
+      annualSpending: 0,
+      startAge: null,
+      startYear: 2026,
+      yearsToProject: 1,
+      expectedReturn: 0.05,
+      inflationRate: 0.03,
+      knobs: { ...DEFAULT_KNOBS, capeRatio: 8 },
+    });
+
+    expect(result.year1Withdrawal).toBeCloseTo(30_000, 2);
+    expect(result.rows[0]!.effectiveRate).toBeCloseTo(0.06, 6);
   });
 });
 
