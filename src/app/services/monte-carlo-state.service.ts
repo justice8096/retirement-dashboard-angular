@@ -21,6 +21,7 @@ import {
 } from '@app/lib/tax-sources';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
 import { DEFAULT_CHILD_SUPPORT_UNTIL_AGE, DEFAULT_DEPENDENT_MONTHLY_COST } from '@app/lib/household-costs';
+import { estimateBenefitAtClaim } from '@app/lib/social-security';
 
 const PATH_CHART_W = 640;
 const PATH_CHART_H = 260;
@@ -28,22 +29,6 @@ const HIST_CHART_W = 640;
 const HIST_CHART_H = 220;
 const HIST_BINS = 40;
 
-/**
- * Monthly SS benefit adjusted for claim age. Mirrors the same helper in
- * ss-screen.component.ts:estimateBenefit so screens stay consistent.
- */
-function estimateBenefitAtClaim(m: HouseholdMember): number {
-  const pia = Number(m.ssPia) || 0;
-  if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
-  const diff = m.ssClaimAge - m.ssFra;
-  if (diff === 0) return pia;
-  if (diff > 0) return Math.round(pia * (1 + diff * 0.08));
-  const yearsEarly = Math.abs(diff);
-  const reduction = yearsEarly <= 3
-    ? yearsEarly * 0.0667
-    : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
-  return Math.round(pia * (1 - reduction));
-}
 
 /**
  * Owns the user-controllable Monte Carlo simulation state — every input

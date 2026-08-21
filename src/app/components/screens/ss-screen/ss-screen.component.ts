@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
 import { HouseholdProfile, HouseholdMember } from '@models/api.model';
+import { estimateBenefitAtClaim, formatClaimAge } from '@app/lib/social-security';
 
 @Component({
   selector: 'app-ss-screen',
@@ -45,7 +46,7 @@ import { HouseholdProfile, HouseholdMember } from '@models/api.model';
               </div>
               <div class="field">
                 <label class="field-label">Claim Age</label>
-                <div class="field-value">{{ member.ssClaimAge ?? '—' }}</div>
+                <div class="field-value">{{ claimAgeLabel(member) }}</div>
               </div>
               <div class="field">
                 <label class="field-label">Birth Year</label>
@@ -148,14 +149,11 @@ export class SsScreenComponent implements OnInit {
   }
 
   estimateBenefit(m: HouseholdMember): number {
-    if (!m.ssPia || !m.ssFra || !m.ssClaimAge) return 0;
-    const diff = m.ssClaimAge - m.ssFra;
-    if (diff === 0) return m.ssPia;
-    if (diff > 0) return Math.round(m.ssPia * (1 + diff * 0.08));
-    // Early claiming: ~6.67% per year reduction for first 3 years, 5% after
-    const yearsEarly = Math.abs(diff);
-    const reduction = yearsEarly <= 3 ? yearsEarly * 0.0667 : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
-    return Math.round(m.ssPia * (1 - reduction));
+    return estimateBenefitAtClaim(m);
+  }
+
+  claimAgeLabel(m: HouseholdMember): string {
+    return formatClaimAge(m.ssClaimAge, m.ssClaimAgeMonths);
   }
 
   fmt(amount: number): string {

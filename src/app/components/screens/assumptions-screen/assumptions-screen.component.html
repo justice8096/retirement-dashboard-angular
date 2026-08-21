@@ -114,12 +114,20 @@
                     (ngModelChange)="patchMember(i, { ssFra: +$event || null })" />
                 </label>
                 <label class="field compact">
-                  <span class="field-label">
-                    SS Claim Age: <strong>{{ member.ssClaimAge ?? 67 }}</strong>
-                  </span>
-                  <input type="range" class="field-range" min="62" max="70" step="1"
+                  <span class="field-label">SS Claim Age (years)</span>
+                  <input appNumeric="age" class="field-input" min="62" max="70"
                     [ngModel]="member.ssClaimAge ?? 67"
-                    (ngModelChange)="patchMember(i, { ssClaimAge: +$event })" />
+                    (ngModelChange)="patchMember(i, { ssClaimAge: +$event || null })" />
+                </label>
+                <label class="field compact">
+                  <span class="field-label">+ Months (0–11)</span>
+                  <input appNumeric="age" class="field-input" min="0" max="11"
+                    [ngModel]="member.ssClaimAgeMonths ?? 0"
+                    (ngModelChange)="patchMember(i, { ssClaimAgeMonths: clampMonths(+$event) })" />
+                  <span class="field-echo">
+                    claims at {{ claimAgeLabel(member) }}
+                    · {{ fmtMonthly(estimateBenefit(member)) }}/mo
+                  </span>
                 </label>
               </div>
               <button class="remove-btn" (click)="removeMember(i)" aria-label="Remove">×</button>

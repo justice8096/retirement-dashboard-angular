@@ -11,6 +11,7 @@ import {
   LocalInfoSupplement, Scenario, bulletText,
 } from '@models/api.model';
 import { escYaml as yamlStr } from '@app/lib/text-escape';
+import { estimateBenefitAtClaim } from '@app/lib/social-security';
 import {
   FIRE_WITHDRAWAL_RATE,
   GUARDRAIL_FLOOR_RATE as GUARDRAIL_FLOOR,
@@ -780,18 +781,6 @@ function collectWarnings(selected: LocationFull[], financial: FinancialSettings 
   return warnings;
 }
 
-function estimateBenefitAtClaim(m: HouseholdMember): number {
-  const pia = Number(m.ssPia) || 0;
-  if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
-  const diff = m.ssClaimAge - m.ssFra;
-  if (diff === 0) return pia;
-  if (diff > 0) return Math.round(pia * (1 + diff * 0.08));
-  const yearsEarly = Math.abs(diff);
-  const reduction = yearsEarly <= 3
-    ? yearsEarly * 0.0667
-    : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
-  return Math.round(pia * (1 - reduction));
-}
 
 function yearsToFire(current: number, target: number, savings: number, rate: number): number {
   if (current >= target) return 0;

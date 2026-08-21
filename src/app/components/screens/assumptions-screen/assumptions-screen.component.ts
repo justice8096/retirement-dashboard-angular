@@ -15,6 +15,7 @@ import {
   MemberRole, DependentType, PetType,
 } from '@models/api.model';
 import type { RentalProperty } from '@app/lib/rental-income';
+import { estimateBenefitAtClaim, formatClaimAge } from '@app/lib/social-security';
 
 type MemberDraft = Partial<HouseholdMember> & { birthYear: number; role: MemberRole };
 type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
@@ -175,6 +176,19 @@ export class AssumptionsScreenComponent implements OnInit {
   /** Currency formatters that honor the user's dyscalculia number-format preference. */
   fmtYearly(v: number): string { return this.currency.currencyYearly(v); }
   fmtMonthly(v: number): string { return this.currency.currencyMonthly(v); }
+
+  /** Clamp the months input to SSA's 0-11 range (a 12 belongs in years). */
+  clampMonths(v: number): number {
+    return Math.min(11, Math.max(0, Math.round(v) || 0));
+  }
+
+  claimAgeLabel(m: Partial<HouseholdMember>): string {
+    return formatClaimAge(m.ssClaimAge ?? 67, m.ssClaimAgeMonths);
+  }
+
+  estimateBenefit(m: Partial<HouseholdMember>): number {
+    return estimateBenefitAtClaim(m);
+  }
   fmtFplPct(pct: number): string { return this.dyscalculia.formatCount(Math.round(pct), '% of the poverty line'); }
 
   patch(partial: Partial<HouseholdProfile>): void {
@@ -208,6 +222,7 @@ export class AssumptionsScreenComponent implements OnInit {
       ssPia: null,
       ssFra: 67,
       ssClaimAge: 67,
+      ssClaimAgeMonths: 0,
       sortOrder: this.draft()?.members.length ?? 0,
     };
     this.draft.update(d => d ? { ...d, members: [...d.members, newMember] } : d);
@@ -289,6 +304,7 @@ export class AssumptionsScreenComponent implements OnInit {
         ssPia: m.ssPia == null ? null : num(m.ssPia),
         ssFra: m.ssFra == null ? null : num(m.ssFra),
         ssClaimAge: m.ssClaimAge == null ? null : num(m.ssClaimAge),
+        ssClaimAgeMonths: num(m.ssClaimAgeMonths),
       })),
       pets: d.pets.map(p => ({
         ...p,

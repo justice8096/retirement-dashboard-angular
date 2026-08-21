@@ -13,6 +13,7 @@ import { McResultsComponent } from './mc-results/mc-results.component';
 import { McParametersComponent } from './mc-parameters/mc-parameters.component';
 import { McSamplingComponent } from './mc-sampling/mc-sampling.component';
 import { McScenariosComponent } from './mc-scenarios/mc-scenarios.component';
+import { estimateBenefitAtClaim } from '@app/lib/social-security';
 
 /**
  * Portfolio-weighted annual drag % from per-account load + fees. Decision:
@@ -31,22 +32,6 @@ function weightedAccountDragPct(f: FinancialSettings): number {
   return rows.reduce((s, [b, l, fe]) => s + (b / total) * (l + fe), 0);
 }
 
-/**
- * Monthly SS benefit adjusted for claim age. Mirrors the same helper in
- * ss-screen.component.ts:estimateBenefit so the two screens agree.
- */
-function estimateBenefitAtClaim(m: HouseholdMember): number {
-  const pia = Number(m.ssPia) || 0;
-  if (!pia || !m.ssFra || !m.ssClaimAge) return 0;
-  const diff = m.ssClaimAge - m.ssFra;
-  if (diff === 0) return pia;
-  if (diff > 0) return Math.round(pia * (1 + diff * 0.08));
-  const yearsEarly = Math.abs(diff);
-  const reduction = yearsEarly <= 3
-    ? yearsEarly * 0.0667
-    : 3 * 0.0667 + (yearsEarly - 3) * 0.05;
-  return Math.round(pia * (1 - reduction));
-}
 
 /**
  * Monte Carlo screen — thin orchestrator after Phase 2c.
