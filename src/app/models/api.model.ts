@@ -23,3 +23,4 @@ export * from './scenario.model';
 export * from './user.model';
 export * from './supplement.model';
 export * from './groceries.model';
+export * from './admin-location.model';

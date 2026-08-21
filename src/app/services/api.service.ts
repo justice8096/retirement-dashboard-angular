@@ -22,6 +22,8 @@ import {
   BrokerageFees,
   GroceryData,
   LocationOverrideRow,
+  AdminLocationRow,
+  AdminLocationHistoryEntry,
 } from '@models/api.model';
 
 @Injectable({ providedIn: 'root' })
@@ -238,6 +240,55 @@ export class ApiService {
 
   updateFees(data: Partial<BrokerageFees>): Observable<BrokerageFees> {
     return this.http.put<BrokerageFees>(`${this.base}/me/fees`, data);
+  }
+
+  /* ─── Admin: location catalog (A4 parity port #6) ────────────────────
+   * All under /api/admin/locations, gated server-side by requireAdmin —
+   * a signed-in non-admin user gets 403 `{ error: 'Admin access required' }`,
+   * an unauthenticated request gets 401. See retirement-api
+   * `src/routes/admin.ts` + `src/middleware/auth.ts`. The catalog LIST
+   * itself is public (`getLocations` above) — only create/update/delete/
+   * history/reindex require admin.
+   */
+
+  /** POST /admin/locations — create a new catalog entry. `id` must match
+   *  `/^[a-z0-9-]+$/` (server-enforced); 409 if it already exists. */
+  createAdminLocation(id: string, locationData: Record<string, unknown>): Observable<AdminLocationRow> {
+    return this.http.post<AdminLocationRow>(`${this.base}/admin/locations`, { id, locationData });
+  }
+
+  /** PUT /admin/locations/:id — full replace of `locationData`; server
+   *  increments `version` and writes an `AdminLocationHistory` row.
+   *  `changedBy` defaults server-side to the authenticated admin's email
+   *  when omitted — callers normally leave it unset. */
+  updateAdminLocation(id: string, locationData: Record<string, unknown>, changedBy?: string): Observable<AdminLocationRow> {
+    const body: Record<string, unknown> = { locationData };
+    if (changedBy) body['changedBy'] = changedBy;
+    return this.http.put<AdminLocationRow>(`${this.base}/admin/locations/${id}`, body);
+  }
+
+  /** DELETE /admin/locations/:id — deletes the location (and its
+   *  supplements/history, cascaded server-side). */
+  deleteAdminLocation(id: string): Observable<{ message: string; id: string }> {
+    return this.http.delete<{ message: string; id: string }>(`${this.base}/admin/locations/${id}`);
+  }
+
+  /** GET /admin/locations/:id/history — paginated version history, newest
+   *  first. Also doubles as this screen's admin-access probe (a cheap,
+   *  read-only, side-effect-free admin-gated call) since the catalog LIST
+   *  itself is public and can't answer "is this user an admin". */
+  getAdminLocationHistory(id: string, page = 1, limit = 20): Observable<PaginatedResponse<AdminLocationHistoryEntry>> {
+    return this.http.get<PaginatedResponse<AdminLocationHistoryEntry>>(
+      `${this.base}/admin/locations/${id}/history`,
+      { params: { page: String(page), limit: String(limit) } },
+    );
+  }
+
+  /** POST /admin/locations/reindex — rebuilds denormalized search columns
+   *  (name/country/monthlyCostTotal/etc.) for every location. Server-side
+   *  single-process mutex rejects a concurrent run with 409. */
+  reindexAdminLocations(): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.base}/admin/locations/reindex`, {});
   }
 
   /* ─── Health ────────────────────────────────────────────────────── */

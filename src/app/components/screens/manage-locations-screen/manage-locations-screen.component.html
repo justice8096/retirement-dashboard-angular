@@ -1,0 +1,401 @@
+<div class="manage-locations-screen">
+  <div class="screen-header">
+    <span class="header-icon">🗺️</span>
+    <div>
+      <h2 class="header-title">Manage Locations</h2>
+      <p class="header-sub">Admin-only catalog CRUD, version history, and reindex</p>
+    </div>
+  </div>
+
+  @switch (gate()) {
+    @case ('checking') {
+      <div class="status-msg">Checking admin access…</div>
+    }
+    @case ('unauthenticated') {
+      <div class="card gate-card">
+        <div class="gate-icon">🔒</div>
+        <h3 class="card-title">Please sign in</h3>
+        <p class="gate-text">Sign in to use this feature.</p>
+        <button mat-stroked-button (click)="retryGate()">Try again</button>
+      </div>
+    }
+    @case ('forbidden') {
+      <div class="card gate-card">
+        <div class="gate-icon">🔒</div>
+        <h3 class="card-title">Admin access required</h3>
+        <p class="gate-text">
+          The location catalog's create/edit/delete/history/reindex tools are
+          restricted to admin accounts. You can still browse location data
+          from the Locations screens — this page is for catalog maintenance only.
+        </p>
+      </div>
+    }
+    @case ('error') {
+      <div class="card gate-card">
+        <h3 class="card-title">Couldn't verify admin access</h3>
+        <p class="gate-text">Check your connection and try again.</p>
+        <button mat-stroked-button (click)="retryGate()">Try again</button>
+      </div>
+    }
+    @case ('admin') {
+      <!-- Update log -->
+      <div class="card log-card">
+        <h4 class="card-title">Update Log</h4>
+        <div class="log-body">
+          @if (log().length === 0) {
+            <span class="log-empty">No operations performed yet.</span>
+          } @else {
+            @for (line of log(); track $index) { <div>{{ line }}</div> }
+          }
+        </div>
+      </div>
+
+      <!-- Reindex -->
+      <div class="card">
+        <div class="card-head">
+          <h3 class="card-title">Catalog Maintenance</h3>
+        </div>
+        <p class="hint-text">
+          Rebuilds the denormalized search columns (name/country/monthly total/etc.)
+          for every location from its stored data. Useful after a bulk import or
+          direct data migration.
+        </p>
+        @if (!reindexArmed()) {
+          <button mat-stroked-button [disabled]="reindexRunning()" (click)="armReindex()">
+            {{ reindexRunning() ? 'Reindexing…' : 'Reindex All Locations' }}
+          </button>
+        } @else {
+          <div class="confirm-row">
+            <span>Reindex every location now? This touches the whole catalog.</span>
+            <button mat-flat-button color="primary" (click)="confirmReindex()">Yes, reindex</button>
+            <button mat-stroked-button (click)="cancelReindex()">Cancel</button>
+          </div>
+        }
+        @if (reindexMessage()) {
+          <p class="reindex-msg">{{ reindexMessage() }}</p>
+        }
+      </div>
+
+      <div class="grid-2">
+        <!-- Location list -->
+        <div class="card">
+          <div class="card-head">
+            <h3 class="card-title">Locations ({{ locations().length }})</h3>
+            <button mat-stroked-button (click)="startCreate()">+ Add New Location</button>
+          </div>
+
+          <input type="text" class="field-input search-input" placeholder="Search locations…"
+            aria-label="Search locations"
+            [ngModel]="searchTerm()" (ngModelChange)="searchTerm.set($event)" />
+
+          @if (loadingList()) {
+            <div class="status-msg">Loading locations…</div>
+          } @else if (listError()) {
+            <div class="status-msg">{{ listError() }}</div>
+          } @else {
+            <div class="loc-list" role="list">
+              @for (loc of filteredLocations(); track loc.id) {
+                <div class="loc-row" role="listitem">
+                  <div class="loc-info">
+                    <span class="loc-name">{{ loc.name }}</span>
+                    <div class="loc-detail">
+                      {{ loc.country }} · {{ loc.currency }} · {{ fmtCost(loc.monthlyCostTotal) }} · v{{ loc.version }}
+                    </div>
+                  </div>
+                  <div class="loc-actions">
+                    <button mat-stroked-button class="sm" (click)="showHistory(loc.id)">History</button>
+                    <button mat-stroked-button class="sm" (click)="startEdit(loc.id)">Edit</button>
+                    @if (pendingDeleteId() === loc.id) {
+                      <span class="confirm-inline">
+                        <button mat-flat-button color="warn" class="sm" [disabled]="deleting()" (click)="confirmDelete()">Confirm</button>
+                        <button mat-stroked-button class="sm" (click)="cancelDelete()">Cancel</button>
+                      </span>
+                    } @else {
+                      <button mat-stroked-button class="sm danger" (click)="armDelete(loc.id)">Delete</button>
+                    }
+                  </div>
+                </div>
+              } @empty {
+                <div class="status-msg">No locations match your search.</div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- History panel -->
+        @if (historyForId()) {
+          <div class="card">
+            <div class="card-head">
+              <h3 class="card-title">Version History — {{ historyForId() }}</h3>
+              <button mat-stroked-button class="sm" (click)="closeHistory()">Close</button>
+            </div>
+            @if (historyLoading()) {
+              <div class="status-msg">Loading history…</div>
+            } @else if (historyError()) {
+              <div class="status-msg">{{ historyError() }}</div>
+            } @else if (history().length === 0) {
+              <div class="status-msg">No recorded version history yet — this location hasn't been edited through the admin API.</div>
+            } @else {
+              <div class="history-list">
+                @for (h of history(); track h.version) {
+                  <div class="history-row">
+                    <strong>v{{ h.version }}</strong>
+                    <span class="history-when">{{ h.createdAt | date:'medium' }}</span>
+                    <span class="history-who">{{ h.changedBy }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Create / edit form -->
+        @if (formOpen()) {
+          <div class="card form-card">
+            <h3 class="card-title">{{ editingId() ? 'Edit Location' : 'Add New Location' }}</h3>
+
+            @if (formLoading()) {
+              <div class="status-msg">Loading location…</div>
+            } @else {
+              <div class="field-grid">
+                <label class="field">
+                  <span class="field-label">Location Name *</span>
+                  <input type="text" class="field-input" placeholder="e.g. Barcelona, Spain"
+                    [ngModel]="form().name" (ngModelChange)="onNameChange($event)" />
+                </label>
+                <label class="field">
+                  <span class="field-label">ID {{ editingId() ? '' : '(auto-generated, editable)' }}</span>
+                  <input type="text" class="field-input" [readOnly]="!!editingId()"
+                    [ngModel]="form().id" (ngModelChange)="patchForm({ id: $event })" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Country *</span>
+                  <input type="text" class="field-input" placeholder="Spain"
+                    [ngModel]="form().country" (ngModelChange)="patchForm({ country: $event })" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Region</span>
+                  <input type="text" class="field-input" placeholder="Catalonia"
+                    [ngModel]="form().region" (ngModelChange)="patchForm({ region: $event })" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Subregion / State</span>
+                  <input type="text" class="field-input"
+                    [ngModel]="form().subregion" (ngModelChange)="patchForm({ subregion: $event })" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Cities (comma-separated)</span>
+                  <input type="text" class="field-input" placeholder="Barcelona, Sitges"
+                    [ngModel]="form().cities" (ngModelChange)="patchForm({ cities: $event })" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Currency *</span>
+                  <input type="text" class="field-input" placeholder="EUR"
+                    [ngModel]="form().currency" (ngModelChange)="patchForm({ currency: $event })" />
+                </label>
+                <label class="field">
+                  <span class="field-label">Exchange Rate to USD</span>
+                  <input appNumeric="fx" class="field-input"
+                    [ngModel]="form().exchangeRate" (ngModelChange)="patchForm({ exchangeRate: +$event })" />
+                </label>
+              </div>
+
+              <!-- Visa -->
+              <div class="form-section">
+                <h4 class="section-title">Visa &amp; Residency</h4>
+                <div class="field-grid">
+                  <label class="field">
+                    <span class="field-label">Visa Type</span>
+                    <input type="text" class="field-input" placeholder="e.g. Non-Lucrative Visa"
+                      [ngModel]="form().visaType" (ngModelChange)="patchForm({ visaType: $event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Income Req. (monthly, local currency)</span>
+                    <input appNumeric="currency" class="field-input" step="50"
+                      [ngModel]="form().visaIncome" (ngModelChange)="patchForm({ visaIncome: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Income Req. Currency</span>
+                    <input type="text" class="field-input" placeholder="EUR"
+                      [ngModel]="form().visaIncomeCurr" (ngModelChange)="patchForm({ visaIncomeCurr: $event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Visa Notes</span>
+                    <input type="text" class="field-input"
+                      [ngModel]="form().visaNotes" (ngModelChange)="patchForm({ visaNotes: $event })" />
+                  </label>
+                </div>
+              </div>
+
+              <!-- Climate -->
+              <div class="form-section">
+                <h4 class="section-title">Climate</h4>
+                <div class="field-grid">
+                  <label class="field">
+                    <span class="field-label">Winter Low (°F) *</span>
+                    <input appNumeric="age" class="field-input" min="-30" max="130" step="1"
+                      [ngModel]="form().winterLow" (ngModelChange)="patchForm({ winterLow: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Summer High (°F)</span>
+                    <input appNumeric="age" class="field-input" min="-30" max="130" step="1"
+                      [ngModel]="form().summerHigh" (ngModelChange)="patchForm({ summerHigh: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Rainy Days / Year</span>
+                    <input appNumeric="age" class="field-input" min="0" max="365" step="5"
+                      [ngModel]="form().rainyDays" (ngModelChange)="patchForm({ rainyDays: +$event })" />
+                  </label>
+                </div>
+              </div>
+
+              <!-- Monthly costs -->
+              <div class="form-section">
+                <h4 class="section-title">Monthly Costs (USD) *</h4>
+                <div class="cost-table">
+                  <div class="cost-head">
+                    <span></span><span>Min</span><span>Typical</span><span>Max</span><span>Inflation %</span>
+                  </div>
+                  @for (cat of costCategories; track cat.key) {
+                    <div class="cost-row">
+                      <span class="cost-label">{{ cat.icon }} {{ cat.label }}</span>
+                      <input appNumeric="currency" class="field-input"
+                        [ngModel]="form().costs[cat.key].min" (ngModelChange)="patchCost(cat.key, 'min', +$event)" />
+                      <input appNumeric="currency" class="field-input"
+                        [ngModel]="form().costs[cat.key].typical" (ngModelChange)="patchCost(cat.key, 'typical', +$event)" />
+                      <input appNumeric="currency" class="field-input"
+                        [ngModel]="form().costs[cat.key].max" (ngModelChange)="patchCost(cat.key, 'max', +$event)" />
+                      <input appNumeric="percent" class="field-input" step="0.25"
+                        [ngModel]="form().costs[cat.key].annualInflationPct" (ngModelChange)="patchCost(cat.key, 'annualInflationPct', +$event)" />
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Healthcare -->
+              <div class="form-section">
+                <h4 class="section-title">Healthcare</h4>
+                <div class="field-grid">
+                  <label class="field">
+                    <span class="field-label">System Name</span>
+                    <input type="text" class="field-input" placeholder="e.g. Public universal"
+                      [ngModel]="form().healthSystem" (ngModelChange)="patchForm({ healthSystem: $event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Quality (1-10)</span>
+                    <input appNumeric="age" class="field-input" min="1" max="10"
+                      [ngModel]="form().healthQuality" (ngModelChange)="patchForm({ healthQuality: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Dental Included</span>
+                    <select class="field-input"
+                      [ngModel]="form().dentalIncluded" (ngModelChange)="patchForm({ dentalIncluded: $event })">
+                      <option [ngValue]="false">No</option>
+                      <option [ngValue]="true">Yes</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Wait Times</span>
+                    <input type="text" class="field-input" placeholder="low / moderate / long"
+                      [ngModel]="form().waitTimes" (ngModelChange)="patchForm({ waitTimes: $event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Prescription Coverage</span>
+                    <input type="text" class="field-input" placeholder="partial / 70-100%"
+                      [ngModel]="form().rxCoverage" (ngModelChange)="patchForm({ rxCoverage: $event })" />
+                  </label>
+                </div>
+              </div>
+
+              <!-- Lifestyle -->
+              <div class="form-section">
+                <h4 class="section-title">Lifestyle Scores (1-10)</h4>
+                <div class="field-grid">
+                  <label class="field">
+                    <span class="field-label">Internet Speed</span>
+                    <input type="text" class="field-input" placeholder="e.g. 1Gbps fiber available"
+                      [ngModel]="form().internet" (ngModelChange)="patchForm({ internet: $event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Dog-Friendly</span>
+                    <input appNumeric="age" class="field-input" min="1" max="10"
+                      [ngModel]="form().dogFriendly" (ngModelChange)="patchForm({ dogFriendly: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Expat Community</span>
+                    <input appNumeric="age" class="field-input" min="1" max="10"
+                      [ngModel]="form().expatComm" (ngModelChange)="patchForm({ expatComm: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">English Prevalence</span>
+                    <input appNumeric="age" class="field-input" min="1" max="10"
+                      [ngModel]="form().english" (ngModelChange)="patchForm({ english: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Safety Rating</span>
+                    <input appNumeric="age" class="field-input" min="1" max="10"
+                      [ngModel]="form().safety" (ngModelChange)="patchForm({ safety: +$event })" />
+                  </label>
+                </div>
+              </div>
+
+              <!-- Pros & cons -->
+              <div class="form-section">
+                <h4 class="section-title">Pros &amp; Cons</h4>
+                <div class="field-grid two-col">
+                  <label class="field">
+                    <span class="field-label">Pros (one per line)</span>
+                    <textarea class="field-input" rows="4" placeholder="Low cost of living&#10;Beautiful beaches"
+                      [ngModel]="form().pros" (ngModelChange)="patchForm({ pros: $event })"></textarea>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Cons (one per line)</span>
+                    <textarea class="field-input" rows="4" placeholder="Language barrier&#10;Hot summers"
+                      [ngModel]="form().cons" (ngModelChange)="patchForm({ cons: $event })"></textarea>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Taxes -->
+              <div class="form-section">
+                <h4 class="section-title">Tax Information</h4>
+                <div class="field-grid">
+                  <label class="field">
+                    <span class="field-label">Income Tax Notes</span>
+                    <input type="text" class="field-input" placeholder="Tax treatment overview"
+                      [ngModel]="form().taxNotes" (ngModelChange)="patchForm({ taxNotes: $event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">VAT Rate (%)</span>
+                    <input appNumeric="percent" class="field-input" step="0.5"
+                      [ngModel]="form().vatPct" (ngModelChange)="patchForm({ vatPct: +$event })" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Social Charges Rate (%)</span>
+                    <input appNumeric="percent" class="field-input" step="0.5"
+                      [ngModel]="form().socialPct" (ngModelChange)="patchForm({ socialPct: +$event })" />
+                  </label>
+                </div>
+                @if (editingId()) {
+                  <p class="hint-text">
+                    Federal/state tax brackets, ACA marketplace pricing, and source
+                    citations aren't edited here — they're preserved from the existing
+                    record on save.
+                  </p>
+                }
+              </div>
+
+              <div class="save-bar">
+                <button mat-flat-button color="primary" [disabled]="saving()" (click)="save()">
+                  {{ saving() ? 'Saving…' : 'Save Location' }}
+                </button>
+                <button mat-stroked-button [disabled]="saving()" (click)="cancelForm()">Cancel</button>
+                @if (formError()) { <span class="save-msg err">{{ formError() }}</span> }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

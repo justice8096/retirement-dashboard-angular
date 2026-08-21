@@ -33,6 +33,7 @@ import { QolScreenComponent } from '@components/screens/qol-screen/qol-screen.co
 import { ClimateScreenComponent } from '@components/screens/climate-screen/climate-screen.component';
 import { VisaScreenComponent } from '@components/screens/visa-screen/visa-screen.component';
 import { HealthcareCompareScreenComponent } from '@components/screens/healthcare-compare-screen/healthcare-compare-screen.component';
+import { ManageLocationsScreenComponent } from '@components/screens/manage-locations-screen/manage-locations-screen.component';
 
 /* ─── Setup screens ─────────────────────────────────────────────── */
 import { AssumptionsScreenComponent } from '@components/screens/assumptions-screen/assumptions-screen.component';
@@ -77,6 +78,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
     EstateScreenComponent, SankeyScreenComponent,
     /* Locations (added) */
     QolScreenComponent, ClimateScreenComponent, VisaScreenComponent, MapScreenComponent,
+    ManageLocationsScreenComponent,
     /* Costs (added) */
     HealthcareCompareScreenComponent,
     /* Setup */
@@ -125,6 +127,7 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
         @case ('locations/climate')  { <app-climate-screen /> }
         @case ('locations/visa')     { <app-visa-screen /> }
         @case ('locations/qol')      { <app-qol-screen /> }
+        @case ('locations/manage')   { <app-manage-locations-screen /> }
 
         <!-- Costs -->
         @case ('costs/housing')       { <app-housing-screen /> }
