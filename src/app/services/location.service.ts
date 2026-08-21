@@ -5,6 +5,7 @@ import {
   NeighborhoodsSupplement, Neighborhood, SupplementType,
 } from '@models/api.model';
 import { weightedInflationFromLocation } from '@retirement/shared/engine/monte-carlo.js';
+import { PET_COST_CATEGORY_KEYS } from '@retirement/shared/engine/household-costs.js';
 
 export type SortField = 'name' | 'monthlyCostTotal' | 'country';
 export type SortDir = 'asc' | 'desc';
@@ -239,6 +240,14 @@ export class LocationService {
       sum += (val?.typical ?? 0);
     }
     return sum;
+  }
+
+  /** Total monthly pet cost categories (petCare + petDaycare + petGrooming)
+   *  for a location, today's USD. Used to exclude pets from the flat
+   *  baseCost when the per-year pet cost curve replaces them. */
+  petMonthlyTotal(loc: LocationFull): number {
+    const costs = (loc.monthlyCosts ?? {}) as Partial<Record<string, CostRange>>;
+    return PET_COST_CATEGORY_KEYS.reduce((sum, key) => sum + (costs[key]?.typical ?? 0), 0);
   }
 
   /** Baseline monthly cost of a catalog location in today's USD (sum of monthlyCosts). */

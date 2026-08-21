@@ -9,6 +9,7 @@ import { RentalIncomeService } from '@services/rental-income.service';
 import { NumericInputDirective } from '@directives/numeric-input.directive';
 import { McLifeEventsTimelineComponent } from '../mc-life-events-timeline/mc-life-events-timeline.component';
 import { defaultLtcCostForCountry } from '@app/lib/ltc-costs';
+import { SENIOR_PET_FRACTION } from '@retirement/shared/engine/household-costs.js';
 
 /**
  * Monte Carlo "what-if scenarios" sub-component. Bundles the 5
@@ -71,6 +72,20 @@ export class McScenariosComponent {
 
   /** Calendar year "right now" — fallback when household.planningStartYear isn't set. */
   protected todayYear(): number { return new Date().getFullYear(); }
+
+  /** Plain-language per-pet summary for the Pets & Dependents card
+   *  ("Luna (dog): costs modeled through 2034, senior rates from 2031"). */
+  protected readonly petSummaries = computed(() => {
+    const start = this.state.household()?.planningStartYear ?? this.todayYear();
+    return (this.state.household()?.pets ?? []).map(p => {
+      const lifespan = Math.max(1, p.expectedLifespan);
+      const death = Math.max(p.birthYear + lifespan, start + 1);
+      const seniorFrom = p.birthYear + Math.ceil(SENIOR_PET_FRACTION * lifespan);
+      const name = p.name || p.type || 'Pet';
+      const senior = seniorFrom < death ? `, senior rates from ${Math.max(seniorFrom, start)}` : '';
+      return { label: `${name} (${p.type}): costs modeled through ${death - 1}${senior}` };
+    });
+  });
 
   /* ─── Multi-location moves ─────────────────────────────────────── */
 
