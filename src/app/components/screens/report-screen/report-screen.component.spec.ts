@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import type { LocationFull, HouseholdProfile, FinancialSettings } from '@models/api.model';
+import { LocationService } from '@services/location.service';
 import {
   buildLocationCostsCsv,
   buildTaxComparisonCsv,
@@ -119,6 +126,51 @@ describe('buildLocationCostsCsv', () => {
     expect(cells[1]).toBe('N/A'); // country
     expect(cells[11]).toBe('N/A'); // safety rating
     expect(cells[12]).toBe('N/A'); // internet speed
+  });
+});
+
+describe('buildLocationCostsCsv — rent override consistency (A4 port #5)', () => {
+  /**
+   * This screen reads `loc.monthlyCostTotal` directly for the Total
+   * Monthly/Annual columns (see the deviation note above `buildLocationCostsCsv`)
+   * rather than re-summing categories — so an editable-rent override only
+   * stays consistent here if `LocationService.fullLocations()` itself
+   * delta-adjusts `monthlyCostTotal` alongside `monthlyCosts.rent.typical`.
+   * Exercises the real service (not a hand-rolled mock) so this test would
+   * fail again if that adjustment ever regressed.
+   */
+  it('Total Monthly reflects the override\'s delta-adjusted monthlyCostTotal, not the stale catalog total', () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    const loc = TestBed.inject(LocationService);
+    const httpMock = TestBed.inject(HttpTestingController);
+
+    loc.loadFull();
+    httpMock.expectOne((r) => r.url.endsWith('/locations') && r.method === 'GET').flush({
+      data: [makeLocation()], // Austin: rent 1800, monthlyCostTotal 3280
+      pagination: { page: 1, limit: 200, total: 1, totalPages: 1 },
+    });
+
+    loc.setRentOverride('us-austin-tx', 2500); // +700 over catalog rent
+    // Flush the debounced save synchronously instead of waiting out the
+    // real 2s timer, so no stray request fires after this test completes.
+    loc.flushRentOverrides();
+    httpMock.expectOne((r) => r.url.endsWith('/me/locations/overrides') && r.method === 'PUT')
+      .flush({ id: 'row-1', userId: 'u1', baseLocationId: 'us-austin-tx', baseLocationVersion: 1, overrides: {}, createdAt: '', updatedAt: '' });
+
+    const overridden = loc.fullLocations().find(l => l.id === 'us-austin-tx')!;
+
+    expect(overridden.monthlyCosts.rent.typical).toBe(2500);
+    expect(overridden.monthlyCostTotal).toBe(3980); // 3280 + (2500 - 1800)
+
+    const csv = buildLocationCostsCsv([overridden]);
+    const cells = csv.split('\n')[1]!.split(',');
+    expect(cells[3]).toBe('2500'); // Rent
+    expect(cells[9]).toBe('3980'); // Total Monthly
+    expect(cells[10]).toBe(String(3980 * 12)); // Total Annual
+
+    httpMock.verify();
   });
 });
 

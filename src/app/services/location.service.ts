@@ -168,12 +168,35 @@ export class LocationService {
    *  shallow copy with `monthlyCosts.rent.typical` replaced — every other
    *  rent field (min/max/annualInflation/sources) is preserved from the
    *  catalog, matching the retired React `setBaseOverride` call in
-   *  `HousingTab.saveEdit`. */
+   *  `HousingTab.saveEdit`.
+   *
+   *  Also delta-adjusts the backend-computed `monthlyCostTotal` by the same
+   *  amount the rent changed. Everything that *sums categories* (
+   *  `nonHealthcareBaseMonthly` → MC baseCost, cost-detail's chart,
+   *  TaxService's location-compare path) already reflects the override for
+   *  free because it re-sums `monthlyCosts`; but `report-screen.component.ts`
+   *  reads the precomputed `monthlyCostTotal` field directly for its CSV
+   *  exports and narrative text (buildLocationCostsCsv's "Total Monthly"/
+   *  "Total Annual" columns, buildScenarioProjectionCsv's 35-year baseCost,
+   *  and the brochure narrative) — without this adjustment those totals
+   *  would silently go stale next to a changed rent line. `monthlyCostTotal`
+   *  is the only backend-precomputed total-like field on `LocationFull`/
+   *  `LocationSummary` (grepped the model: no separate annual total is
+   *  stored — every "Total Annual" column is derived client-side as
+   *  `monthlyCostTotal * 12`, so adjusting the monthly figure here fixes
+   *  the annual ones too, automatically, wherever they're derived). */
   private withRentOverride(loc: LocationFull, overrideTypical: number | undefined): LocationFull {
     if (overrideTypical == null) return loc;
     const rent = loc.monthlyCosts?.rent;
+    const rawRentTypical = rent?.typical;
+    let monthlyCostTotal = loc.monthlyCostTotal;
+    if (typeof monthlyCostTotal === 'number' && Number.isFinite(monthlyCostTotal) &&
+        typeof rawRentTypical === 'number' && Number.isFinite(rawRentTypical)) {
+      monthlyCostTotal = Math.max(0, monthlyCostTotal + (overrideTypical - rawRentTypical));
+    }
     return {
       ...loc,
+      monthlyCostTotal,
       monthlyCosts: {
         ...loc.monthlyCosts,
         rent: { ...(rent ?? { min: 0, max: 0, typical: 0 }), typical: overrideTypical },

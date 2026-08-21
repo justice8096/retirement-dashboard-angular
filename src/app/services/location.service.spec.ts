@@ -69,12 +69,28 @@ describe('LocationService — rent overrides', () => {
       buffer: { typical: 0, min: 0, max: 0 },
       medicalOOP: { typical: 0, min: 0, max: 0 },
     },
+    // Deliberately NOT the simple sum of the categories above (3180) — the
+    // backend bakes in extra factors (e.g. tax-on-total convergence) that a
+    // naive recompute-from-categories would lose. Using a total with a
+    // built-in +220 "extra" over the raw sum proves the fix delta-adjusts
+    // rather than silently recomputing monthlyCostTotal from scratch.
+    monthlyCostTotal: 3400,
+  } as LocationFull;
+
+  // A second, never-overridden location — used to prove the patch is
+  // scoped to the overridden id only.
+  const shelbyville: LocationFull = {
+    ...springfield,
+    id: 'shelbyville',
+    name: 'Shelbyville',
+    monthlyCosts: { ...springfield.monthlyCosts, rent: { typical: 1100, min: 900, max: 1400 } },
+    monthlyCostTotal: 3000,
   } as LocationFull;
 
   function seedFullLocations(): void {
     svc.loadFull();
     const req = httpMock.expectOne((r) => r.url.endsWith('/locations') && r.method === 'GET');
-    req.flush({ data: [springfield], pagination: { page: 1, limit: 200, total: 1, totalPages: 1 } });
+    req.flush({ data: [springfield, shelbyville], pagination: { page: 1, limit: 200, total: 2, totalPages: 1 } });
   }
 
   beforeEach(() => {
@@ -146,6 +162,48 @@ describe('LocationService — rent overrides', () => {
     it('does not mutate the raw catalog object', () => {
       svc.setRentOverride('springfield', 2200);
       expect(svc.catalogRent('springfield')).toBe(1500);
+    });
+
+    it('delta-adjusts monthlyCostTotal by the rent change, preserving the backend-baked extra', () => {
+      // monthlyCostTotal (3400) is not the raw category sum (3180) — it has
+      // a +220 "extra" baked in by the backend. Raising rent by +700 should
+      // land at 3400 + 700 = 4100, keeping that extra intact rather than
+      // recomputing the total from scratch.
+      svc.setRentOverride('springfield', 2200);
+      const loc = svc.fullLocations().find(l => l.id === 'springfield')!;
+      expect(loc.monthlyCostTotal).toBe(4100);
+    });
+
+    it('monthlyCostTotal never goes negative even if a huge negative rent delta were applied', () => {
+      svc.setRentOverride('springfield', 0);
+      const loc = svc.fullLocations().find(l => l.id === 'springfield')!;
+      // 3400 + (0 - 1500) = 1900 — still comfortably positive here, but the
+      // clamp itself is exercised by an extreme fixture below.
+      expect(loc.monthlyCostTotal).toBe(1900);
+    });
+
+    it('clamps monthlyCostTotal at 0 rather than going negative on a large rent cut', () => {
+      // A pathological fixture whose total (200) is smaller than its rent
+      // (1500) — clearing rent to 0 would naively land at 200 - 1500 = -1300.
+      const tinyTotalLoc = { ...springfield, id: 'tiny', monthlyCostTotal: 200 } as LocationFull;
+      const patched = (svc as unknown as { withRentOverride(l: LocationFull, o: number | undefined): LocationFull })
+        .withRentOverride(tinyTotalLoc, 0);
+      expect(patched.monthlyCostTotal).toBe(0);
+    });
+
+    it('clearing the override restores monthlyCostTotal to the catalog value', () => {
+      svc.setRentOverride('springfield', 2200);
+      expect(svc.fullLocations().find(l => l.id === 'springfield')!.monthlyCostTotal).toBe(4100);
+      svc.clearRentOverride('springfield');
+      httpMock.expectOne((r) => r.method === 'DELETE').flush({ message: 'Override removed' });
+      expect(svc.fullLocations().find(l => l.id === 'springfield')!.monthlyCostTotal).toBe(3400);
+    });
+
+    it('leaves non-overridden locations\' monthlyCostTotal untouched', () => {
+      svc.setRentOverride('springfield', 2200);
+      const shelby = svc.fullLocations().find(l => l.id === 'shelbyville')!;
+      expect(shelby.monthlyCostTotal).toBe(3000);
+      expect(shelby.monthlyCosts.rent.typical).toBe(1100);
     });
 
     it('propagates into selectedFullLocations()', () => {
