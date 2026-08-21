@@ -20,6 +20,16 @@ export interface Neighborhood {
   expats: { communitySize: string; englishPrevalence: string };
   character_notes?: string;
   sources?: Source[];
+  /** Latitude for map placement. Field name matches the retired React
+   *  dashboard's `Neighborhood` type (A4 parity port #1); no
+   *  neighborhoods.json row carries it yet, but the API passes through
+   *  whatever the data file has. */
+  lat?: number;
+  /** Longitude for map placement. See `lat`. */
+  lng?: number;
+  /** Explicit external map URL (e.g. a hand-picked Google Maps link),
+   *  taking priority over lat/lng-derived URLs when present. */
+  mapUrl?: string;
 }
 
 export interface NeighborhoodsSupplement {

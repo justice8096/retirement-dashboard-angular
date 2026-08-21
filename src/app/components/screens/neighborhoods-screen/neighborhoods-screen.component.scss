@@ -81,12 +81,18 @@
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px;
     }
-    .nbh-top { display: flex; justify-content: space-between; align-items: center; }
+    .nbh-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .nbh-name { font-size: 14px; font-weight: 700; color: var(--dark-text); margin: 0; }
+    .nbh-top-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .nbh-safety {
       font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
       text-transform: capitalize;
     }
+    .nbh-maps-link {
+      font-size: 10px; color: var(--dark-blue); white-space: nowrap;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
+    .nbh-maps-link:hover { color: var(--dark-amber); }
     .nbh-safety.high { background: rgba(76, 175, 80, 0.12); color: var(--dark-green); }
     .nbh-safety.moderate-high { background: rgba(212, 148, 58, 0.12); color: var(--dark-amber); }
     .nbh-safety.moderate { background: rgba(139, 157, 195, 0.15); color: var(--dark-neutral); }

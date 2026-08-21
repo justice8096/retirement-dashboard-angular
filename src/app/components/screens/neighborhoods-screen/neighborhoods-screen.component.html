@@ -48,7 +48,16 @@
               <div class="nbh-card">
                 <div class="nbh-top">
                   <h4 class="nbh-name">{{ nbh.name }}</h4>
-                  <span class="nbh-safety" [class]="safetyClass(nbh.safetyRating)">{{ nbh.safetyRating }}</span>
+                  <div class="nbh-top-actions">
+                    <span class="nbh-safety" [class]="safetyClass(nbh.safetyRating)">{{ nbh.safetyRating }}</span>
+                    <a class="nbh-maps-link"
+                      [href]="mapsUrl(nbh)"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      [attr.aria-label]="'View ' + nbh.name + ' on Google Maps'">
+                      Google Maps
+                    </a>
+                  </div>
                 </div>
                 <p class="nbh-desc">{{ nbh.description }}</p>
                 <div class="nbh-character">{{ nbh.character }}</div>

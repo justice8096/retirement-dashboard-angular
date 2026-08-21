@@ -10,6 +10,8 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
 import { NeighborhoodsSupplement, Neighborhood, LocationFull } from '@models/api.model';
 import * as L from 'leaflet';
 import { getCityCenter } from '@app/data/city-coordinates';
+import { getGoogleMapsUrl } from '@app/data/google-maps-url';
+import { escHtml } from '@app/lib/text-escape';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 /* Fix Leaflet default icon paths. Self-hosted in public/leaflet/ (copied from
@@ -42,6 +44,10 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
   readonly mapEl = viewChild<ElementRef>('mapEl');
   private map: L.Map | null = null;
   private markers: L.Marker[] = [];
+  /** Separate layer for per-neighborhood pins (A4 parity port #1), kept
+   *  apart from the city-center `markers` above so the two can be
+   *  cleared/redrawn independently. */
+  private nbhMarkerLayer: L.LayerGroup | null = null;
 
   readonly activeCity = signal<string | null>(null);
   readonly supplementMap = signal<Record<string, NeighborhoodsSupplement | null>>({});
@@ -77,7 +83,12 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
   ngAfterViewInit(): void {
     this.initMap();
     // Update markers once locations load
-    setTimeout(() => this.updateMapMarkers(), 1500);
+    setTimeout(() => {
+      this.updateMapMarkers();
+      // Covers the (unlikely but possible) case where the initial city's
+      // neighborhood supplement resolved before the map finished init.
+      this.syncNeighborhoodPins(this.activeSupplement());
+    }, 1500);
   }
 
   ngOnDestroy(): void {
@@ -92,6 +103,10 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
       const coords = getCityCenter(id);
       if (coords) this.map.flyTo(coords, 8, { duration: 1 });
     }
+    // Reflect whatever is already known for this city (clears stale pins
+    // from the previous city immediately; loadSupplement's callback below
+    // repaints them once/if the fetch resolves).
+    this.syncNeighborhoodPins(this.activeSupplement());
   }
 
   goToOverview(): void {
@@ -106,10 +121,15 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
       next: (data) => {
         this.supplementMap.update(m => ({ ...m, [locId]: data as NeighborhoodsSupplement }));
         this.loadingSet.update(s => { const n = new Set(s); n.delete(locId); return n; });
+        // Only repaint pins if the user hasn't since switched to another
+        // city — otherwise a slow, stale request would clobber the
+        // pins for whatever city is now active.
+        if (this.activeCity() === locId) this.syncNeighborhoodPins(this.activeSupplement());
       },
       error: () => {
         this.supplementMap.update(m => ({ ...m, [locId]: null }));
         this.loadingSet.update(s => { const n = new Set(s); n.delete(locId); return n; });
+        if (this.activeCity() === locId) this.syncNeighborhoodPins(null);
       },
     });
   }
@@ -130,6 +150,54 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
       subdomains: 'abcd',
       maxZoom: 19,
     }).addTo(this.map);
+
+    this.nbhMarkerLayer = L.layerGroup().addTo(this.map);
+  }
+
+  /**
+   * Draw one pin per neighborhood that has lat/lng, with a popup showing
+   * name + character + walk score + an "Open in Google Maps" link — this
+   * matches what the React reference's `NeighborhoodMap` popup actually
+   * rendered (it does not show rent).
+   *
+   * No neighborhoods.json row has lat/lng today, so this always clears
+   * down to zero pins in practice; when it has none to draw, the
+   * existing city-center marker from `updateMapMarkers()` remains the
+   * only pin for that city, unchanged.
+   */
+  private syncNeighborhoodPins(supp: NeighborhoodsSupplement | null): void {
+    if (!this.map || !this.nbhMarkerLayer) return;
+    this.nbhMarkerLayer.clearLayers();
+    if (!supp) return;
+
+    const cityName = supp.city;
+    const points: L.LatLngTuple[] = [];
+
+    for (const nh of supp.neighborhoods) {
+      if (nh.lat === undefined || nh.lng === undefined) continue;
+
+      const popupHtml = `
+        <div style="min-width:180px">
+          <strong>${escHtml(nh.name)}</strong>
+          ${nh.character ? `<div style="font-size:12px;margin-top:4px">${escHtml(nh.character)}</div>` : ''}
+          ${nh.walkabilityScore !== undefined ? `<div style="font-size:12px;margin-top:4px">Walk Score: <strong>${escHtml(nh.walkabilityScore)}</strong></div>` : ''}
+          <a href="${escHtml(getGoogleMapsUrl(nh, cityName))}" target="_blank" rel="noopener noreferrer" style="font-size:12px;margin-top:6px;display:inline-block">Open in Google Maps</a>
+        </div>`;
+
+      L.marker([nh.lat, nh.lng]).bindPopup(popupHtml).addTo(this.nbhMarkerLayer);
+      points.push([nh.lat, nh.lng]);
+    }
+
+    if (points.length > 1) {
+      this.map.flyToBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 13, duration: 0.8 });
+    } else if (points.length === 1) {
+      this.map.flyTo(points[0], 13, { duration: 0.8 });
+    }
+  }
+
+  /** URL for the card's "Open in Google Maps" link — see `getGoogleMapsUrl`. */
+  mapsUrl(nh: Neighborhood): string {
+    return getGoogleMapsUrl(nh, this.activeSupplement()?.city);
   }
 
   updateMapMarkers(): void {
