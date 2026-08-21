@@ -20,6 +20,7 @@ import {
   FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026,
 } from '@app/lib/tax-sources';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
+import { DEFAULT_CHILD_SUPPORT_UNTIL_AGE, DEFAULT_DEPENDENT_MONTHLY_COST } from '@app/lib/household-costs';
 
 const PATH_CHART_W = 640;
 const PATH_CHART_H = 260;
@@ -217,13 +218,29 @@ export class MonteCarloStateService {
   readonly baseCost = computed(() => {
     const l = this.selectedLoc();
     if (!l?.monthlyCosts) return 0;
-    return this.loc.nonHealthcareBaseMonthly(l) + this.healthcare.decide(l).monthlyCost;
+    // The pet cost curve REPLACES the flat pet categories — exclude them
+    // from the base so pets aren't double-counted (see household-costs.ts).
+    const petExcluded = this.petCurveEnabled() ? this.loc.petMonthlyTotal(l) : 0;
+    return this.loc.nonHealthcareBaseMonthly(l) - petExcluded + this.healthcare.decide(l).monthlyCost;
   });
 
   /** Non-dependent adults in the household, in sort order. */
   readonly adults = computed(() =>
     (this.household()?.members ?? []).filter(m => m.role !== 'dependent')
   );
+
+  /** Dependent members (children / supported adults), in sort order. */
+  readonly dependents = computed(() =>
+    (this.household()?.members ?? []).filter(m => m.role === 'dependent')
+  );
+
+  // Pets & dependents cost curves — per-year arrays replacing the flat
+  // pet categories / adding explicit dependent costs (household-costs.ts).
+  readonly petCurveEnabled = signal(false);
+  readonly replacePets = signal(false);
+  readonly dependentCurveEnabled = signal(false);
+  readonly dependentMonthlyCost = signal(DEFAULT_DEPENDENT_MONTHLY_COST);
+  readonly childSupportUntilAge = signal(DEFAULT_CHILD_SUPPORT_UNTIL_AGE);
 
   readonly survivorMonthlySs = computed(() => {
     const adults = this.adults();
@@ -503,6 +520,10 @@ export class MonteCarloStateService {
       this.oneTimeIncomes(); this.oneTimeIncomesEnabled();
       this.inheritedIRAs(); this.inheritedIRAsEnabled();
       this.propertySales(); this.propertySalesEnabled();
+      // Pets & dependents cost curves — the kernel arrays are rebuilt from
+      // these each run, so any edit invalidates prior results.
+      this.petCurveEnabled(); this.replacePets();
+      this.dependentCurveEnabled(); this.dependentMonthlyCost(); this.childSupportUntilAge();
       this.ltcMode(); this.ltcProbability(); this.ltcCostPerYearUSD();
       this.ltcDurationYears(); this.ltcStartAgeMin(); this.ltcStartAgeMax();
       this.ltcInsuranceMonthly(); this.ltcInsuranceStartAge();

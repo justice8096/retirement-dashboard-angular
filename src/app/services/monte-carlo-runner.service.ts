@@ -8,6 +8,7 @@ import { LocationFull } from '@models/api.model';
 import { runMonteCarlo } from '@app/lib/monte-carlo';
 import { aggregateRentalIncome } from '@app/lib/rental-income';
 import { monthlyMedicareFor } from '@app/lib/irmaa';
+import { buildPetCostByYear, buildDependentCostByYear } from '@app/lib/household-costs';
 
 /**
  * Orchestrates a Monte Carlo simulation run: assembles the kernel-ready
@@ -62,6 +63,11 @@ export class MonteCarloRunnerService {
           ? this.healthcare.decideConsistent(planLoc).magiUsed
           : this.healthcare.magi().magiForAca;
         const transitionMagi = this.computeTransitionMagi(planLoc, steadyMagi);
+
+        // Pets & dependents cost curves — built before the params object so
+        // segment building (which excludes flat pet categories when the pet
+        // curve is on) and the kernel arrays stay consistent for this run.
+        const householdCurves = this.buildHouseholdCostCurves(s.years());
 
         const result = runMonteCarlo({
           portfolio: s.portfolio(),
@@ -149,6 +155,11 @@ export class MonteCarloRunnerService {
           mortgageEndYear: Number(f.mortgageEndYear) || 0,
           inheritanceTaxByYear: s.spouseDeathEnabled() ? this.buildInheritanceTaxByYear(s.years()) : undefined,
           medicareMonthlyByYear: this.buildMedicareMonthlyByYear(s.years()),
+          // Per-year pet / dependent cost curves (annual USD, today's $).
+          // The pet curve replaces the flat pet categories excluded from
+          // each segment's nonHealthcareBase above.
+          petCostByYear: householdCurves.petCostByYear,
+          dependentCostByYear: householdCurves.dependentCostByYear,
           survivorRelocate: this.buildSurvivorRelocate(),
           regime: {
             bullMean: s.regimeBullMean() / 100,
@@ -205,7 +216,11 @@ export class MonteCarloRunnerService {
    *  healthcare/tax breakdown so the sim can swap ACA → Medicare per year. */
   private buildSegmentForLocation(loc: LocationFull, fromYear: number, moveCostUSD?: number) {
     const monthlyCosts = loc.monthlyCosts ?? {};
-    const nonHealthcareBase = this.loc.nonHealthcareBaseMonthly(loc);
+    // When the pet cost curve is enabled it REPLACES the flat pet
+    // categories — exclude them from the segment base so pets aren't
+    // double-counted (see household-costs.ts).
+    const petExcluded = this.state.petCurveEnabled() ? this.loc.petMonthlyTotal(loc) : 0;
+    const nonHealthcareBase = this.loc.nonHealthcareBaseMonthly(loc) - petExcluded;
     const isUS = loc.country === 'United States';
     const medicareMonthly = monthlyCosts['healthcare']?.typical ?? 0;
     const acaUnsubsidizedMonthly = monthlyCosts['healthcarePreMedicare']?.typical
@@ -401,6 +416,55 @@ export class MonteCarloRunnerService {
       arr[y] = perAdult * nAdults;
     }
     return arr;
+  }
+
+  /** Per-year pet / dependent cost curves (annual USD, today's $) built
+   *  from the household profile + the location active at each sim year.
+   *  Fields stay undefined when the respective toggle is off or the
+   *  household has nothing to model — kernel stays on the dormant path. */
+  private buildHouseholdCostCurves(years: number): {
+    petCostByYear?: number[]; dependentCostByYear?: number[];
+  } {
+    const s = this.state;
+    const simStartYear = s.household()?.planningStartYear ?? new Date().getFullYear();
+    const out: { petCostByYear?: number[]; dependentCostByYear?: number[] } = {};
+
+    if (s.petCurveEnabled()) {
+      const pets = s.household()?.pets ?? [];
+      const primary = s.selectedLoc();
+      if (pets.length && primary) {
+        const all = this.loc.fullLocations();
+        const moves = s.movesEnabled() ? s.moves() : [];
+        // Active location per sim year — same walk as buildInheritanceTaxByYear.
+        const activeAtYear = (y: number): LocationFull => {
+          let active: LocationFull = primary;
+          for (const m of moves) {
+            if (y >= m.fromYear) {
+              const loc = all.find(l => l.id === m.locationId);
+              if (loc) active = loc;
+            }
+          }
+          return active;
+        };
+        out.petCostByYear = buildPetCostByYear(pets, {
+          years, simStartYear,
+          petMonthlyTotalAtYear: (y) => this.loc.petMonthlyTotal(activeAtYear(y)),
+          replacePets: s.replacePets(),
+        });
+      }
+    }
+
+    if (s.dependentCurveEnabled()) {
+      const dependents = s.dependents();
+      if (dependents.length) {
+        out.dependentCostByYear = buildDependentCostByYear(dependents, {
+          years, simStartYear,
+          monthlyCostPerDependent: s.dependentMonthlyCost(),
+          childSupportUntilAge: s.childSupportUntilAge(),
+        });
+      }
+    }
+    return out;
   }
 
   /** Build the kernel schedule from the UI state — year 0 + any enabled moves. */
