@@ -1,7 +1,7 @@
 import { Injectable, inject, computed, signal } from '@angular/core';
 import { LocationService } from './location.service';
 import { LocationFull, IncomeTaxTable, COST_CATEGORIES } from '@models/api.model';
-import { FED_BRACKETS_2026_MFJ, FED_STD_DEDUCTION_2026 } from '@retirement/shared/engine/tax-sources.js';
+import { FED_BRACKETS_2026_MFJ, FED_BRACKETS_2026_SINGLE, FED_STD_DEDUCTION_2026 } from '@retirement/shared/engine/tax-sources.js';
 import { taxableSocialSecurity, type SsFilingStatus } from '../lib/taxable-social-security';
 
 /** How much of the annual income is Social Security, and the filing status
@@ -118,6 +118,10 @@ export class TaxService {
       taxableSSAnnual = taxableSocialSecurity(ss.ssAnnual, other, ss.filingStatus);
       bracketIncome = other + taxableSSAnnual;
     }
+    // Filing status picks the fallback federal table + standard deduction.
+    // Ambient ssContext covers callers that pass a pre-adjusted AGI with no
+    // `ss` arg (healthcare solver) — bracket CHOICE can't double-count.
+    const filing = ss?.filingStatus ?? this.ssContext().filingStatus;
     const t = loc.taxes;
     // US locations: apply the shared 2026 MFJ federal table when the seed
     // doesn't ship federal brackets. Matches what retirement-api/shared/
@@ -130,8 +134,8 @@ export class TaxService {
       const fedTable: IncomeTaxTable | undefined = hasSeedFed
         ? t!.federalIncomeTax
         : (fallbackFed ? {
-            brackets: FED_BRACKETS_2026_MFJ,
-            standardDeduction: FED_STD_DEDUCTION_2026.mfj,
+            brackets: filing === 'single' ? FED_BRACKETS_2026_SINGLE : FED_BRACKETS_2026_MFJ,
+            standardDeduction: filing === 'single' ? FED_STD_DEDUCTION_2026.single : FED_STD_DEDUCTION_2026.mfj,
           } : undefined);
       const fed = this.applyBrackets(fedTable, bracketIncome);
       const state = this.applyBrackets(t?.stateIncomeTax, bracketIncome);

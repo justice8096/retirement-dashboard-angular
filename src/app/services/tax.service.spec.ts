@@ -61,6 +61,21 @@ describe('TaxService — SS-aware income tax', () => {
     expect(r.monthlyTax).toBe(0);
   });
 
+  it('uses the single-filer table and deduction when filing status is single', () => {
+    // 72k − 16.1k single deduction = 55.9k
+    // → 10%×12.4k + 12%×38k + 22%×5.5k = 1,240 + 4,560 + 1,210 = 7,010/yr
+    const r = svc.computeIncomeTax(usLoc, 72_000, { ssAnnual: 0, filingStatus: 'single' });
+    expect(r.monthlyTax).toBeCloseTo(7_010 / 12, 5);
+  });
+
+  it('honors the ambient ssContext filing status when no ss arg is passed', () => {
+    // The healthcare solver passes pre-adjusted AGI with no ss arg — bracket
+    // CHOICE must still match the household's filing status.
+    svc.ssContext.set({ ssAnnual: 0, filingStatus: 'single' });
+    const r = svc.computeIncomeTax(usLoc, 72_000);
+    expect(r.monthlyTax).toBeCloseTo(7_010 / 12, 5);
+  });
+
   it('totalWithIncomeTax defaults to the pushed ssContext', () => {
     svc.ssContext.set({ ssAnnual: 30_000, filingStatus: 'joint' });
     // annualIncome default 72k → same 3,506/yr as the explicit case
