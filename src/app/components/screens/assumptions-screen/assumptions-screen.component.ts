@@ -15,6 +15,7 @@ import {
   MemberRole, DependentType, PetType,
 } from '@models/api.model';
 import type { RentalProperty } from '@app/lib/rental-income';
+import { spousalTopUps } from '@app/lib/ss-benefits';
 
 type MemberDraft = Partial<HouseholdMember> & { birthYear: number; role: MemberRole };
 type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
@@ -65,6 +66,14 @@ export class AssumptionsScreenComponent implements OnInit {
   );
   readonly adultCount = computed(() =>
     this.draft()?.members.filter(m => m.role !== 'dependent').length ?? 0
+  );
+
+  /** Monthly spousal top-up per member, index-aligned with draft().members.
+   *  Live preview: excess of half the other spouse's PIA over the member's
+   *  own PIA, reduced for early claiming. Zero unless a primary + spouse
+   *  pair both have a PIA entered. */
+  readonly memberSpousalTopUps = computed(() =>
+    spousalTopUps(this.draft()?.members ?? []),
   );
 
   /** True when we're in the new-user creation path (no profile existed
