@@ -106,6 +106,11 @@
                       = {{ fmtMonthly(member.ssPia ?? 0) }}/mo
                     </span>
                   }
+                  @if (memberSpousalTopUps()[i]; as spousalTopUp) {
+                    <span class="field-echo" [class]="dyscalculia.numberSpacingClass()">
+                      + {{ fmtMonthly(spousalTopUp) }}/mo spousal top-up
+                    </span>
+                  }
                 </label>
                 <label class="field compact">
                   <span class="field-label">SS FRA</span>
@@ -464,6 +469,14 @@
                     [ngModel]="healthcare.income().ssAnnual"
                     (ngModelChange)="healthcare.patchIncome({ ssAnnual: +$event }); markIncomeDirty()" />
                 </label>
+                @if (householdSsAnnualPreview(); as hhSs) {
+                  <div class="field compact hc-apply-wrap">
+                    <button mat-stroked-button class="hc-apply-btn" type="button"
+                      (click)="applyHouseholdSs()">
+                      Use household Social Security ({{ fmtAnnual(hhSs) }}/yr)
+                    </button>
+                  </div>
+                }
                 <label class="field compact">
                   <span class="field-label">Pension / other taxable ($)</span>
                   <input appNumeric="currency" class="field-input" step="500"

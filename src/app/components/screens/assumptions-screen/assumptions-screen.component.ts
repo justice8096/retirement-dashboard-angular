@@ -16,6 +16,7 @@ import {
 } from '@models/api.model';
 import type { RentalProperty } from '@retirement/shared/engine/rental-income.js';
 import { estimateBenefitAtClaim, formatClaimAge } from '@app/lib/social-security';
+import { spousalTopUps, householdSsAnnual } from '@app/lib/ss-benefits';
 
 type MemberDraft = Partial<HouseholdMember> & { birthYear: number; role: MemberRole };
 type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
@@ -67,6 +68,28 @@ export class AssumptionsScreenComponent implements OnInit {
   readonly adultCount = computed(() =>
     this.draft()?.members.filter(m => m.role !== 'dependent').length ?? 0
   );
+
+  /** Monthly spousal top-up per member, index-aligned with draft().members.
+   *  Live preview: excess of half the other spouse's PIA over the member's
+   *  own PIA, reduced for early claiming. Zero unless a primary + spouse
+   *  pair both have a PIA entered. */
+  readonly memberSpousalTopUps = computed(() =>
+    spousalTopUps(this.draft()?.members ?? []),
+  );
+
+  /** Household annual SS (own benefits + spousal top-ups, × 12) from the
+   *  live member draft — mirrors the server's /me/household/ss-benefits
+   *  totalAnnual, but includes unsaved edits. Drives the ssAnnual apply
+   *  button in the income-composition card. */
+  readonly householdSsAnnualPreview = computed(() =>
+    householdSsAnnual(this.draft()?.members ?? []),
+  );
+
+  /** Fill the income composition's Social Security from the members above. */
+  applyHouseholdSs(): void {
+    this.healthcare.patchIncome({ ssAnnual: this.householdSsAnnualPreview() });
+    this.markIncomeDirty();
+  }
 
   /** True when we're in the new-user creation path (no profile existed
    *  on the server). Drives the welcome banner and the save-button label. */
@@ -176,6 +199,7 @@ export class AssumptionsScreenComponent implements OnInit {
   /** Currency formatters that honor the user's dyscalculia number-format preference. */
   fmtYearly(v: number): string { return this.currency.currencyYearly(v); }
   fmtMonthly(v: number): string { return this.currency.currencyMonthly(v); }
+  fmtAnnual(v: number): string { return this.currency.currency(v); }
 
   /** Clamp the months input to SSA's 0-11 range (a 12 belongs in years). */
   clampMonths(v: number): number {
