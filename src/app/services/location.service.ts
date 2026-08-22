@@ -238,10 +238,18 @@ export class LocationService {
 
   /* ─── Supplement data ──────────────────────────────────────────── */
   readonly supplementCache = signal<Record<string, Record<string, unknown>>>({});
+  /** Plain-language fetch-failure message per `${locId}:${dataType}` key.
+   *  A key is present only while its last fetch failed with something other
+   *  than a 404 — a 404 means "this location has no such supplement" and is
+   *  cached as an empty supplement instead (same convention as
+   *  `preloadNeighborhoodsForSelected`'s batch misses), so consumers fall
+   *  through to their "data not available" cards rather than a retry UI. */
+  readonly supplementErrors = signal<Record<string, string>>({});
 
   loadSupplement(locId: string, dataType: SupplementType): void {
     const cacheKey = `${locId}:${dataType}`;
     if (this.supplementCache()[cacheKey]) return;
+    this.clearSupplementError(cacheKey);
     this.api.getLocationSupplement(locId, dataType).subscribe({
       next: (data) => {
         this.supplementCache.update(cache => ({
@@ -250,13 +258,44 @@ export class LocationService {
         }));
       },
       error: (err) => {
+        if (err?.status === 404) {
+          this.supplementCache.update(cache => ({ ...cache, [cacheKey]: {} }));
+          return;
+        }
         console.warn(`LocationService: supplement fetch failed (${dataType} for ${locId}).`, err);
+        this.supplementErrors.update(m => ({
+          ...m,
+          [cacheKey]: "Could not load this location's data. Check your connection and try again.",
+        }));
       },
     });
   }
 
   getSupplement(locId: string, dataType: SupplementType): Record<string, unknown> | null {
     return this.supplementCache()[`${locId}:${dataType}`] ?? null;
+  }
+
+  /** The plain-language failure message for one location's supplement, or
+   *  null when it loaded fine, resolved as "no data" (404), or hasn't been
+   *  requested/settled yet. Signal-backed — safe to read from computeds. */
+  supplementError(locId: string, dataType: SupplementType): string | null {
+    return this.supplementErrors()[`${locId}:${dataType}`] ?? null;
+  }
+
+  /** Clears a failed supplement's error and refetches it. The error clears
+   *  immediately so consumers drop back to their loading state while the
+   *  new request is in flight. */
+  retrySupplement(locId: string, dataType: SupplementType): void {
+    this.loadSupplement(locId, dataType);
+  }
+
+  private clearSupplementError(cacheKey: string): void {
+    if (!(cacheKey in this.supplementErrors())) return;
+    this.supplementErrors.update(m => {
+      const next = { ...m };
+      delete next[cacheKey];
+      return next;
+    });
   }
 
   /**

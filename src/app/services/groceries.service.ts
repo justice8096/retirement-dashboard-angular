@@ -81,6 +81,21 @@ export class GroceriesService {
     return id ? this.loc.getSupplement(id, 'detailed-costs') !== null : false;
   });
 
+  /** Plain-language message when the active location's catalog fetch failed
+   *  (`catalogLoaded` stays false in that case, so check this first to show
+   *  an error + retry instead of an infinite "Loading…"). Null while
+   *  loading, on success, and for locations with no detailed data. */
+  readonly catalogError = computed(() => {
+    const id = this.activeLocationId();
+    return id ? this.loc.supplementError(id, 'detailed-costs') : null;
+  });
+
+  /** Refetches the active location's catalog after a failed load. */
+  retryCatalog(): void {
+    const id = this.activeLocationId();
+    if (id) this.loc.retrySupplement(id, 'detailed-costs');
+  }
+
   /** Catalog items merged with overrides — the source for both the item
    *  table and every total below. */
   readonly workingItems = computed<GroceryWorkingItem[]>(() => {

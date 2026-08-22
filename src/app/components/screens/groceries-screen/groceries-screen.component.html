@@ -31,7 +31,12 @@
       }
     </div>
 
-    @if (!groceries.catalogLoaded()) {
+    @if (groceries.catalogError(); as err) {
+      <div class="status-msg error retryable">
+        <span>{{ err }}</span>
+        <button mat-stroked-button (click)="groceries.retryCatalog()">Try again</button>
+      </div>
+    } @else if (!groceries.catalogLoaded()) {
       <div class="status-msg">Loading grocery items…</div>
     } @else if (!groceries.activeCatalog().length) {
       <!-- Fallback: no per-item catalog for this location -->

@@ -120,3 +120,16 @@
     }
 
     .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+
+    // Matches the groceries screen's fetch-error banner.
+    .status-msg.error.retryable {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+      color: var(--dark-red, #E57373);
+      text-align: left;
+      padding: 10px 14px;
+      background: rgba(229, 115, 115, 0.08);
+      border: 1px solid rgba(229, 115, 115, 0.25);
+      border-radius: 8px;
+      font-size: 12px;
+    }

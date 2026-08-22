@@ -108,6 +108,45 @@ describe('GroceriesService', () => {
     });
   });
 
+  describe('catalog error surfacing', () => {
+    it('a failed catalog fetch surfaces catalogError and keeps catalogLoaded false', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      svc.setActiveLocation('test-loc');
+      const req = httpMock.expectOne((r) => r.url.endsWith('/locations/test-loc/detailed-costs'));
+      req.flush({}, { status: 500, statusText: 'Server Error' });
+
+      expect(svc.catalogLoaded()).toBe(false);
+      expect(svc.catalogError()).toMatch(/could not load/i);
+      warnSpy.mockRestore();
+    });
+
+    it('retryCatalog clears the error and re-fetches; success renders the catalog', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      svc.setActiveLocation('test-loc');
+      httpMock.expectOne((r) => r.url.endsWith('/locations/test-loc/detailed-costs'))
+        .flush({}, { status: 500, statusText: 'Server Error' });
+
+      svc.retryCatalog();
+      expect(svc.catalogError()).toBeNull();
+      httpMock.expectOne((r) => r.url.endsWith('/locations/test-loc/detailed-costs'))
+        .flush({ groceries: sampleCatalog });
+
+      expect(svc.catalogLoaded()).toBe(true);
+      expect(svc.activeCatalog()).toHaveLength(2);
+      warnSpy.mockRestore();
+    });
+
+    it('a 404 catalog (no detailed data for this location) resolves as loaded-and-empty, not an error', () => {
+      svc.setActiveLocation('test-loc');
+      httpMock.expectOne((r) => r.url.endsWith('/locations/test-loc/detailed-costs'))
+        .flush({ error: 'Data not found' }, { status: 404, statusText: 'Not Found' });
+
+      expect(svc.catalogLoaded()).toBe(true);
+      expect(svc.activeCatalog()).toEqual([]);
+      expect(svc.catalogError()).toBeNull();
+    });
+  });
+
   describe('workingItems / totals', () => {
     beforeEach(() => {
       svc.load();

@@ -345,3 +345,126 @@ describe('LocationService — rent overrides', () => {
     });
   });
 });
+
+/**
+ * Supplement fetch error handling — a failed `loadSupplement` used to leave
+ * both the cache and consumers' loading state unset forever, so screens
+ * (groceries, neighborhoods) showed an infinite "Loading…" on any fetch
+ * error. Now:
+ *   - a transport/server error records a plain-language, per-location/
+ *     per-type error readable via `supplementError()`, leaving the cache
+ *     unset so a retry can refetch;
+ *   - a 404 means "this location has no such supplement" (the API's
+ *     documented shape) and caches an empty supplement instead — the same
+ *     convention `preloadNeighborhoodsForSelected` uses for batch misses —
+ *     so screens fall through to their "data not available" cards;
+ *   - `retrySupplement` (and any later `loadSupplement`) clears the error
+ *     and re-issues the request.
+ */
+describe('LocationService — supplement error handling', () => {
+  let svc: LocationService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    });
+    svc = TestBed.inject(LocationService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('caches a successful fetch and records no error', () => {
+    svc.loadSupplement('lisbon', 'neighborhoods');
+    const req = httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'));
+    req.flush({ city: 'Lisbon', neighborhoods: [] });
+
+    expect(svc.getSupplement('lisbon', 'neighborhoods')).toEqual({ city: 'Lisbon', neighborhoods: [] });
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toBeNull();
+  });
+
+  it('a failed fetch records a plain-language per-key error and leaves the cache unset', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    svc.loadSupplement('lisbon', 'neighborhoods');
+    const req = httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'));
+    req.flush({}, { status: 500, statusText: 'Server Error' });
+
+    expect(svc.getSupplement('lisbon', 'neighborhoods')).toBeNull();
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toMatch(/could not load/i);
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toMatch(/try again/i);
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('a 404 caches an empty supplement ("no data for this location"), not an error', () => {
+    svc.loadSupplement('lisbon', 'detailed-costs');
+    const req = httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/detailed-costs'));
+    req.flush({ error: 'Data not found' }, { status: 404, statusText: 'Not Found' });
+
+    expect(svc.getSupplement('lisbon', 'detailed-costs')).toEqual({});
+    expect(svc.supplementError('lisbon', 'detailed-costs')).toBeNull();
+
+    // Known-empty — a later load must not refetch.
+    svc.loadSupplement('lisbon', 'detailed-costs');
+    httpMock.expectNone((r) => r.url.endsWith('/locations/lisbon/detailed-costs'));
+  });
+
+  it('errors are scoped to their location+type key', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    svc.loadSupplement('lisbon', 'neighborhoods');
+    svc.loadSupplement('porto', 'neighborhoods');
+    svc.loadSupplement('lisbon', 'detailed-costs');
+    httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'))
+      .flush({}, { status: 500, statusText: 'Server Error' });
+    httpMock.expectOne((r) => r.url.endsWith('/locations/porto/neighborhoods'))
+      .flush({ city: 'Porto', neighborhoods: [] });
+    httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/detailed-costs'))
+      .flush({ groceries: { categories: [] } });
+
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toMatch(/could not load/i);
+    expect(svc.supplementError('porto', 'neighborhoods')).toBeNull();
+    expect(svc.supplementError('lisbon', 'detailed-costs')).toBeNull();
+    warnSpy.mockRestore();
+  });
+
+  it('retrySupplement clears the error and re-issues the request', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    svc.loadSupplement('lisbon', 'neighborhoods');
+    httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'))
+      .flush({}, { status: 500, statusText: 'Server Error' });
+    expect(svc.supplementError('lisbon', 'neighborhoods')).not.toBeNull();
+
+    svc.retrySupplement('lisbon', 'neighborhoods');
+    // The retry clears the error immediately so consumers drop back to
+    // their loading state while the new request is in flight.
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toBeNull();
+    const retryReq = httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'));
+    retryReq.flush({ city: 'Lisbon', neighborhoods: [] });
+
+    expect(svc.getSupplement('lisbon', 'neighborhoods')).toEqual({ city: 'Lisbon', neighborhoods: [] });
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toBeNull();
+    warnSpy.mockRestore();
+  });
+
+  it('a later loadSupplement after an error also refetches and clears the error', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    svc.loadSupplement('lisbon', 'neighborhoods');
+    httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'))
+      .flush({}, { status: 500, statusText: 'Server Error' });
+
+    // E.g. the user navigates away and back — the screen's ngOnInit calls
+    // loadSupplement again; that alone must recover, not just retrySupplement.
+    svc.loadSupplement('lisbon', 'neighborhoods');
+    expect(svc.supplementError('lisbon', 'neighborhoods')).toBeNull();
+    httpMock.expectOne((r) => r.url.endsWith('/locations/lisbon/neighborhoods'))
+      .flush({ city: 'Lisbon', neighborhoods: [] });
+    expect(svc.getSupplement('lisbon', 'neighborhoods')).toEqual({ city: 'Lisbon', neighborhoods: [] });
+    warnSpy.mockRestore();
+  });
+});

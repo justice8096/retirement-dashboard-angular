@@ -28,7 +28,7 @@
               [class.active]="activeCity() === city.id"
               (click)="selectCity(city.id)">
               {{ city.name }}
-              @if (supplementMap()[city.id]; as supp) {
+              @if (suppFor(city.id); as supp) {
                 <span class="pill-count">{{ supp.neighborhoods.length }}</span>
               }
             </button>
@@ -36,7 +36,12 @@
         </div>
 
         <!-- Neighborhood content -->
-        @if (isLoading()) {
+        @if (activeError(); as err) {
+          <div class="status-msg error retryable">
+            <span>{{ err }}</span>
+            <button mat-stroked-button (click)="retry()">Try again</button>
+          </div>
+        } @else if (isLoading()) {
           <div class="status-msg">Loading neighborhoods…</div>
         } @else if (activeSupplement()) {
           <div class="nbh-header-row">
@@ -80,22 +85,22 @@
                 @if (nbh.housing) {
                   <div class="housing-section">
                     <div class="housing-row">
-                      @if (nbh.housing.avgRentOneBedroomEUR) {
+                      @if (housingPrice(nbh.housing, 'rentOneBedroom'); as p) {
                         <div class="housing-item">
                           <span class="h-label">1BR Rent</span>
-                          <span class="h-value">€{{ nbh.housing.avgRentOneBedroomEUR.toLocaleString() }}</span>
+                          <span class="h-value">{{ p.symbol }}{{ p.amount.toLocaleString() }}</span>
                         </div>
                       }
-                      @if (nbh.housing.avgRentTwoBedroomEUR) {
+                      @if (housingPrice(nbh.housing, 'rentTwoBedroom'); as p) {
                         <div class="housing-item">
                           <span class="h-label">2BR Rent</span>
-                          <span class="h-value">€{{ nbh.housing.avgRentTwoBedroomEUR.toLocaleString() }}</span>
+                          <span class="h-value">{{ p.symbol }}{{ p.amount.toLocaleString() }}</span>
                         </div>
                       }
-                      @if (nbh.housing.buyPricePerSqmEUR) {
+                      @if (housingPrice(nbh.housing, 'buyPricePerSqm'); as p) {
                         <div class="housing-item">
                           <span class="h-label">Buy/m²</span>
-                          <span class="h-value">€{{ nbh.housing.buyPricePerSqmEUR.toLocaleString() }}</span>
+                          <span class="h-value">{{ p.symbol }}{{ p.amount.toLocaleString() }}</span>
                         </div>
                       }
                     </div>

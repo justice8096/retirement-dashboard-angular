@@ -9,6 +9,10 @@
   border-radius: 8px;
   font-size: 12px;
 }
+.status-msg.error.retryable {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
 
 .empty-state {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

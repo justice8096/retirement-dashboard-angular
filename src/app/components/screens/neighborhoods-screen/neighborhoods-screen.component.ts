@@ -3,15 +3,16 @@ import {
   ElementRef, viewChild, AfterViewInit, effect,
   ChangeDetectionStrategy
 } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { LocationService } from '@services/location.service';
 import { NavigationService } from '@services/navigation.service';
-import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
-import { NeighborhoodsSupplement, Neighborhood, LocationFull } from '@models/api.model';
+import { NeighborhoodsSupplement, Neighborhood, NeighborhoodHousing, LocationFull } from '@models/api.model';
 import * as L from 'leaflet';
 import { getCityCenter } from '@app/data/city-coordinates';
 import { getGoogleMapsUrl } from '@app/data/google-maps-url';
 import { escHtml } from '@app/lib/text-escape';
+import { resolveHousingPrice, HousingField, ResolvedHousingPrice } from '@app/lib/housing-currency';
 import { SourceTooltipComponent } from '@components/source-tooltip/source-tooltip.component';
 
 /* Fix Leaflet default icon paths. Self-hosted in public/leaflet/ (copied from
@@ -30,7 +31,7 @@ L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, ic
 @Component({
   selector: 'app-neighborhoods-screen',
   standalone: true,
-  imports: [SourceTooltipComponent],
+  imports: [MatButtonModule, SourceTooltipComponent],
   templateUrl: './neighborhoods-screen.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrls: ['./neighborhoods-screen.component.scss'],
@@ -38,7 +39,6 @@ L.Marker.prototype.options.icon = L.icon({ iconUrl, iconRetinaUrl, shadowUrl, ic
 export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly loc = inject(LocationService);
   private readonly nav = inject(NavigationService);
-  readonly api = inject(ApiService);
   readonly dyscalculia = inject(DyscalculiaService);
 
   readonly mapEl = viewChild<ElementRef>('mapEl');
@@ -50,8 +50,6 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
   private nbhMarkerLayer: L.LayerGroup | null = null;
 
   readonly activeCity = signal<string | null>(null);
-  readonly supplementMap = signal<Record<string, NeighborhoodsSupplement | null>>({});
-  readonly loadingSet = signal<Set<string>>(new Set());
 
   readonly selectedCities = computed(() => {
     const ids = this.loc.selectedIds();
@@ -62,15 +60,45 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
     this.loc.fullLocations().find(l => l.id === this.activeCity()) ?? null
   );
 
+  /* Supplement state now reads through `LocationService`'s shared cache +
+   * per-key error signals (previously a screen-local map that swallowed
+   * fetch errors into an eternal null). Sharing the cache also means data
+   * preloaded by `preloadNeighborhoodsForSelected` renders instantly here. */
+
+  /** A city's neighborhoods supplement from the shared cache, or null when
+   *  unfetched, still in flight, failed, or resolved as "no data" (an empty
+   *  object — the 404/batch-miss convention). */
+  suppFor(id: string): NeighborhoodsSupplement | null {
+    const sup = this.loc.getSupplement(id, 'neighborhoods') as unknown as NeighborhoodsSupplement | null;
+    return sup?.neighborhoods ? sup : null;
+  }
+
   readonly isLoading = computed(() => {
     const id = this.activeCity();
-    return id ? this.loadingSet().has(id) : false;
+    if (!id) return false;
+    return this.loc.getSupplement(id, 'neighborhoods') === null
+      && !this.loc.supplementError(id, 'neighborhoods');
+  });
+
+  /** Plain-language message when the active city's supplement fetch failed —
+   *  drives the error card + "Try again" instead of an infinite spinner. */
+  readonly activeError = computed<string | null>(() => {
+    const id = this.activeCity();
+    return id ? this.loc.supplementError(id, 'neighborhoods') : null;
   });
 
   readonly activeSupplement = computed<NeighborhoodsSupplement | null>(() => {
     const id = this.activeCity();
-    return id ? (this.supplementMap()[id] ?? null) : null;
+    return id ? this.suppFor(id) : null;
   });
+
+  constructor() {
+    // Repaints per-neighborhood pins whenever the active city or its
+    // supplement changes — replaces the old per-request repaint callbacks,
+    // which needed manual stale-response guards and couldn't see loads
+    // that resolved through the shared cache.
+    effect(() => this.syncNeighborhoodPins(this.activeSupplement()));
+  }
 
   ngOnInit(): void {
     this.loc.loadFull();
@@ -97,41 +125,23 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
 
   selectCity(id: string): void {
     this.activeCity.set(id);
-    this.loadSupplement(id);
-    // Pan map to location
+    this.loc.loadSupplement(id, 'neighborhoods');
+    // Pan map to location. Per-neighborhood pins follow via the
+    // constructor effect on activeSupplement().
     if (this.map) {
       const coords = getCityCenter(id);
       if (coords) this.map.flyTo(coords, 8, { duration: 1 });
     }
-    // Reflect whatever is already known for this city (clears stale pins
-    // from the previous city immediately; loadSupplement's callback below
-    // repaints them once/if the fetch resolves).
-    this.syncNeighborhoodPins(this.activeSupplement());
+  }
+
+  retry(): void {
+    const id = this.activeCity();
+    if (id) this.loc.retrySupplement(id, 'neighborhoods');
   }
 
   goToOverview(): void {
     this.nav.selectScreen('overview');
     this.nav.selectCategory('locations');
-  }
-
-  private loadSupplement(locId: string): void {
-    if (this.supplementMap()[locId] !== undefined) return;
-    this.loadingSet.update(s => { const n = new Set(s); n.add(locId); return n; });
-    this.api.getLocationSupplement(locId, 'neighborhoods').subscribe({
-      next: (data) => {
-        this.supplementMap.update(m => ({ ...m, [locId]: data as NeighborhoodsSupplement }));
-        this.loadingSet.update(s => { const n = new Set(s); n.delete(locId); return n; });
-        // Only repaint pins if the user hasn't since switched to another
-        // city — otherwise a slow, stale request would clobber the
-        // pins for whatever city is now active.
-        if (this.activeCity() === locId) this.syncNeighborhoodPins(this.activeSupplement());
-      },
-      error: () => {
-        this.supplementMap.update(m => ({ ...m, [locId]: null }));
-        this.loadingSet.update(s => { const n = new Set(s); n.delete(locId); return n; });
-        if (this.activeCity() === locId) this.syncNeighborhoodPins(null);
-      },
-    });
   }
 
   private initMap(): void {
@@ -193,6 +203,12 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
     } else if (points.length === 1) {
       this.map.flyTo(points[0], 13, { duration: 0.8 });
     }
+  }
+
+  /** Housing figure in whichever currency the data file prices it (EUR
+   *  preferred, USD fallback) — see `resolveHousingPrice`. */
+  housingPrice(housing: NeighborhoodHousing | undefined, field: HousingField): ResolvedHousingPrice | null {
+    return resolveHousingPrice(housing, field);
   }
 
   /** URL for the card's "Open in Google Maps" link — see `getGoogleMapsUrl`. */
