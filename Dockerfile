@@ -33,6 +33,13 @@ FROM node:25-alpine@sha256:bdf2cca6fe3dabd014ea60163eca3f0f7015fbd5c7ee1b0e9ccb4
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
+# npm installs the "@retirement/shared": "file:../retirement-api/shared"
+# dependency as a SYMLINK (node_modules/@retirement/shared →
+# /retirement-api/shared). The COPY above preserves that symlink but not its
+# target, so restore the target in this stage too or `ng build` fails with
+# "Could not resolve @retirement/shared/engine/*" (broke every rogue deploy
+# after the engine-consolidation merge).
+COPY --from=shared-src . /retirement-api/shared
 COPY angular.json tsconfig.json tsconfig.app.json package.json ./
 COPY src ./src
 COPY public ./public
