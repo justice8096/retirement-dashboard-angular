@@ -31,12 +31,13 @@ import {
  * `feat(shared): port calcCAPEWithdrawal...` commit), so all 7 strategies
  * are now available here, called the same way as the other six.
  *
- * Note the API's persisted-strategy schema (`retirement-api/src/routes/
- * withdrawal.ts` `STRATEGY_TYPES`) still omits `'cape'` — a user can compare
- * it here but can't yet save it as their strategy of record. That's fine
- * for this exploratory comparison (see the "no save-back" note below), but
- * worth tracking separately if `/api/me/withdrawal` should grow a `cape`
- * strategy type.
+ * The API's persisted-strategy schema (`retirement-api/src/routes/
+ * withdrawal.ts` `STRATEGY_TYPES`) now includes `'cape'` too, with
+ * `capeMultiplier`/`capeFixedComponent` knobs persisted alongside the
+ * shared `floorRate`/`ceilingRate` clamps — so all seven comparison
+ * strategies match the persisted union. (`capeRatio` is deliberately not
+ * persisted: it's a market observable supplied at comparison time, not a
+ * saved setting.)
  *
  * Bug fix vs. the retired React source: `WithdrawalTab.tsx`'s strategy
  * switch had no `case 'guardrails'` at all — selecting the guardrails card
@@ -63,10 +64,9 @@ export type ComparisonStrategy =
   | 'floor-ceiling'
   | 'cape';
 
-/** All strategies this comparison supports, in display order. The first
- *  six match the persisted `WithdrawalStrategy.strategyType` union exactly;
- *  `cape` does not (see the file header note) — comparable here, but not
- *  yet save-able as the user's strategy of record. */
+/** All strategies this comparison supports, in display order. All seven
+ *  match the persisted `WithdrawalStrategy.strategyType` union exactly
+ *  (see the file header note). */
 export const COMPARISON_STRATEGIES: ComparisonStrategy[] = [
   'fixed',
   'constant',

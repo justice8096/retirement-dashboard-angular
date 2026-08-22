@@ -665,6 +665,8 @@ export class WithdrawalScreenComponent implements OnInit {
     if (w.essentialSpending != null) this.floorEssentialSpending.set(w.essentialSpending);
     if (w.discretionaryBudget != null) this.floorDiscretionaryBudget.set(w.discretionaryBudget);
     if (w.maxDiscretionaryRate != null) this.floorMaxDiscretionaryRatePct.set(w.maxDiscretionaryRate * 100);
+    if (w.capeMultiplier != null) this.capeMultiplier.set(w.capeMultiplier);
+    if (w.capeFixedComponent != null) this.capeFixedComponentPct.set(w.capeFixedComponent * 100);
   }
 
   private seedFromFinancial(f: FinancialSettings): void {

@@ -1,4 +1,4 @@
-export type StrategyType = 'fixed' | 'constant' | 'guardrails' | 'vpw' | 'bucket' | 'floor-ceiling';
+export type StrategyType = 'fixed' | 'constant' | 'guardrails' | 'vpw' | 'bucket' | 'floor-ceiling' | 'cape';
 export type SpendingModel = 'level' | 'smile' | 'declining' | 'essential-first';
 
 export interface WithdrawalStrategy {
@@ -13,6 +13,8 @@ export interface WithdrawalStrategy {
   essentialSpending: number | null;
   discretionaryBudget: number | null;
   maxDiscretionaryRate: number | null;
+  capeMultiplier: number | null;
+  capeFixedComponent: number | null;
   spendingModel: SpendingModel;
   declineRate: number | null;
   rothConversionEnabled: boolean;
