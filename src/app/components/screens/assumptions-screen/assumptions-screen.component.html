@@ -458,6 +458,14 @@
                     [ngModel]="healthcare.income().ssAnnual"
                     (ngModelChange)="healthcare.patchIncome({ ssAnnual: +$event }); markIncomeDirty()" />
                 </label>
+                @if (householdSsAnnualPreview(); as hhSs) {
+                  <div class="field compact hc-apply-wrap">
+                    <button mat-stroked-button class="hc-apply-btn" type="button"
+                      (click)="applyHouseholdSs()">
+                      Use household Social Security ({{ fmtAnnual(hhSs) }}/yr)
+                    </button>
+                  </div>
+                }
                 <label class="field compact">
                   <span class="field-label">Pension / other taxable ($)</span>
                   <input appNumeric="currency" class="field-input" step="500"

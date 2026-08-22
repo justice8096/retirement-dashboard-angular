@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcSSBenefit, calcSpousalBenefit, spousalTopUps } from './ss-benefits';
+import { calcSSBenefit, calcSpousalBenefit, spousalTopUps, householdSsAnnual } from './ss-benefits';
 
 /**
  * Mirror of retirement-api/shared/__tests__/socialSecurity.test.js so the
@@ -80,5 +80,32 @@ describe('spousalTopUps', () => {
 
   it('defaults a missing claim age to FRA', () => {
     expect(spousalTopUps([pat, { ...sam, ssClaimAge: null }])).toEqual([0, 440]);
+  });
+});
+
+describe('householdSsAnnual', () => {
+  const pat = { role: 'primary', ssPia: 2400, ssFra: 67, ssClaimAge: 67, ssClaimAgeMonths: 0 };
+  const sam = { role: 'spouse', ssPia: 760, ssFra: 67, ssClaimAge: 67, ssClaimAgeMonths: 0 };
+
+  it('annualizes own benefits plus top-ups (spec worked example)', () => {
+    // Pat 2400 + Sam (760 + 440) = 3600/mo → 43200/yr
+    expect(householdSsAnnual([pat, sam])).toBe(43_200);
+  });
+
+  it('counts a single qualifying member without a top-up', () => {
+    expect(householdSsAnnual([pat, { ...sam, ssPia: null }])).toBe(2400 * 12);
+  });
+
+  it('returns 0 when nobody has SS data', () => {
+    expect(householdSsAnnual([{ ...pat, ssPia: null }, { ...sam, ssPia: null }])).toBe(0);
+  });
+
+  it('defaults a missing FRA to 67', () => {
+    expect(householdSsAnnual([{ ...pat, ssFra: null }, sam])).toBe(43_200);
+  });
+
+  it('applies claim-age adjustments to both parts', () => {
+    // Sam at 62: own 760*0.70=532, top-up 440*0.65=286 → (2400+818)*12
+    expect(householdSsAnnual([pat, { ...sam, ssClaimAge: 62 }])).toBe((2400 + 532 + 286) * 12);
   });
 });

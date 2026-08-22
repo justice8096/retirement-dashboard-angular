@@ -60,6 +60,24 @@ export interface SsMemberLike {
  * Only a primary/spouse pair that both have a PIA qualifies; dependents and
  * everyone else get 0. A missing claim age defaults to FRA (67 fallback).
  */
+/**
+ * Household annual Social Security income: each qualifying primary/spouse
+ * member's own claim-age-adjusted benefit plus their spousal top-up, × 12.
+ * Mirrors GET /api/me/household/ss-benefits `household.totalAnnual`.
+ */
+export function householdSsAnnual(members: readonly SsMemberLike[]): number {
+  const topUps = spousalTopUps(members);
+  let monthly = 0;
+  members.forEach((m, i) => {
+    if ((m.role === 'primary' || m.role === 'spouse') && (m.ssPia ?? 0) > 0) {
+      const fra = m.ssFra ?? 67;
+      const claimAge = (m.ssClaimAge ?? fra) + (m.ssClaimAgeMonths ?? 0) / 12;
+      monthly += calcSSBenefit(m.ssPia!, fra, claimAge) + topUps[i];
+    }
+  });
+  return monthly * 12;
+}
+
 export function spousalTopUps(members: readonly SsMemberLike[]): number[] {
   const qualifying = members
     .map((m, i) => ({ m, i }))

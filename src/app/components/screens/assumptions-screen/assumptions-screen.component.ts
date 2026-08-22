@@ -15,7 +15,7 @@ import {
   MemberRole, DependentType, PetType,
 } from '@models/api.model';
 import type { RentalProperty } from '@app/lib/rental-income';
-import { spousalTopUps } from '@app/lib/ss-benefits';
+import { spousalTopUps, householdSsAnnual } from '@app/lib/ss-benefits';
 
 type MemberDraft = Partial<HouseholdMember> & { birthYear: number; role: MemberRole };
 type PetDraft = Partial<HouseholdPet> & { birthYear: number; type: PetType };
@@ -75,6 +75,20 @@ export class AssumptionsScreenComponent implements OnInit {
   readonly memberSpousalTopUps = computed(() =>
     spousalTopUps(this.draft()?.members ?? []),
   );
+
+  /** Household annual SS (own benefits + spousal top-ups, × 12) from the
+   *  live member draft — mirrors the server's /me/household/ss-benefits
+   *  totalAnnual, but includes unsaved edits. Drives the ssAnnual apply
+   *  button in the income-composition card. */
+  readonly householdSsAnnualPreview = computed(() =>
+    householdSsAnnual(this.draft()?.members ?? []),
+  );
+
+  /** Fill the income composition's Social Security from the members above. */
+  applyHouseholdSs(): void {
+    this.healthcare.patchIncome({ ssAnnual: this.householdSsAnnualPreview() });
+    this.markIncomeDirty();
+  }
 
   /** True when we're in the new-user creation path (no profile existed
    *  on the server). Drives the welcome banner and the save-button label. */
@@ -184,6 +198,7 @@ export class AssumptionsScreenComponent implements OnInit {
   /** Currency formatters that honor the user's dyscalculia number-format preference. */
   fmtYearly(v: number): string { return this.currency.currencyYearly(v); }
   fmtMonthly(v: number): string { return this.currency.currencyMonthly(v); }
+  fmtAnnual(v: number): string { return this.currency.currency(v); }
   fmtFplPct(pct: number): string { return this.dyscalculia.formatCount(Math.round(pct), '% of the poverty line'); }
 
   patch(partial: Partial<HouseholdProfile>): void {
