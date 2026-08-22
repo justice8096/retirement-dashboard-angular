@@ -13,6 +13,7 @@
     "test:pure": "tsx --test scripts/test-*.mts",
     "check:readability": "node scripts/check-readability.mjs",
     "check:numeric-inputs": "node scripts/check-raw-numeric-inputs.mjs",
+    "check:font-scale": "node scripts/check-scalable-font-sizes.mjs",
     "verify:apportion": "node scripts/verify-apportionment.mjs"
   },
   "dependencies": {

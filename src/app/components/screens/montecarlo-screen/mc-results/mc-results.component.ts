@@ -311,7 +311,7 @@ function buildPrintHtml(svgStr: string): string {
   @page { size: letter; margin: 0.5in; }
   body { font-family: system-ui, sans-serif; color: #111; margin: 0; padding: 24px; background: #fff; }
   svg { display: block; max-width: 100%; height: auto; }
-  .noprint { margin-bottom: 16px; color: #666; font-size: 12px; }
+  .noprint { margin-bottom: 16px; color: #666; font-size: calc(12px * var(--font-scale, 1)); }
   .noprint button {
     padding: 6px 12px; border-radius: 4px; border: 1px solid #999;
     background: #eee; cursor: pointer; margin-right: 8px;

@@ -167,16 +167,16 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
   styles: [`
     .fire-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
     .save-btn {
       margin-left: auto;
       --mat-button-filled-container-color: var(--dark-amber);
       --mat-button-filled-label-text-color: #000;
       --mat-button-filled-label-text-size: 12px;
     }
-    .save-msg { font-size: 11px; color: var(--dark-green); }
+    .save-msg { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-green); }
     .save-msg.error { color: var(--dark-red); }
 
     .card {
@@ -184,11 +184,11 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       border-radius: 12px; padding: 20px;
     }
     .card.highlight { border-color: var(--dark-amber); }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .field { display: flex; flex-direction: column; gap: 4px; }
-    .field-label { font-size: 11px; color: var(--dark-text-muted); }
+    .field-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
 
     .field-input {
       padding: 8px 10px;
@@ -196,7 +196,7 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary);
       color: var(--dark-text);
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       font-weight: 600;
       font-family: var(--font-sans);
       outline: none;
@@ -204,7 +204,7 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       box-sizing: border-box;
       &:focus { border-color: var(--dark-amber); }
     }
-    .field-input.lg { font-size: 18px; color: var(--dark-amber); }
+    .field-input.lg { font-size: calc(18px * var(--font-scale, 1)); color: var(--dark-amber); }
     select.field-input { cursor: pointer; }
 
     .input-wrap {
@@ -212,15 +212,15 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
     }
     .input-wrap.dollar .input-prefix {
       position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-      font-size: 14px; color: var(--dark-text-muted); pointer-events: none;
+      font-size: calc(14px * var(--font-scale, 1)); color: var(--dark-text-muted); pointer-events: none;
     }
     .input-wrap.dollar .field-input { padding-left: 22px; }
     .input-wrap.pct { gap: 4px; }
     .input-wrap.pct .field-input { flex: 1; }
-    .input-suffix { font-size: 12px; color: var(--dark-text-muted); white-space: nowrap; }
+    .input-suffix { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); white-space: nowrap; }
 
-    .fire-number { font-size: 32px; font-weight: 800; color: var(--dark-amber); }
-    .fire-explain { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; }
+    .fire-number { font-size: calc(32px * var(--font-scale, 1)); font-weight: 800; color: var(--dark-amber); }
+    .fire-explain { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 4px; }
 
     .progress-section { margin-top: 16px; }
     .progress-bar {
@@ -231,14 +231,14 @@ import { FinancialSettings, RetirementPath } from '@models/api.model';
       height: 100%; background: var(--dark-green);
       border-radius: 6px; transition: width 0.5s ease;
     }
-    .progress-label { font-size: 11px; color: var(--dark-text-sec); margin-top: 6px; }
+    .progress-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); margin-top: 6px; }
 
     .years-display { display: flex; align-items: baseline; gap: 8px; }
-    .years-value { font-size: 48px; font-weight: 800; color: var(--dark-blue); }
-    .years-label { font-size: 16px; color: var(--dark-text-sec); }
-    .years-detail { font-size: 11px; color: var(--dark-text-muted); margin-top: 8px; }
+    .years-value { font-size: calc(48px * var(--font-scale, 1)); font-weight: 800; color: var(--dark-blue); }
+    .years-label { font-size: calc(16px * var(--font-scale, 1)); color: var(--dark-text-sec); }
+    .years-detail { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 8px; }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
 
     input[type=number]::-webkit-outer-spin-button,
     input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

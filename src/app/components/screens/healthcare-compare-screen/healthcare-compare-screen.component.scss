@@ -4,7 +4,7 @@
      * .header-sub picks up prose line-height from the global p/.prose/.header-sub
      * selector in styles.scss, so no per-component override is needed. */
     .badge-new {
-      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
 
@@ -14,17 +14,17 @@
       border: 1px solid var(--dark-border); border-radius: 10px;
     }
     .result-card.highlight { border-color: var(--dark-green); background: rgba(76, 175, 80, 0.06); }
-    .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
-    .result-value { font-size: 20px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .result-explain { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; }
+    .result-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; }
+    .result-value { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .result-explain { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 4px; }
 
     .table-wrap { overflow-x: auto; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
     .data-table th, .data-table td {
       padding: 8px 10px; border-bottom: 1px solid var(--dark-border); text-align: left;
     }
     .data-table th {
-      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      font-weight: 600; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
     .data-table td { color: var(--dark-text); }
@@ -45,7 +45,7 @@
     .scatter-axes { display: grid; grid-template-columns: 36px 1fr; gap: 4px; height: 320px; }
     .y-axis {
       display: flex; flex-direction: column; justify-content: space-between;
-      font-size: 11px; color: var(--dark-text-muted); padding: 2px 4px 2px 0; text-align: right;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); padding: 2px 4px 2px 0; text-align: right;
     }
     .plot {
       position: relative; background: var(--dark-bg-secondary); border-radius: 8px;
@@ -71,9 +71,9 @@
     .dot.selected { background: var(--dark-green); transform: translate(-50%, 50%) scale(1.6); z-index: 3; }
     .x-axis {
       display: flex; justify-content: space-between; padding: 6px 0 0 40px;
-      font-size: 11px; color: var(--dark-text-muted); font-variant-numeric: tabular-nums;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); font-variant-numeric: tabular-nums;
     }
-    .axis-labels { display: flex; justify-content: space-between; padding: 6px 0 0 0; font-size: 11px; color: var(--dark-text-sec); }
+    .axis-labels { display: flex; justify-content: space-between; padding: 6px 0 0 0; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); }
     .y-label { padding-left: 4px; }
     .x-label { padding-right: 12px; }
 
@@ -83,23 +83,23 @@
       border-radius: 12px; padding: 20px;
     }
     .quality-meter { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .qm-label { font-size: 12px; color: var(--dark-text-muted); min-width: 60px; }
+    .qm-label { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); min-width: 60px; }
     .qm-track { flex: 1; height: 14px; background: var(--dark-bg-secondary); border-radius: 7px; overflow: hidden; }
     .qm-fill { height: 100%; transition: width 0.3s; }
     .qm-fill.q-good { background: var(--dark-green); }
     .qm-fill.q-mid  { background: var(--dark-amber); }
     .qm-fill.q-low  { background: var(--dark-neutral); }
-    .qm-val { font-size: 14px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
+    .qm-val { font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; min-width: 56px; text-align: right; }
 
     .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px; }
     .detail-cell { padding: 12px; background: var(--dark-bg-secondary); border-radius: 8px; }
-    .detail-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 4px; }
-    .detail-val { font-size: 16px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
+    .detail-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 4px; }
+    .detail-val { font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
     .detail-val.green { color: var(--dark-green); }
     .detail-val.red { color: var(--dark-neutral); }
 
     .aca-note, .warning-block {
-      padding: 12px 14px; border-radius: 8px; font-size: 13px;
+      padding: 12px 14px; border-radius: 8px; font-size: calc(13px * var(--font-scale, 1));
       color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5);
       margin-top: 10px;
     }

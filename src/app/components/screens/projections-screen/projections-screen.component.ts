@@ -79,26 +79,26 @@ import { FinancialSettings } from '@models/api.model';
   styles: [`
     .proj-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .summary-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
     .sum-card {
       padding: 14px; background: var(--dark-bg-card);
       border: 1px solid var(--dark-border); border-radius: 10px;
     }
-    .sum-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
-    .sum-value { font-size: 20px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
-    .sum-value.alloc { font-size: 12px; color: var(--dark-text-sec); font-weight: 600; }
+    .sum-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; }
+    .sum-value { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
+    .sum-value.alloc { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); font-weight: 600; }
 
     .table-section {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .section-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .section-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
     .table-wrap { overflow-x: auto; }
-    .proj-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .proj-table { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--font-scale, 1)); }
     .proj-table th {
       text-align: left; padding: 8px 12px; color: var(--dark-text-muted);
       border-bottom: 1px solid var(--dark-border); font-weight: 600;
@@ -107,7 +107,7 @@ import { FinancialSettings } from '@models/api.model';
     .proj-table tr.highlight td { background: rgba(92, 156, 230, 0.04); }
     .proj-table tr:hover td { background: rgba(92, 156, 230, 0.08); }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class ProjectionsScreenComponent implements OnInit {

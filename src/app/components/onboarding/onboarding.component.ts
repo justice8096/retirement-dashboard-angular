@@ -165,7 +165,7 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       font-weight: 700;
       &.done { background: var(--dark-green); color: #000; }
       &.current { background: var(--dark-amber); color: #000; }
@@ -179,7 +179,7 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
     }
     .step-label {
       margin-left: 8px;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-sec);
     }
 
@@ -248,7 +248,7 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
       margin-bottom: 8px;
     }
     .a11y-rec {
-      font-size: 9px;
+      font-size: calc(9px * var(--font-scale, 1));
       color: var(--dark-green);
       font-weight: 700;
       margin-bottom: 6px;
@@ -286,7 +286,7 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       border-left: 2px solid transparent;
       &.active {
         background: var(--dark-bg-card);
@@ -304,7 +304,7 @@ import { NavMode, FontSize, FONT_SIZES } from '@models/navigation.model';
     }
     .preview-label-item {
       padding: 2px 6px;
-      font-size: 7px;
+      font-size: calc(7px * var(--font-scale, 1));
       display: flex;
       align-items: center;
       gap: 2px;

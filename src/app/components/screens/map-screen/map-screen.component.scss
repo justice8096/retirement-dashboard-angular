@@ -1,10 +1,10 @@
     .map-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
     .badge-new {
-      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
 
@@ -12,21 +12,21 @@
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 10px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 10px; }
 
     .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
     .ctrl { display: flex; flex-direction: column; gap: 4px; flex: 1 1 200px; max-width: 320px; }
-    .ctrl-label { font-size: 11px; color: var(--dark-text-muted); }
+    .ctrl-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .ctrl-input {
       padding: 8px 10px; border-radius: 6px; border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary); color: var(--dark-text);
-      font-size: 13px; font-family: var(--font-sans); outline: none;
+      font-size: calc(13px * var(--font-scale, 1)); font-family: var(--font-sans); outline: none;
     }
     .ctrl-input:focus { border-color: var(--dark-blue); }
 
     .scale {
       display: inline-flex; align-items: center; gap: 2px; margin-left: auto;
-      font-size: 11px; color: var(--dark-text-muted);
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
     }
     .scale-label { margin-right: 6px; }
     .scale-tick { padding: 0 4px; font-variant-numeric: tabular-nums; }
@@ -47,18 +47,18 @@
       background: #1a1a1a;
     }
 
-    .missing-card { font-size: 13px; }
+    .missing-card { font-size: calc(13px * var(--font-scale, 1)); }
     .param-hint {
-      font-size: 12px; color: var(--dark-text-muted);
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted);
       line-height: var(--prose-line-height, 1.5); margin: 0 0 10px;
     }
     .param-hint code {
       background: var(--dark-bg-secondary); padding: 1px 6px; border-radius: 4px;
-      font-family: var(--font-mono, monospace); font-size: 11px;
+      font-family: var(--font-mono, monospace); font-size: calc(11px * var(--font-scale, 1));
     }
     .missing-list { display: flex; flex-wrap: wrap; gap: 6px; }
     .missing-chip {
-      font-size: 11px; padding: 2px 8px; border-radius: 10px;
+      font-size: calc(11px * var(--font-scale, 1)); padding: 2px 8px; border-radius: 10px;
       background: var(--dark-bg-secondary); color: var(--dark-text-muted);
     }
 
@@ -71,24 +71,24 @@
     }
     :host ::ng-deep .leaflet-popup-tip { background: var(--dark-bg-card); border: 1px solid var(--dark-border); }
     :host ::ng-deep .leaflet-popup-content {
-      font-family: var(--font-sans); font-size: 12px;
+      font-family: var(--font-sans); font-size: calc(12px * var(--font-scale, 1));
       line-height: 1.5; margin: 10px 14px;
     }
     :host ::ng-deep .leaflet-popup-content .popup-title {
-      font-weight: 700; font-size: 13px; color: var(--dark-text); margin-bottom: 4px;
+      font-weight: 700; font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text); margin-bottom: 4px;
     }
     :host ::ng-deep .leaflet-popup-content .popup-country {
-      font-size: 11px; color: var(--dark-text-muted); margin-bottom: 8px;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 8px;
     }
     :host ::ng-deep .leaflet-popup-content .popup-score {
       display: inline-block; padding: 2px 8px; border-radius: 10px;
-      font-weight: 700; margin-bottom: 6px; font-size: 11px;
+      font-weight: 700; margin-bottom: 6px; font-size: calc(11px * var(--font-scale, 1));
     }
     :host ::ng-deep .leaflet-popup-content .popup-detail { color: var(--dark-text-sec); margin-bottom: 8px; }
     :host ::ng-deep .leaflet-popup-content .popup-link {
       display: inline-block; padding: 4px 10px; border-radius: 6px;
       background: var(--dark-amber); color: #000; font-weight: 700;
-      text-decoration: none; font-size: 11px; cursor: pointer; border: none;
+      text-decoration: none; font-size: calc(11px * var(--font-scale, 1)); cursor: pointer; border: none;
     }
     :host ::ng-deep .leaflet-container { background: #1a1a1a; }
     :host ::ng-deep .map-marker {

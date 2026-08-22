@@ -38,7 +38,7 @@ import { Component, Input, computed, signal, ChangeDetectionStrategy } from '@an
       opacity: 0.85;
     }
     .tile-legend {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin: 0;
     }

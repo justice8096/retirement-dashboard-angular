@@ -66,11 +66,11 @@ import { AuthService } from '@services/auth.service';
       color: var(--dark-text, #f0f0f0);
     }
     .auth-brand h1 {
-      font-size: 24px;
+      font-size: calc(24px * var(--font-scale, 1));
       margin: 0 0 8px;
     }
     .auth-brand p {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec, #a0a0a0);
       margin: 0;
     }
@@ -88,7 +88,7 @@ import { AuthService } from '@services/auth.service';
       flex-direction: column;
       gap: 6px;
       color: var(--dark-text, #f0f0f0);
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
     }
     .auth-field input {
       padding: 10px 12px;
@@ -96,7 +96,7 @@ import { AuthService } from '@services/auth.service';
       border: 1px solid var(--dark-border, #444);
       background: var(--dark-bg, #1a1a1a);
       color: var(--dark-text, #f0f0f0);
-      font-size: 16px;
+      font-size: calc(16px * var(--font-scale, 1));
     }
     .auth-field input:focus-visible {
       outline: 2px solid var(--dark-amber, #E8B86D);
@@ -105,7 +105,7 @@ import { AuthService } from '@services/auth.service';
     .auth-error {
       margin: 0;
       color: var(--dark-amber-light, #E8B86D);
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
     }
     .auth-submit {
       padding: 12px;
@@ -113,7 +113,7 @@ import { AuthService } from '@services/auth.service';
       border-radius: 8px;
       background: var(--dark-amber, #E8B86D);
       color: #1a1a1a;
-      font-size: 16px;
+      font-size: calc(16px * var(--font-scale, 1));
       font-weight: 600;
       cursor: pointer;
     }

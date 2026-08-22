@@ -126,11 +126,11 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
   styles: [`
     .calc-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
     .badge-new {
-      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
 
@@ -138,15 +138,15 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
     .param { display: flex; flex-direction: column; gap: 4px; }
-    .param-label { font-size: 11px; color: var(--dark-text-muted); }
+    .param-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .param-input {
       padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary); color: var(--dark-text);
-      font-size: 14px; font-family: var(--font-sans); outline: none;
+      font-size: calc(14px * var(--font-scale, 1)); font-family: var(--font-sans); outline: none;
     }
     .param-input:focus { border-color: var(--dark-blue); }
 
@@ -156,18 +156,18 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
       border: 1px solid var(--dark-border); border-radius: 10px;
     }
     .result-card.highlight { border-color: var(--dark-amber); }
-    .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
-    .result-value { font-size: 15px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
-    .result-value.lg { font-size: 24px; line-height: 1.15; word-break: break-word; }
+    .result-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; }
+    .result-value { font-size: calc(15px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
+    .result-value.lg { font-size: calc(24px * var(--font-scale, 1)); line-height: 1.15; word-break: break-word; }
 
     /* FIRE Number spans 2 columns so the full formatted value fits. */
     .fire-number-card { grid-column: span 2; }
-    .fire-number-value { font-size: 28px; letter-spacing: 0.5px; }
+    .fire-number-value { font-size: calc(28px * var(--font-scale, 1)); letter-spacing: 0.5px; }
     @media (max-width: 520px) {
       .fire-number-card { grid-column: span 1; }
-      .fire-number-value { font-size: 22px; }
+      .fire-number-value { font-size: calc(22px * var(--font-scale, 1)); }
     }
-    .result-explain { font-size: 12px; color: var(--dark-text-muted); margin-top: 2px; }
+    .result-explain { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; }
     .result-explain-steps {
       list-style: decimal inside;
       margin-top: 10px;
@@ -175,7 +175,7 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
       background: rgba(92, 156, 230, 0.06);
       border-radius: 6px;
       border: 1px solid rgba(92, 156, 230, 0.15);
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       line-height: var(--prose-line-height, 1.5);
       letter-spacing: var(--prose-letter-spacing, 0);
@@ -184,7 +184,7 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
     .result-explain-steps strong { color: var(--dark-text); font-weight: 700; }
 
     .param-hint {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       line-height: var(--prose-line-height, 1.5);
       margin-top: 2px;
@@ -192,7 +192,7 @@ import { NumericInputDirective } from '@directives/numeric-input.directive';
 
     .progress-bar { height: 14px; background: var(--dark-bg-secondary); border-radius: 7px; overflow: hidden; }
     .progress-fill { height: 100%; background: var(--dark-green); border-radius: 7px; transition: width 0.3s; }
-    .progress-label { font-size: 11px; color: var(--dark-text-sec); margin-top: 8px; }
+    .progress-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); margin-top: 8px; }
   `],
 })
 export class FireCalcScreenComponent {

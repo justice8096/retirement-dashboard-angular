@@ -32,10 +32,10 @@
       background: rgba(232, 184, 109, 0.12);
       border: 1px solid var(--dark-amber);
       color: var(--dark-text);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
     }
     .stale-icon {
-      font-size: 16px; color: var(--dark-amber); font-weight: 700;
+      font-size: calc(16px * var(--font-scale, 1)); color: var(--dark-amber); font-weight: 700;
       line-height: 1;
     }
     .stale-text { flex: 1; line-height: 1.5; }
@@ -48,17 +48,17 @@
       border: 1px solid rgba(76, 175, 80, 0.35);
       border-radius: 12px; padding: 16px 20px;
     }
-    .ss-icon { font-size: 28px; line-height: 1; }
+    .ss-icon { font-size: calc(28px * var(--font-scale, 1)); line-height: 1; }
     .ss-body { flex: 1; }
     .ss-label {
-      font-size: 11px; color: var(--dark-text-muted);
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
     }
     .ss-row {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
       gap: 16px;
     }
-    .ss-num { font-size: 20px; font-weight: 700; color: var(--dark-green); line-height: 1.1; }
-    .ss-unit { font-size: 11px; color: var(--dark-text-muted); font-weight: 400; margin-left: 2px; }
-    .ss-sub { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
-    .ss-note { font-size: 11px; color: var(--dark-amber); margin-top: 8px; }
+    .ss-num { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green); line-height: 1.1; }
+    .ss-unit { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); font-weight: 400; margin-left: 2px; }
+    .ss-sub { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; }
+    .ss-note { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-amber); margin-top: 8px; }

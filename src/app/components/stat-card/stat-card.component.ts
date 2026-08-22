@@ -35,24 +35,24 @@ import { StatUnit } from '@models/stat.model';
       text-align: center;
     }
     .value {
-      font-size: 24px;
+      font-size: calc(24px * var(--font-scale, 1));
       font-weight: 700;
       color: var(--dark-amber);
       font-variant-numeric: tabular-nums;
       word-break: break-word;
     }
     .label {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       margin-top: 4px;
     }
     .sub {
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin-top: 2px;
     }
     .text-summary {
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       color: var(--dark-teal);
       margin-top: 6px;
       padding: 4px 8px;
@@ -61,7 +61,7 @@ import { StatUnit } from '@models/stat.model';
       line-height: 1.4;
     }
     .anchor {
-      font-size: 9px;
+      font-size: calc(9px * var(--font-scale, 1));
       color: var(--dark-purple);
       margin-top: 4px;
       font-style: italic;

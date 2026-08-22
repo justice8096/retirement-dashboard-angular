@@ -17,18 +17,18 @@
 }
 .regime-col.bull { border-left: 3px solid var(--dark-green); }
 .regime-col.bear { border-left: 3px solid var(--dark-neutral); }
-.regime-title { font-size: 12px; margin: 0; color: var(--dark-text); font-weight: 600; }
+.regime-title { font-size: calc(12px * var(--font-scale, 1)); margin: 0; color: var(--dark-text); font-weight: 600; }
 
 /* Local copies of param input styles (sub-component-encapsulated SCSS
  * doesn't inherit from sibling component scopes). Kept identical to the
  * parent's ones so the visual is unchanged. */
 .param { display: flex; flex-direction: column; gap: 4px; }
-.param-label { font-size: 11px; color: var(--dark-text-muted); font-weight: 500; }
-.param-hint { font-size: 10px; color: var(--dark-text-muted); }
+.param-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); font-weight: 500; }
+.param-hint { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); }
 .param-input {
   padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
   background: var(--dark-bg-secondary); color: var(--dark-text);
-  font-size: 14px; font-family: var(--font-sans); outline: none;
+  font-size: calc(14px * var(--font-scale, 1)); font-family: var(--font-sans); outline: none;
 }
 .param-input:focus { border-color: var(--dark-blue); }
 select.param-input { appearance: auto; }

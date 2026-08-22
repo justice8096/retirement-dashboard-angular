@@ -77,7 +77,7 @@ import { NavigationService } from '@services/navigation.service';
     .cat-icon { flex-shrink: 0; }
     .cat-label { flex: 1; }
     .new-badge {
-      font-size: 8px;
+      font-size: calc(8px * var(--font-scale, 1));
       background: var(--dark-amber);
       color: #000;
       padding: 2px 6px;

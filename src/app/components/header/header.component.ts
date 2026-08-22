@@ -70,13 +70,13 @@ import { AuthService } from '@services/auth.service';
       z-index: 50;
     }
     .title {
-      font-size: 18px;
+      font-size: calc(18px * var(--font-scale, 1));
       color: var(--dark-amber);
       font-weight: 700;
       margin: 0;
     }
     .subtitle {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-sec);
     }
     .controls {
@@ -96,7 +96,7 @@ import { AuthService } from '@services/auth.service';
       --mat-fab-small-container-shape: 6px;
       width: 36px;
       height: 36px;
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       &.active-green {
         --mat-fab-small-container-color: var(--dark-green);
         color: #fff;
@@ -107,7 +107,7 @@ import { AuthService } from '@services/auth.service';
       }
     }
     .who {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       max-width: 180px;
       overflow: hidden;

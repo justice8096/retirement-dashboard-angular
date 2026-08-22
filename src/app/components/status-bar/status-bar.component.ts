@@ -27,7 +27,7 @@ import { DyscalculiaService } from '@services/dyscalculia.service';
       padding: 4px 16px;
       display: flex;
       justify-content: space-between;
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       flex-shrink: 0;
     }

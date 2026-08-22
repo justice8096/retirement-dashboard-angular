@@ -13,7 +13,7 @@
       border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary);
       color: var(--dark-text);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       font-family: var(--font-sans);
       cursor: pointer;
       min-width: 130px;
@@ -27,7 +27,7 @@
       border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary);
       color: var(--dark-text);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       font-family: var(--font-sans);
       outline: none;
       &:focus { border-color: var(--dark-blue); }
@@ -62,7 +62,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       cursor: pointer;
       input[type="checkbox"] {
@@ -73,7 +73,7 @@
       }
     }
     .selection-count {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-amber);
       font-weight: 600;
     }
@@ -83,7 +83,7 @@
       align-items: center;
     }
     .stat-pill {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       font-weight: 700;
       color: var(--dark-amber);
       display: flex;
@@ -92,7 +92,7 @@
     }
     .stat-pill.cheapest { color: var(--dark-green); }
     .stat-label {
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       font-weight: 400;
       color: var(--dark-text-muted);
     }
@@ -131,18 +131,18 @@
       }
     }
     .row-name {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
       min-width: 140px;
     }
     .row-meta {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       flex: 1;
     }
     .row-cost {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       font-weight: 700;
       color: var(--dark-amber);
       white-space: nowrap;
@@ -160,17 +160,17 @@
       padding: 20px;
       text-align: center;
       color: var(--dark-text-sec);
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       &.error { color: var(--dark-red); }
     }
     .empty-state {
       padding: 40px;
       text-align: center;
       color: var(--dark-text-muted);
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
     }
     .anchor-note {
-      font-size: 9px;
+      font-size: calc(9px * var(--font-scale, 1));
       color: var(--dark-purple);
       font-style: italic;
       text-align: center;
@@ -181,14 +181,14 @@
       border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
     }
     .converged-head { display: flex; flex-direction: column; gap: 2px; }
-    .converged-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--dark-text); }
-    .converged-sub { font-size: 10px; color: var(--dark-text-muted); }
+    .converged-title { margin: 0; font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text); }
+    .converged-sub { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .converged-rows { display: flex; flex-direction: column; gap: 4px; }
     .converged-row {
       display: grid; grid-template-columns: 1.8fr 1fr 1fr 1fr; gap: 10px; align-items: baseline;
       padding: 6px 8px; border-radius: 6px; background: var(--dark-bg-secondary);
     }
-    .cr-name { font-size: 13px; color: var(--dark-text); font-weight: 500; }
-    .cr-country { font-size: 11px; color: var(--dark-text-muted); }
-    .cr-total { font-size: 14px; font-weight: 700; color: var(--dark-amber); text-align: right; font-variant-numeric: tabular-nums; }
-    .cr-tax { font-size: 11px; color: var(--dark-text-sec); text-align: right; font-variant-numeric: tabular-nums; }
+    .cr-name { font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text); font-weight: 500; }
+    .cr-country { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .cr-total { font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); text-align: right; font-variant-numeric: tabular-nums; }
+    .cr-tax { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); text-align: right; font-variant-numeric: tabular-nums; }

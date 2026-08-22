@@ -157,46 +157,46 @@ const CLAIM_AGE_MAX = 70;
   styles: [`
     .ss-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .member-card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
     .member-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
-    .member-name { font-size: 16px; font-weight: 700; color: var(--dark-text); }
+    .member-name { font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); }
     .member-role {
-      font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase;
       padding: 2px 8px; background: var(--dark-bg-secondary); border-radius: 4px;
     }
 
     .field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
-    .field-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 4px; display: block; }
-    .field-value { font-size: 15px; font-weight: 600; color: var(--dark-text); }
+    .field-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 4px; display: block; }
+    .field-value { font-size: calc(15px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text); }
     .field-value.highlight { color: var(--dark-amber); }
-    .spousal-note { font-size: 12px; color: var(--dark-text-sec); font-weight: 500; }
+    .spousal-note { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); font-weight: 500; }
 
     .explore-block {
       margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--dark-border);
       display: flex; flex-direction: column; gap: 10px;
     }
-    .slider-label { font-size: 13px; color: var(--dark-text); font-weight: 600; }
+    .slider-label { font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text); font-weight: 600; }
     .claim-slider { width: 100%; }
     .slider-legend {
-      display: flex; justify-content: space-between; font-size: 11px; color: var(--dark-text-muted);
+      display: flex; justify-content: space-between; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
     }
 
     .compare-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     .compare-table caption {
-      text-align: left; font-size: 12px; color: var(--dark-text-muted); margin-bottom: 6px; caption-side: top;
+      text-align: left; font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 6px; caption-side: top;
     }
     .compare-table th, .compare-table td {
-      text-align: center; padding: 8px; font-size: 14px; font-weight: 600; color: var(--dark-text);
+      text-align: center; padding: 8px; font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text);
       border: 1px solid var(--dark-border);
     }
-    .compare-table th { font-size: 11px; font-weight: 700; color: var(--dark-text-muted); text-transform: uppercase; }
+    .compare-table th { font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text-muted); text-transform: uppercase; }
     .compare-table td.current { color: var(--dark-amber); background: var(--dark-bg-secondary); }
 
     .total-card {
@@ -204,13 +204,13 @@ const CLAIM_AGE_MAX = 70;
       padding: 16px 20px; background: var(--dark-bg-card);
       border: 1px solid var(--dark-amber); border-radius: 10px;
     }
-    .total-label { font-size: 14px; font-weight: 600; color: var(--dark-text); }
-    .total-value { font-size: 24px; font-weight: 700; color: var(--dark-amber); }
+    .total-label { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text); }
+    .total-value { font-size: calc(24px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
     .status-msg.error { color: var(--dark-red); }
-    .empty-state { padding: 40px; text-align: center; color: var(--dark-text-muted); font-size: 13px; }
-    .hint { font-size: 11px; color: var(--dark-text-sec); margin-top: 8px; }
+    .empty-state { padding: 40px; text-align: center; color: var(--dark-text-muted); font-size: calc(13px * var(--font-scale, 1)); }
+    .hint { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); margin-top: 8px; }
   `],
 })
 export class SsScreenComponent implements OnInit {

@@ -61,18 +61,18 @@ import { ITEM_CATEGORIES, ItemCategoryKey } from '../../../data/item-catalog';
   styles: [`
     .items-screen { display: flex; flex-direction: column; gap: 14px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; max-width: 640px; line-height: 1.5; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; max-width: 640px; line-height: 1.5; }
 
     .cat-card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 18px;
     }
     .cat-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
-    .cat-title { font-size: 14px; margin: 0; color: var(--dark-text); font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .cat-icon { font-size: 18px; }
-    .cat-count { font-size: 11px; color: var(--dark-text-muted); font-weight: 400; margin-left: 4px; }
+    .cat-title { font-size: calc(14px * var(--font-scale, 1)); margin: 0; color: var(--dark-text); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .cat-icon { font-size: calc(18px * var(--font-scale, 1)); }
+    .cat-count { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); font-weight: 400; margin-left: 4px; }
     .cat-actions { display: flex; gap: 6px; }
     .sm-btn {
       --mat-button-outlined-container-height: 26px;
@@ -85,7 +85,7 @@ import { ITEM_CATEGORIES, ItemCategoryKey } from '../../../data/item-catalog';
       display: flex; align-items: center; gap: 8px;
       padding: 7px 10px; border-radius: 6px;
       background: var(--dark-bg-secondary); border: 1px solid transparent;
-      font-size: 12px; color: var(--dark-text-sec); cursor: pointer;
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); cursor: pointer;
       transition: all 0.15s;
     }
     .item-chk:hover { border-color: var(--dark-border); }
@@ -95,7 +95,7 @@ import { ITEM_CATEGORIES, ItemCategoryKey } from '../../../data/item-catalog';
     .cat-foot {
       margin-top: 10px; padding: 8px 10px;
       background: var(--dark-bg-secondary); border-radius: 6px;
-      font-size: 11px; color: var(--dark-text-muted);
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
     }
     .cat-foot strong { color: var(--dark-text); font-variant-numeric: tabular-nums; }
   `],

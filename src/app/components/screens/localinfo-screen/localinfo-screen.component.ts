@@ -171,21 +171,21 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
   styles: [`
     .info-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .empty-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       text-align: center; padding: 60px 24px; color: var(--dark-text-muted);
     }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
-    .empty-hint { font-size: 12px; color: var(--dark-text-muted); font-style: italic; margin: 0; padding: 6px 0; }
+    .empty-icon { font-size: calc(48px * var(--font-scale, 1)); margin-bottom: 12px; }
+    .empty-state p { font-size: calc(13px * var(--font-scale, 1)); max-width: 360px; line-height: 1.5; }
+    .empty-hint { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); font-style: italic; margin: 0; padding: 6px 0; }
     .detail-row.muted .dv { color: var(--dark-text-muted); font-style: italic; }
     .link-btn {
       background: none; border: none; color: var(--dark-amber); cursor: pointer;
-      font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
+      font-size: calc(13px * var(--font-scale, 1)); font-family: var(--font-sans); padding: 0 2px;
       text-decoration: underline; text-underline-offset: 2px;
     }
 
@@ -194,7 +194,7 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
       border-bottom: 1px solid var(--dark-border); padding-bottom: 8px;
     }
     .city-tab {
-      padding: 6px 14px; font-size: 12px; border-radius: 6px 6px 0 0; cursor: pointer;
+      padding: 6px 14px; font-size: calc(12px * var(--font-scale, 1)); border-radius: 6px 6px 0 0; cursor: pointer;
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-bottom: none; color: var(--dark-text-sec);
       font-family: var(--font-sans); transition: all 0.15s;
@@ -210,26 +210,26 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .detail-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--dark-bg-secondary); }
     .detail-row:last-child { border-bottom: none; }
-    .dl { font-size: 12px; color: var(--dark-text-sec); }
-    .dv { font-size: 12px; color: var(--dark-text); font-weight: 500; }
+    .dl { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); }
+    .dv { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text); font-weight: 500; }
 
     .pc-section { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
     .pc-section:last-child { margin-bottom: 0; }
-    .pc-item { font-size: 12px; padding: 4px 0; line-height: 1.3; }
+    .pc-item { font-size: calc(12px * var(--font-scale, 1)); padding: 4px 0; line-height: 1.3; }
     .pc-item.pro { color: var(--dark-green); }
     .pc-item.con { color: var(--dark-neutral); }
 
     .link-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
     .link-group:last-child { margin-bottom: 0; }
-    .link-label { font-size: 11px; font-weight: 600; color: var(--dark-text-muted); margin-bottom: 2px; }
-    .ext-link { font-size: 12px; color: var(--dark-blue); text-decoration: none; }
+    .link-label { font-size: calc(11px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-muted); margin-bottom: 2px; }
+    .ext-link { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-blue); text-decoration: none; }
     .ext-link:hover { text-decoration: underline; }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class LocalinfoScreenComponent implements OnInit {

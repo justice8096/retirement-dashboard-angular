@@ -135,11 +135,11 @@ interface Scored {
   styles: [`
     .qol-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
     .badge-new {
-      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
 
@@ -147,7 +147,7 @@ interface Scored {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .podium { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
     .podium-card {
@@ -157,14 +157,14 @@ interface Scored {
     .podium-card.rank-1 { border-top-color: var(--dark-green); background: rgba(76, 175, 80, 0.06); }
     .podium-card.rank-2 { border-top-color: var(--dark-blue); background: rgba(92, 156, 230, 0.06); }
     .podium-card.rank-3 { border-top-color: var(--dark-amber); background: rgba(212, 148, 58, 0.06); }
-    .medal { font-size: 28px; }
+    .medal { font-size: calc(28px * var(--font-scale, 1)); }
     .podium-name { font-weight: 700; color: var(--dark-text); margin-top: 4px; }
-    .podium-score { font-size: 20px; font-weight: 700; color: var(--dark-amber); margin-top: 2px; }
-    .podium-country { font-size: 11px; color: var(--dark-text-muted); margin-top: 2px; }
+    .podium-score { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 2px; }
+    .podium-country { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; }
 
     .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
     .preset-btn {
-      padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;
+      padding: 6px 12px; border-radius: 6px; font-size: calc(12px * var(--font-scale, 1)); font-weight: 600;
       background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
       color: var(--dark-text-sec); cursor: pointer;
     }
@@ -172,13 +172,13 @@ interface Scored {
     .preset-btn:hover:not(.active) { border-color: var(--dark-amber); color: var(--dark-text); }
 
     .sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
-    .slider-row { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--dark-text-sec); }
+    .slider-row { display: flex; flex-direction: column; gap: 6px; font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); }
     .slider-head { display: flex; justify-content: space-between; }
     .slider-val { color: var(--dark-amber); font-weight: 700; font-variant-numeric: tabular-nums; }
 
     .bar-list { display: flex; flex-direction: column; gap: 6px; }
     .bar-row { display: grid; grid-template-columns: 200px 1fr; gap: 10px; align-items: center; }
-    .bar-name { font-size: 12px; color: var(--dark-text); }
+    .bar-name { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text); }
     .bar-track {
       position: relative; height: 20px;
       background: var(--dark-bg-secondary); border-radius: 10px; overflow: hidden;
@@ -189,17 +189,17 @@ interface Scored {
     }
     .bar-score {
       position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-      font-size: 11px; font-weight: 700; color: var(--dark-text);
+      font-size: calc(11px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text);
       font-variant-numeric: tabular-nums;
     }
 
     .table-wrap { overflow-x: auto; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
     .data-table th, .data-table td {
       padding: 8px 10px; border-bottom: 1px solid var(--dark-border); text-align: left;
     }
     .data-table th {
-      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      font-weight: 600; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
     .data-table td { color: var(--dark-text); }

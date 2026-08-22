@@ -84,13 +84,13 @@ import { ChartDataPoint } from '@models/stat.model';
       text-align: center;
       color: var(--dark-text-muted);
     }
-    .placeholder-icon { font-size: 40px; margin-bottom: 8px; }
+    .placeholder-icon { font-size: calc(40px * var(--font-scale, 1)); margin-bottom: 8px; }
     .placeholder-title {
-      font-size: 16px;
+      font-size: calc(16px * var(--font-scale, 1));
       color: var(--dark-text);
       font-weight: 600;
     }
-    .placeholder-hint { font-size: 14px; margin-top: 4px; }
+    .placeholder-hint { font-size: calc(14px * var(--font-scale, 1)); margin-top: 4px; }
 
     /* Chart */
     .chart-area { width: 100%; }
@@ -101,17 +101,17 @@ import { ChartDataPoint } from '@models/stat.model';
       margin-bottom: 16px;
     }
     .chart-title {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text);
       font-weight: 600;
     }
     .chart-subtitle {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       margin-top: 2px;
     }
     .chart-badge {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-teal);
       padding: 2px 8px;
       background: rgba(42, 123, 123, 0.1);
@@ -130,8 +130,8 @@ import { ChartDataPoint } from '@models/stat.model';
       margin-bottom: 4px;
       align-items: baseline;
     }
-    .bar-name { font-size: 14px; color: var(--dark-text); }
-    .bar-value { font-size: 14px; font-weight: 600; }
+    .bar-name { font-size: calc(14px * var(--font-scale, 1)); color: var(--dark-text); }
+    .bar-value { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; }
     .bar-track {
       height: 24px;
       background: var(--dark-bg-secondary);
@@ -150,12 +150,12 @@ import { ChartDataPoint } from '@models/stat.model';
       &.no-transition { transition: none; }
     }
     .bar-inline-value {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: #fff;
       font-weight: 600;
     }
     .bar-anchor {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin-top: 2px;
       font-style: italic;
@@ -170,13 +170,13 @@ import { ChartDataPoint } from '@models/stat.model';
       border: 1px solid rgba(42, 123, 123, 0.15);
     }
     .summary-title {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       color: var(--dark-teal);
       font-weight: 600;
       margin-bottom: 4px;
     }
     .summary-text {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       line-height: var(--prose-line-height, 1.5);
       letter-spacing: var(--prose-letter-spacing, 0);

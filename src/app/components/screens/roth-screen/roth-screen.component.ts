@@ -340,9 +340,9 @@ import {
   styles: [`
     .roth-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .balance-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
     .bal-card {
@@ -350,47 +350,47 @@ import {
       border: 1px solid var(--dark-border); border-radius: 10px;
     }
     .bal-card.roth { border-color: var(--dark-purple); }
-    .bal-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
-    .bal-value { font-size: 18px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
+    .bal-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; }
+    .bal-value { font-size: calc(18px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
 
     .planner-card, .results-card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .param { display: flex; flex-direction: column; gap: 4px; }
-    .param-label { font-size: 11px; color: var(--dark-text-muted); }
-    .param-hint { font-size: 10px; color: var(--dark-text-muted); font-style: italic; margin-top: 2px; line-height: 1.4; }
+    .param-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .param-hint { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); font-style: italic; margin-top: 2px; line-height: 1.4; }
     .param-input {
       padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
-      background: var(--dark-bg-secondary); color: var(--dark-text); font-size: 14px;
+      background: var(--dark-bg-secondary); color: var(--dark-text); font-size: calc(14px * var(--font-scale, 1));
       font-family: var(--font-sans); outline: none;
     }
     .param-input:focus { border-color: var(--dark-blue); }
 
     .result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .result { display: flex; flex-direction: column; gap: 4px; }
-    .result-label { font-size: 11px; color: var(--dark-text-muted); }
-    .result-value { font-size: 18px; font-weight: 700; color: var(--dark-amber); }
+    .result-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .result-value { font-size: calc(18px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); }
     .result-value.tax { color: var(--dark-amber); }
     .result-value.harvest-zero { color: var(--dark-green, #4ade80); }
     .card-sub {
-      font-size: 12px; color: var(--dark-text-muted); line-height: 1.5;
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); line-height: 1.5;
       margin: 0 0 14px;
     }
     .harvest-results { margin-top: 14px; }
     select.param-input { cursor: pointer; }
 
     .table-wrap { overflow-x: auto; margin-bottom: 14px; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
     .data-table th, .data-table td {
       padding: 8px 10px; border-bottom: 1px solid var(--dark-border);
       text-align: left;
     }
     .data-table th {
-      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      font-weight: 600; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
     .data-table td { color: var(--dark-text); }
@@ -398,7 +398,7 @@ import {
     .data-table .strong { font-weight: 700; color: var(--dark-amber); }
     .data-table tr.row-current { background: rgba(212, 148, 58, 0.08); }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class RothScreenComponent implements OnInit {

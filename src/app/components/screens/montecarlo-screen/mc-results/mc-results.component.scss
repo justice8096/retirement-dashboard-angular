@@ -10,9 +10,9 @@
   --mat-button-outlined-container-height: 32px;
   --mat-button-outlined-label-text-size: 12px;
 }
-.save-msg { font-size: 11px; color: var(--dark-green); font-weight: 600; }
+.save-msg { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-green); font-weight: 600; }
 .save-msg.err { color: var(--dark-red); }
-.save-hint { font-size: 10px; color: var(--dark-text-muted); font-style: italic; flex-basis: 100%; }
+.save-hint { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); font-style: italic; flex-basis: 100%; }
 
 /* Results grid (success / median / worst / best) */
 .results-grid {
@@ -60,11 +60,11 @@
 .success-bar-tick.tick-50 { left: 50%; background: rgba(255, 255, 255, 0.25); }
 .success-bar-tick.tick-75 { left: 75%; }
 
-.result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.result-value { font-size: 22px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; line-height: 1.1; word-break: break-word; }
+.result-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.result-value { font-size: calc(22px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; line-height: 1.1; word-break: break-word; }
 .result-value.worst { color: var(--dark-neutral); }
 .result-value.best { color: var(--dark-green); }
-.result-sub { font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
+.result-sub { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; }
 
 /* Calm-mode pacer (Dyscalculia F-006) */
 .calm-pacer {
@@ -75,7 +75,7 @@
   border-radius: 8px;
 }
 .calm-next-btn { --mat-button-outlined-container-height: 36px; }
-.calm-progress { font-size: 11px; color: var(--dark-text-muted); margin-left: auto; }
+.calm-progress { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-left: auto; }
 
 /* Plain-language summary card */
 .calm-summary {
@@ -83,7 +83,7 @@
   border-color: rgba(92, 156, 230, 0.25);
 }
 .summary-text {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: var(--dark-text);
   line-height: var(--prose-line-height, 1.5);
   letter-spacing: var(--prose-letter-spacing, 0);
@@ -93,12 +93,12 @@
 
 /* Charts (paths + histogram) */
 .chart-svg { width: 100%; height: auto; display: block; }
-.axis-text { font-size: 10px; fill: var(--dark-text-muted); font-family: var(--font-sans); }
+.axis-text { font-size: calc(10px * var(--font-scale, 1)); fill: var(--dark-text-muted); font-family: var(--font-sans); }
 
 /* Percentile breakdown bars */
 .pct-list { display: flex; flex-direction: column; gap: 8px; }
 .pct-row { display: flex; align-items: center; gap: 12px; }
-.pct-label { width: 140px; font-size: 12px; color: var(--dark-text-sec); flex-shrink: 0; }
+.pct-label { width: 140px; font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); flex-shrink: 0; }
 .pct-track {
   flex: 1; background: var(--dark-bg-secondary);
   border-radius: 4px; height: 24px; overflow: hidden;
@@ -108,4 +108,4 @@
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 8px; min-width: 60px;
 }
-.pct-val { font-size: 12px; font-weight: 600; color: #fff; }
+.pct-val { font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: #fff; }

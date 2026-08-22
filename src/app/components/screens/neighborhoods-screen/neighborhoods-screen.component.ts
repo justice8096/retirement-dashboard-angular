@@ -179,9 +179,9 @@ export class NeighborhoodsScreenComponent implements OnInit, AfterViewInit, OnDe
       const popupHtml = `
         <div style="min-width:180px">
           <strong>${escHtml(nh.name)}</strong>
-          ${nh.character ? `<div style="font-size:12px;margin-top:4px">${escHtml(nh.character)}</div>` : ''}
-          ${nh.walkabilityScore !== undefined ? `<div style="font-size:12px;margin-top:4px">Walk Score: <strong>${escHtml(nh.walkabilityScore)}</strong></div>` : ''}
-          <a href="${escHtml(getGoogleMapsUrl(nh, cityName))}" target="_blank" rel="noopener noreferrer" style="font-size:12px;margin-top:6px;display:inline-block">Open in Google Maps</a>
+          ${nh.character ? `<div style="font-size: calc(12px * var(--font-scale, 1));margin-top:4px">${escHtml(nh.character)}</div>` : ''}
+          ${nh.walkabilityScore !== undefined ? `<div style="font-size: calc(12px * var(--font-scale, 1));margin-top:4px">Walk Score: <strong>${escHtml(nh.walkabilityScore)}</strong></div>` : ''}
+          <a href="${escHtml(getGoogleMapsUrl(nh, cityName))}" target="_blank" rel="noopener noreferrer" style="font-size: calc(12px * var(--font-scale, 1));margin-top:6px;display:inline-block">Open in Google Maps</a>
         </div>`;
 
       L.marker([nh.lat, nh.lng]).bindPopup(popupHtml).addTo(this.nbhMarkerLayer);

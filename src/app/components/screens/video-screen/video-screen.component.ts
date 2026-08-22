@@ -50,19 +50,19 @@ import { MatButtonModule } from '@angular/material/button';
   styles: [`
     .video-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 40px;
     }
     .coming-soon { text-align: center; }
-    .cs-icon { font-size: 64px; margin-bottom: 16px; }
-    .cs-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0 0 8px; }
+    .cs-icon { font-size: calc(64px * var(--font-scale, 1)); margin-bottom: 16px; }
+    .cs-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0 0 8px; }
     .cs-desc {
-      font-size: 13px; color: var(--dark-text-sec); max-width: 500px;
+      font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text-sec); max-width: 500px;
       margin: 0 auto 24px; line-height: 1.5;
     }
     .features {
@@ -74,8 +74,8 @@ import { MatButtonModule } from '@angular/material/button';
       padding: 10px; background: var(--dark-bg-secondary);
       border-radius: 8px; text-align: left;
     }
-    .f-icon { font-size: 18px; }
-    .f-text { font-size: 12px; color: var(--dark-text); }
+    .f-icon { font-size: calc(18px * var(--font-scale, 1)); }
+    .f-text { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text); }
   `],
 })
 export class VideoScreenComponent {}

@@ -85,7 +85,7 @@ import { HelpService } from '@services/help.service';
     }
     .badge {
       margin-left: 6px;
-      font-size: 8px;
+      font-size: calc(8px * var(--font-scale, 1));
       background: var(--dark-amber);
       color: #000;
       padding: 2px 4px;
@@ -94,7 +94,7 @@ import { HelpService } from '@services/help.service';
     }
     .lock {
       margin-left: 4px;
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
     }
 
     .spacer { flex: 1; min-width: 8px; }
@@ -125,7 +125,7 @@ import { HelpService } from '@services/help.service';
       border-color: var(--dark-blue);
     }
     .help-btn .help-label {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
     }
     @media (max-width: 520px) {
       .help-btn .help-label { display: none; }

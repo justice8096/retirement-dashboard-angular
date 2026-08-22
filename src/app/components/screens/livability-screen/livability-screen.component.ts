@@ -97,19 +97,19 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
   styles: [`
     .liv-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .empty-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       text-align: center; padding: 60px 24px; color: var(--dark-text-muted);
     }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
+    .empty-icon { font-size: calc(48px * var(--font-scale, 1)); margin-bottom: 12px; }
+    .empty-state p { font-size: calc(13px * var(--font-scale, 1)); max-width: 360px; line-height: 1.5; }
     .link-btn {
       background: none; border: none; color: var(--dark-amber); cursor: pointer;
-      font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
+      font-size: calc(13px * var(--font-scale, 1)); font-family: var(--font-sans); padding: 0 2px;
       text-decoration: underline; text-underline-offset: 2px;
     }
 
@@ -118,7 +118,7 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
       border-bottom: 1px solid var(--dark-border); padding-bottom: 8px;
     }
     .city-tab {
-      padding: 6px 14px; font-size: 12px; border-radius: 6px 6px 0 0; cursor: pointer;
+      padding: 6px 14px; font-size: calc(12px * var(--font-scale, 1)); border-radius: 6px 6px 0 0; cursor: pointer;
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-bottom: none; color: var(--dark-text-sec);
       font-family: var(--font-sans); transition: all 0.15s;
@@ -134,9 +134,9 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
       background: var(--dark-bg-card); border: 1px solid var(--dark-amber);
       border-radius: 12px; padding: 20px;
     }
-    .overall-score { font-size: 40px; font-weight: 800; color: var(--dark-amber); }
-    .out-of { font-size: 16px; color: var(--dark-text-muted); font-weight: 400; }
-    .overall-summary { font-size: 13px; color: var(--dark-text-sec); line-height: 1.5; }
+    .overall-score { font-size: calc(40px * var(--font-scale, 1)); font-weight: 800; color: var(--dark-amber); }
+    .out-of { font-size: calc(16px * var(--font-scale, 1)); color: var(--dark-text-muted); font-weight: 400; }
+    .overall-summary { font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text-sec); line-height: 1.5; }
 
     .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
     .cat-card {
@@ -144,14 +144,14 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
       border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 8px;
     }
     .cat-header { display: flex; justify-content: space-between; align-items: center; }
-    .cat-name { font-size: 14px; font-weight: 700; color: var(--dark-text); text-transform: capitalize; }
-    .cat-score { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+    .cat-name { font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); text-transform: capitalize; }
+    .cat-score { font-size: calc(12px * var(--font-scale, 1)); font-weight: 700; padding: 2px 8px; border-radius: 4px; }
     .cat-score.good { background: rgba(76, 175, 80, 0.12); color: var(--dark-green); }
     .cat-score.ok { background: rgba(212, 148, 58, 0.12); color: var(--dark-amber); }
     .cat-score.bad { background: rgba(139, 157, 195, 0.15); color: var(--dark-neutral); }
-    .cat-summary { font-size: 12px; color: var(--dark-text-sec); line-height: 1.4; margin: 0; }
+    .cat-summary { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); line-height: 1.4; margin: 0; }
     .factors { display: flex; flex-direction: column; gap: 3px; }
-    .factor { font-size: 10px; padding: 2px 0; }
+    .factor { font-size: calc(10px * var(--font-scale, 1)); padding: 2px 0; }
     .factor.pos { color: var(--dark-green); }
     .factor.neg { color: var(--dark-neutral); }
 
@@ -159,13 +159,13 @@ import { InclusionSupplement, InclusionCategory } from '@models/api.model';
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .fb-hint { font-size: 12px; color: var(--dark-text-muted); margin: 0 0 12px; }
+    .fb-hint { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 0 0 12px; }
     .ls-grid { display: flex; flex-direction: column; gap: 8px; }
     .ls-item { display: flex; justify-content: space-between; max-width: 250px; }
-    .ls-label { font-size: 11px; color: var(--dark-text-sec); }
-    .ls-val { font-size: 13px; font-weight: 600; color: var(--dark-amber); }
+    .ls-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); }
+    .ls-val { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-amber); }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class LivabilityScreenComponent implements OnInit {

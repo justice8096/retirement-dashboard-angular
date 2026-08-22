@@ -113,7 +113,7 @@ import { FontSize } from '@models/navigation.model';
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
     }
     .status-dot {
       width: 8px;
@@ -133,7 +133,7 @@ import { FontSize } from '@models/navigation.model';
       flex-wrap: wrap;
     }
     .settings-title {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       font-weight: 600;
     }
@@ -143,19 +143,19 @@ import { FontSize } from '@models/navigation.model';
       align-items: center;
     }
     .setting-label {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
     }
     .hint-bar {
       padding: 4px 20px;
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       border-top: 1px solid var(--dark-border);
     }
     kbd {
       display: inline-block;
       padding: 1px 5px;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
       background: var(--dark-bg-secondary);

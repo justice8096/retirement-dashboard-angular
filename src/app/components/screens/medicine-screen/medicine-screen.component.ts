@@ -121,17 +121,17 @@ interface PricedMedication {
       display: flex; justify-content: space-between; align-items: flex-start;
       gap: 16px; flex-wrap: wrap;
     }
-    .panel-title { font-size: 15px; font-weight: 600; color: var(--dark-text); margin: 0; }
-    .panel-sub { font-size: 12px; color: var(--dark-text-muted); margin: 4px 0 0; max-width: 560px; }
+    .panel-title { font-size: calc(15px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text); margin: 0; }
+    .panel-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 4px 0 0; max-width: 560px; }
 
-    .loc-picker { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--dark-text-muted); }
+    .loc-picker { display: flex; flex-direction: column; gap: 4px; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .loc-picker select {
       background: var(--dark-bg-secondary);
       color: var(--dark-text);
       border: 1px solid var(--dark-border);
       border-radius: 6px;
       padding: 6px 10px;
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       min-width: 220px;
     }
 
@@ -142,15 +142,15 @@ interface PricedMedication {
       border: 1px solid var(--dark-border);
       border-radius: 8px;
     }
-    .summary-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .summary-value { font-size: 18px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
-    .per-mo { font-size: 11px; color: var(--dark-text-muted); font-weight: 400; }
+    .summary-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .summary-value { font-size: calc(18px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
+    .per-mo { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); font-weight: 400; }
 
     .table-wrap { overflow-x: auto; border: 1px solid var(--dark-border); border-radius: 8px; }
-    .med-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .med-table { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--font-scale, 1)); }
     .med-table thead { background: var(--dark-bg-secondary); position: sticky; top: 0; }
     .med-table th {
-      text-align: left; padding: 10px; font-size: 11px;
+      text-align: left; padding: 10px; font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px;
       border-bottom: 1px solid var(--dark-border);
     }
@@ -161,14 +161,14 @@ interface PricedMedication {
     .med-table tbody tr:hover { background: var(--dark-bg-secondary); }
     .col-num { text-align: right; white-space: nowrap; }
     .generic { font-weight: 600; }
-    .brand { font-size: 11px; color: var(--dark-text-muted); margin-top: 2px; }
-    .col-use { color: var(--dark-text-sec); font-size: 11px; }
+    .brand { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; }
+    .col-use { color: var(--dark-text-sec); font-size: calc(11px * var(--font-scale, 1)); }
     .base { color: var(--dark-text-muted); }
     .price { color: var(--dark-amber); font-weight: 600; }
-    .range { color: var(--dark-text-muted); font-size: 11px; }
+    .range { color: var(--dark-text-muted); font-size: calc(11px * var(--font-scale, 1)); }
 
-    .disclaimer { font-size: 11px; color: var(--dark-text-muted); line-height: 1.5; margin: 0; }
-    .status-msg { padding: 24px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .disclaimer { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); line-height: 1.5; margin: 0; }
+    .status-msg { padding: 24px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class MedicineScreenComponent implements OnInit {

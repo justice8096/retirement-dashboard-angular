@@ -56,7 +56,7 @@ import { Source } from '@models/api.model';
       background: transparent;
       border: none;
       color: var(--dark-text-sec, #9aa);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       cursor: pointer;
       padding: 0 4px;
       border-radius: 3px;
@@ -86,7 +86,7 @@ import { Source } from '@models/api.model';
       border: 1px solid var(--dark-border, #2a2f36);
       border-radius: 6px;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       line-height: 1.35;
       animation: fadein 100ms ease-out;
     }
@@ -95,7 +95,7 @@ import { Source } from '@models/api.model';
       to   { transform: translateY(0);    opacity: 1; }
     }
     .title {
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--dark-text-muted, #888);
@@ -115,7 +115,7 @@ import { Source } from '@models/api.model';
     a:hover { color: var(--accent-hover, #8cc); }
     .accessed {
       color: var(--dark-text-muted, #888);
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
     }
     .empty {
       font-style: italic;

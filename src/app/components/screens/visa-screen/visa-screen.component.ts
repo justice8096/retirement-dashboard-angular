@@ -165,11 +165,11 @@ type SortBy = 'income' | 'country' | 'type';
   styles: [`
     .visa-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
     .badge-new {
-      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
 
@@ -177,7 +177,7 @@ type SortBy = 'income' | 'country' | 'type';
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
     .result-card {
@@ -185,33 +185,33 @@ type SortBy = 'income' | 'country' | 'type';
       border: 1px solid var(--dark-border); border-radius: 10px;
     }
     .result-card.highlight { border-color: var(--dark-green); background: rgba(76, 175, 80, 0.06); }
-    .result-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; }
-    .result-value { font-size: 22px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .result-explain { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; }
+    .result-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; }
+    .result-value { font-size: calc(22px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .result-explain { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 4px; }
 
     .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
     .ctrl { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; }
-    .ctrl-label { font-size: 11px; color: var(--dark-text-muted); }
+    .ctrl-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .ctrl-input {
       padding: 7px 10px; border-radius: 6px; border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary); color: var(--dark-text);
-      font-size: 13px; font-family: var(--font-sans); outline: none;
+      font-size: calc(13px * var(--font-scale, 1)); font-family: var(--font-sans); outline: none;
     }
     .ctrl-clear {
       padding: 7px 14px; border-radius: 6px; border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary); color: var(--dark-text-sec);
-      font-size: 12px; cursor: pointer;
+      font-size: calc(12px * var(--font-scale, 1)); cursor: pointer;
     }
     .ctrl-clear:hover { color: var(--dark-text); border-color: var(--dark-amber); }
 
     .table-wrap { overflow-x: auto; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
     .data-table th, .data-table td {
       padding: 8px 10px; border-bottom: 1px solid var(--dark-border); text-align: left;
       vertical-align: top;
     }
     .data-table th {
-      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      font-weight: 600; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
     .data-table td { color: var(--dark-text); }
@@ -219,7 +219,7 @@ type SortBy = 'income' | 'country' | 'type';
     .data-table tr { cursor: pointer; }
     .data-table tr:hover { background: var(--dark-bg-secondary); }
     .data-table tr.selected { background: rgba(212, 148, 58, 0.08); }
-    .data-table .notes { font-size: 12px; color: var(--dark-text-sec); max-width: 360px; }
+    .data-table .notes { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); max-width: 360px; }
 
     .green { color: var(--dark-green); }
     .amber { color: var(--dark-amber); }
@@ -235,18 +235,18 @@ type SortBy = 'income' | 'country' | 'type';
     .detail-cell {
       padding: 12px; border-radius: 8px; background: var(--dark-bg-secondary);
     }
-    .detail-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 4px; }
-    .detail-val { font-size: 16px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
+    .detail-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 4px; }
+    .detail-val { font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
     .notes-block {
       padding: 12px; border-radius: 8px; background: var(--dark-bg-secondary);
       border-left: 3px solid var(--dark-text-sec); margin-bottom: 10px;
     }
-    .notes-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 6px; }
-    .notes-block div { font-size: 13px; color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5); }
+    .notes-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 6px; }
+    .notes-block div { font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5); }
     .warning-block {
       padding: 12px 14px; border-radius: 8px;
       background: rgba(229, 115, 115, 0.08); border-left: 3px solid var(--dark-red);
-      font-size: 13px; color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5);
+      font-size: calc(13px * var(--font-scale, 1)); color: var(--dark-text-sec); line-height: var(--prose-line-height, 1.5);
     }
     .warning-block strong { color: var(--dark-red); }
   `],

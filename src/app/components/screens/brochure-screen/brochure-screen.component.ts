@@ -65,9 +65,9 @@ import { bulletText } from '@models/api.model';
   styles: [`
     .brochure-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .brochure-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
     .brochure-card {
@@ -75,18 +75,18 @@ import { bulletText } from '@models/api.model';
       border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
     }
     .b-header {}
-    .b-name { font-size: 16px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .b-country { font-size: 11px; color: var(--dark-text-muted); }
+    .b-name { font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .b-country { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .b-cost { display: flex; justify-content: space-between; align-items: baseline; }
-    .b-cost-label { font-size: 11px; color: var(--dark-text-sec); }
-    .b-cost-value { font-size: 18px; font-weight: 700; color: var(--dark-amber); }
+    .b-cost-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); }
+    .b-cost-value { font-size: calc(18px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); }
     .b-highlights { display: flex; flex-wrap: wrap; gap: 6px; }
     .b-tag {
-      font-size: 10px; padding: 3px 8px; border-radius: 4px;
+      font-size: calc(10px * var(--font-scale, 1)); padding: 3px 8px; border-radius: 4px;
       background: var(--dark-bg-secondary); color: var(--dark-text-sec);
     }
     .b-pros { display: flex; flex-direction: column; gap: 3px; }
-    .b-pro { font-size: 11px; color: var(--dark-green); }
+    .b-pro { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-green); }
     .b-print-btn {
       align-self: flex-start; margin-top: auto;
       --mat-button-outlined-container-height: 32px;
@@ -94,7 +94,7 @@ import { bulletText } from '@models/api.model';
       --mat-button-outlined-outline-color: var(--dark-border);
     }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class BrochureScreenComponent implements OnInit {
@@ -141,24 +141,24 @@ export class BrochureScreenComponent implements OnInit {
 <style>
   @page { size: Letter; margin: 0.6in; }
   body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: #222; margin: 0; }
-  h1 { font-size: 28px; margin: 0 0 4px; }
-  .sub { color: #666; font-size: 13px; margin-bottom: 18px; }
+  h1 { font-size: calc(28px * var(--font-scale, 1)); margin: 0 0 4px; }
+  .sub { color: #666; font-size: calc(13px * var(--font-scale, 1)); margin-bottom: 18px; }
   .cost-hero { background: #fef3e2; border: 1px solid #e8b86d; border-radius: 8px;
     padding: 14px 18px; display: flex; justify-content: space-between; align-items: baseline;
     margin-bottom: 18px; }
-  .cost-hero .lbl { font-size: 12px; color: #8a6a30; text-transform: uppercase; letter-spacing: 0.5px; }
-  .cost-hero .val { font-size: 26px; font-weight: 700; color: #c47a1a; }
+  .cost-hero .lbl { font-size: calc(12px * var(--font-scale, 1)); color: #8a6a30; text-transform: uppercase; letter-spacing: 0.5px; }
+  .cost-hero .val { font-size: calc(26px * var(--font-scale, 1)); font-weight: 700; color: #c47a1a; }
   .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
-  .tag { font-size: 11px; padding: 4px 10px; background: #f1f1f1; border-radius: 4px; }
-  h2 { font-size: 15px; margin: 18px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .tag { font-size: calc(11px * var(--font-scale, 1)); padding: 4px 10px; background: #f1f1f1; border-radius: 4px; }
+  h2 { font-size: calc(15px * var(--font-scale, 1)); margin: 18px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--font-scale, 1)); }
   td { padding: 5px 4px; border-bottom: 1px solid #eee; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  ul { margin: 0; padding-left: 18px; font-size: 12px; }
+  ul { margin: 0; padding-left: 18px; font-size: calc(12px * var(--font-scale, 1)); }
   .pro { color: #2a7a2a; }
   .con { color: #a33; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  footer { margin-top: 24px; font-size: 10px; color: #999; text-align: center; }
+  footer { margin-top: 24px; font-size: calc(10px * var(--font-scale, 1)); color: #999; text-align: center; }
 </style></head><body onload="setTimeout(function(){window.print()},250)">
   <h1>${esc(loc.name)}</h1>
   <div class="sub">${esc(loc.country)} · ${esc(loc.region)}${loc.subregion ? ' · ' + esc(loc.subregion) : ''} · ${esc(loc.currency)}</div>

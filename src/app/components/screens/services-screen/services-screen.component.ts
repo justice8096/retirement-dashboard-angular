@@ -114,19 +114,19 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
   styles: [`
     .svc-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .empty-state {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       text-align: center; padding: 60px 24px; color: var(--dark-text-muted);
     }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-state p { font-size: 13px; max-width: 360px; line-height: 1.5; }
+    .empty-icon { font-size: calc(48px * var(--font-scale, 1)); margin-bottom: 12px; }
+    .empty-state p { font-size: calc(13px * var(--font-scale, 1)); max-width: 360px; line-height: 1.5; }
     .link-btn {
       background: none; border: none; color: var(--dark-amber); cursor: pointer;
-      font-size: 13px; font-family: var(--font-sans); padding: 0 2px;
+      font-size: calc(13px * var(--font-scale, 1)); font-family: var(--font-sans); padding: 0 2px;
       text-decoration: underline; text-underline-offset: 2px;
     }
 
@@ -135,7 +135,7 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
       border-bottom: 1px solid var(--dark-border); padding-bottom: 8px;
     }
     .city-tab {
-      padding: 6px 14px; font-size: 12px; border-radius: 6px 6px 0 0; cursor: pointer;
+      padding: 6px 14px; font-size: calc(12px * var(--font-scale, 1)); border-radius: 6px 6px 0 0; cursor: pointer;
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-bottom: none; color: var(--dark-text-sec);
       font-family: var(--font-sans); transition: all 0.15s;
@@ -149,12 +149,12 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
     .group-section { margin-top: 4px; }
     .group-section.group-empty .group-title { color: var(--dark-text-muted); }
     .group-title {
-      font-size: 13px; font-weight: 700; color: var(--dark-text-sec);
+      font-size: calc(13px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text-sec);
       text-transform: capitalize; margin: 0 0 8px;
       padding-bottom: 6px; border-bottom: 1px solid var(--dark-bg-secondary);
     }
     .svc-empty {
-      font-size: 11px; color: var(--dark-text-muted); font-style: italic;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); font-style: italic;
       padding: 8px 12px; margin-bottom: 12px;
       border: 1px dashed var(--dark-border); border-radius: 6px;
       background: var(--dark-bg-secondary);
@@ -164,28 +164,28 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 4px;
     }
-    .svc-name { font-size: 13px; font-weight: 600; color: var(--dark-text); }
-    .svc-address { font-size: 11px; color: var(--dark-text-sec); }
-    .svc-dist { font-size: 10px; color: var(--dark-text-muted); }
-    .svc-notes { font-size: 11px; color: var(--dark-text-sec); line-height: 1.3; }
+    .svc-name { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text); }
+    .svc-address { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); }
+    .svc-dist { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .svc-notes { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); line-height: 1.3; }
     .svc-sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-    .src-link { font-size: 10px; color: var(--dark-blue); text-decoration: none; }
+    .src-link { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-blue); text-decoration: none; }
     .src-link:hover { text-decoration: underline; }
 
     .fallback-card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .fb-title { font-size: 16px; font-weight: 700; color: var(--dark-text); margin: 0 0 16px; }
+    .fb-title { font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0 0 16px; }
     .info-section { margin-bottom: 16px; }
     .info-section:last-child { margin-bottom: 0; }
-    .info-title { font-size: 13px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 10px; }
+    .info-title { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 10px; }
     .kv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
     .kv { display: flex; flex-direction: column; gap: 2px; }
-    .k { font-size: 10px; color: var(--dark-text-muted); }
-    .v { font-size: 13px; font-weight: 500; color: var(--dark-text); }
+    .k { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .v { font-size: calc(13px * var(--font-scale, 1)); font-weight: 500; color: var(--dark-text); }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
   `],
 })
 export class ServicesScreenComponent implements OnInit {

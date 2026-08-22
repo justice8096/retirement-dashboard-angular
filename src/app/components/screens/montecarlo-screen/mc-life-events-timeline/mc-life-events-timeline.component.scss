@@ -20,18 +20,18 @@
 }
 
 .lane-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   fill: var(--dark-text-sec);
 }
 
 .axis-label {
-  font-size: 9px;
+  font-size: calc(9px * var(--font-scale, 1));
   fill: var(--dark-text-muted);
   letter-spacing: 0.3px;
 }
 
 .empty-state {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--dark-text-muted);
   font-style: italic;
   text-align: center;

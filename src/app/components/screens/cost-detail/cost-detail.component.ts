@@ -104,9 +104,9 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
   styles: [`
     .cost-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .stats-row { display: flex; gap: 12px; flex-wrap: wrap; }
     .stat-card {
@@ -114,36 +114,36 @@ import { SourceTooltipComponent } from '@components/source-tooltip/source-toolti
       background: var(--dark-bg-card); border: 1px solid var(--dark-border); border-radius: 10px;
     }
     .stat-card.cheapest { border-color: var(--dark-green); }
-    .stat-label { font-size: 11px; color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-    .stat-value { font-size: 22px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
-    .per-mo { font-size: 12px; color: var(--dark-text-muted); font-weight: 400; }
-    .stat-loc { font-size: 11px; color: var(--dark-text-sec); margin-top: 2px; }
+    .stat-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-size: calc(22px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; }
+    .per-mo { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); font-weight: 400; }
+    .stat-loc { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); margin-top: 2px; }
 
     .comparison-section {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .section-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .section-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .bars { display: flex; flex-direction: column; gap: 10px; }
     .bar-row { cursor: pointer; padding: 4px 0; }
     .bar-row:hover .bar-name { color: var(--dark-blue); }
     .bar-labels { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-    .bar-name { font-size: 12px; color: var(--dark-text); transition: color 0.15s; }
-    .bar-value { font-size: 12px; font-weight: 600; color: var(--dark-amber); }
+    .bar-name { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text); transition: color 0.15s; }
+    .bar-value { font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-amber); }
     .bar-track { height: 16px; background: var(--dark-bg-secondary); border-radius: 4px; overflow: hidden; }
     .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
-    .range-line { display: flex; gap: 4px; font-size: 10px; color: var(--dark-text-muted); margin-top: 2px; }
+    .range-line { display: flex; gap: 4px; font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; }
     .range-min { color: var(--dark-green); }
     .range-max { color: var(--dark-neutral); }
-    .area-line { display: flex; gap: 6px; font-size: 10px; color: var(--dark-purple); margin-top: 2px; font-style: italic; }
+    .area-line { display: flex; gap: 6px; font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-purple); margin-top: 2px; font-style: italic; }
     .area-value { font-weight: 600; }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
     .filter-banner {
       padding: 10px 14px; background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
       border-left: 3px solid var(--dark-amber); border-radius: 6px;
-      font-size: 12px; color: var(--dark-text-sec);
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec);
     }
     .filter-banner strong { color: var(--dark-text); }
   `],

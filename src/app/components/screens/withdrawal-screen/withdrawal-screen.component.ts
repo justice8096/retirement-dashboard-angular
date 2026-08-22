@@ -443,9 +443,9 @@ const CAPE_FALLBACK_DESC =
   styles: [`
     .wd-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .cards { display: flex; flex-direction: column; gap: 12px; }
     .card {
@@ -453,25 +453,25 @@ const CAPE_FALLBACK_DESC =
       border-radius: 12px; padding: 20px;
     }
     .card.roth { border-color: var(--dark-purple); }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
-    .card-sub { font-size: 12px; color: var(--dark-text-muted); line-height: 1.5; margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); line-height: 1.5; margin: 0 0 14px; }
 
     .kv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
     .kv { display: flex; flex-direction: column; gap: 4px; }
-    .k { font-size: 11px; color: var(--dark-text-muted); }
-    .v { font-size: 15px; font-weight: 600; color: var(--dark-amber); }
+    .k { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .v { font-size: calc(15px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-amber); }
     .v.cap { text-transform: capitalize; color: var(--dark-text); }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
 
     .compare-header { margin-top: 8px; }
     .compare-header .card-sub { margin: 0; }
 
     .card.note {
       display: flex; align-items: flex-start; gap: 10px;
-      font-size: 12px; color: var(--dark-text-sec); padding: 14px 18px;
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec); padding: 14px 18px;
     }
-    .note-icon { font-size: 14px; color: var(--dark-text-muted); flex-shrink: 0; }
+    .note-icon { font-size: calc(14px * var(--font-scale, 1)); color: var(--dark-text-muted); flex-shrink: 0; }
 
     .planner-card {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
@@ -481,11 +481,11 @@ const CAPE_FALLBACK_DESC =
     .param-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
     .knob-grid { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--dark-border); }
     .param { display: flex; flex-direction: column; gap: 4px; }
-    .param-label { font-size: 11px; color: var(--dark-text-muted); }
-    .param-hint { font-size: 10px; color: var(--dark-text-muted); font-style: italic; margin-top: 2px; line-height: 1.4; }
+    .param-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
+    .param-hint { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); font-style: italic; margin-top: 2px; line-height: 1.4; }
     .param-input {
       padding: 8px 12px; border-radius: 8px; border: 1px solid var(--dark-border);
-      background: var(--dark-bg-secondary); color: var(--dark-text); font-size: 14px;
+      background: var(--dark-bg-secondary); color: var(--dark-text); font-size: calc(14px * var(--font-scale, 1));
       font-family: var(--font-sans); outline: none;
     }
     .param-input:focus { border-color: var(--dark-blue); }
@@ -493,7 +493,7 @@ const CAPE_FALLBACK_DESC =
     .knob-note {
       margin-top: 16px; padding: 14px; border-radius: 8px;
       background: var(--dark-bg-hover, rgba(255,255,255,0.04));
-      border: 1px solid var(--dark-border); font-size: 12px; color: var(--dark-text-sec);
+      border: 1px solid var(--dark-border); font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec);
     }
 
     .strategy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
@@ -503,16 +503,16 @@ const CAPE_FALLBACK_DESC =
     }
     .strategy-card.selected { border-color: var(--dark-blue); background: var(--dark-bg-hover, rgba(255,255,255,0.06)); }
     .strategy-card:focus-visible { outline: 2px solid var(--dark-blue); outline-offset: 1px; }
-    .strategy-name { font-size: 13px; font-weight: 700; color: var(--dark-text); margin-bottom: 4px; }
-    .strategy-desc { font-size: 11px; color: var(--dark-text-muted); line-height: 1.35; }
+    .strategy-name { font-size: calc(13px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin-bottom: 4px; }
+    .strategy-desc { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); line-height: 1.35; }
 
     .table-wrap { overflow-x: auto; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
     .data-table th, .data-table td {
       padding: 8px 10px; border-bottom: 1px solid var(--dark-border); text-align: left;
     }
     .data-table th {
-      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      font-weight: 600; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
     .data-table td { color: var(--dark-text); }

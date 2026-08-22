@@ -28,14 +28,14 @@ import { NavigationService } from '@services/navigation.service';
       text-align: center;
       gap: 8px;
     }
-    .icon { font-size: 48px; }
+    .icon { font-size: calc(48px * var(--font-scale, 1)); }
     .title {
-      font-size: 18px;
+      font-size: calc(18px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
     }
     .hint {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       max-width: 400px;
       line-height: 1.5;
@@ -43,7 +43,7 @@ import { NavigationService } from '@services/navigation.service';
     .premium-badge {
       margin-top: 8px;
       padding: 6px 14px;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-amber);
       background: rgba(212, 148, 58, 0.08);
       border-radius: 6px;

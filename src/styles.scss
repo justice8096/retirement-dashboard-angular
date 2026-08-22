@@ -298,10 +298,10 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
  * single-file argument from PR #61's audit still applies. */
 
 .screen-header { display: flex; align-items: center; gap: 12px; }
-.header-icon { font-size: 32px; }
-.header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
+.header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+.header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
 .header-sub {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--dark-text-muted);
   margin: 2px 0 0;
   /* prose vars already inherit via the global p/.prose/.header-sub block above */
@@ -314,7 +314,7 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
   padding: 20px;
 }
 .card-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--dark-text-sec);
   margin: 0 0 14px;
@@ -324,7 +324,7 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
   padding: 40px;
   text-align: center;
   color: var(--dark-text-sec);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 
 /* ─── Material Component Overrides ───────────────────────────────────── */
@@ -363,7 +363,7 @@ html.dx-contrast-light ::-webkit-scrollbar-thumb {
   background: var(--dark-bg-card) !important;
   border: 1px solid var(--dark-border);
   color: var(--dark-text) !important;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 600;
 }
 

@@ -205,13 +205,13 @@ import { VideoScreenComponent } from '@components/screens/video-screen/video-scr
       border-radius: 6px;
       border: 1px solid rgba(76, 175, 80, 0.15);
     }
-    .indicator-icon { font-size: 14px; }
+    .indicator-icon { font-size: calc(14px * var(--font-scale, 1)); }
     .indicator-text {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-green);
     }
     .indicator-detail {
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin-left: auto;
     }

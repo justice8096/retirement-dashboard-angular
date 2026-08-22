@@ -128,9 +128,9 @@ import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '@reti
   styles: [`
     .taxes-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; }
 
     .tax-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
     .tax-card {
@@ -142,15 +142,15 @@ import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '@reti
       display: flex; justify-content: space-between; align-items: baseline;
       padding: 14px 16px 0;
     }
-    .tax-name { font-size: 14px; font-weight: 700; color: var(--dark-text); }
-    .tax-country { font-size: 11px; color: var(--dark-text-muted); }
+    .tax-name { font-size: calc(14px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); }
+    .tax-country { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .tax-body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
     .tax-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .tax-label { font-size: 11px; color: var(--dark-text-sec); }
-    .tax-value { font-size: 13px; font-weight: 600; color: var(--dark-amber); }
-    .tax-notes { font-size: 10px; color: var(--dark-text-muted); line-height: 1.4; padding-top: 4px; border-top: 1px solid var(--dark-bg-secondary); }
+    .tax-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); }
+    .tax-value { font-size: calc(13px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-amber); }
+    .tax-notes { font-size: calc(10px * var(--font-scale, 1)); color: var(--dark-text-muted); line-height: 1.4; padding-top: 4px; border-top: 1px solid var(--dark-bg-secondary); }
     .src-badge {
-      font-size: 9px; padding: 1px 5px; margin-left: 6px; border-radius: 3px;
+      font-size: calc(9px * var(--font-scale, 1)); padding: 1px 5px; margin-left: 6px; border-radius: 3px;
       font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
     }
     .src-brackets      { background: rgba(76, 175, 80, 0.15); color: var(--dark-green); }
@@ -158,8 +158,8 @@ import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '@reti
     .src-vat-converged { background: rgba(156, 111, 222, 0.15); color: var(--dark-purple); }
     .src-none          { background: var(--dark-bg-secondary); color: var(--dark-text-muted); }
 
-    .tax-sub .tax-label { padding-left: 12px; color: var(--dark-text-muted); font-size: 10px; }
-    .tax-sub .tax-value { font-size: 11px; color: var(--dark-text-sec); font-weight: 500; }
+    .tax-sub .tax-label { padding-left: 12px; color: var(--dark-text-muted); font-size: calc(10px * var(--font-scale, 1)); }
+    .tax-sub .tax-value { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); font-weight: 500; }
 
     .income-bar {
       padding: 14px 16px; background: var(--dark-bg-card);
@@ -167,25 +167,25 @@ import { FED_BRACKETS_2026_SOURCES, FED_STD_DEDUCTION_2026_SOURCES } from '@reti
       display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
     }
     .income-field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
-    .income-label { font-size: 11px; color: var(--dark-text-muted); }
+    .income-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); }
     .income-input {
       padding: 7px 10px; border-radius: 6px; border: 1px solid var(--dark-border);
       background: var(--dark-bg-secondary); color: var(--dark-text);
-      font-size: 15px; font-weight: 600; outline: none;
+      font-size: calc(15px * var(--font-scale, 1)); font-weight: 600; outline: none;
     }
     .income-input:focus { border-color: var(--dark-amber); }
-    .income-hint { font-size: 11px; color: var(--dark-text-muted); max-width: 400px; line-height: 1.5; }
+    .income-hint { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); max-width: 400px; line-height: 1.5; }
     .income-magnitude {
       display: block;
-      font-size: 11px; color: var(--dark-text-sec); font-style: italic;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-sec); font-style: italic;
       margin-top: 4px; line-height: 1.45;
     }
 
-    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: 13px; }
+    .status-msg { padding: 40px; text-align: center; color: var(--dark-text-sec); font-size: calc(13px * var(--font-scale, 1)); }
     .filter-banner {
       padding: 10px 14px; background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
       border-left: 3px solid var(--dark-amber); border-radius: 6px;
-      font-size: 12px; color: var(--dark-text-sec);
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec);
     }
     .filter-banner strong { color: var(--dark-text); }
   `],

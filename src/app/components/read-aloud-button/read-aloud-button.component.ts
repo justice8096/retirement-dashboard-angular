@@ -41,7 +41,7 @@ import { DyslexiaService } from '@services/dyslexia.service';
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
       cursor: pointer;
       font-family: var(--app-font-family, var(--font-sans));
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       font-weight: 600;
       z-index: 9997;
     }

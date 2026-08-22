@@ -144,13 +144,13 @@ import { CATEGORIES } from '@models/navigation.model';
       border-bottom: 1px solid var(--dark-border);
     }
     .eyebrow {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--dark-text-muted);
     }
     h2 {
-      font-size: 18px;
+      font-size: calc(18px * var(--font-scale, 1));
       margin: 2px 0 0;
       color: var(--dark-text);
     }
@@ -162,7 +162,7 @@ import { CATEGORIES } from '@models/navigation.model';
       background: transparent;
       border: none;
       color: var(--dark-text-sec);
-      font-size: 20px;
+      font-size: calc(20px * var(--font-scale, 1));
       padding: 4px 10px;
       border-radius: 6px;
       cursor: pointer;
@@ -177,7 +177,7 @@ import { CATEGORIES } from '@models/navigation.model';
     }
 
     .summary {
-      font-size: 15px;
+      font-size: calc(15px * var(--font-scale, 1));
       color: var(--dark-text);
       padding: 10px 12px;
       background: rgba(92, 156, 230, 0.08);
@@ -193,7 +193,7 @@ import { CATEGORIES } from '@models/navigation.model';
       margin-bottom: 20px;
     }
     .section h3 {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       font-weight: 700;
       text-transform: uppercase;
@@ -201,7 +201,7 @@ import { CATEGORIES } from '@models/navigation.model';
       margin: 0 0 8px;
     }
     .section p {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text);
       line-height: var(--prose-line-height, 1.5);
       letter-spacing: var(--prose-letter-spacing, 0);
@@ -213,7 +213,7 @@ import { CATEGORIES } from '@models/navigation.model';
       padding-left: 18px;
     }
     .section li {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text);
       line-height: var(--prose-line-height, 1.5);
       margin-bottom: 6px;
@@ -239,7 +239,7 @@ import { CATEGORIES } from '@models/navigation.model';
     }
     .chip summary {
       cursor: pointer;
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
       list-style: none;
@@ -253,7 +253,7 @@ import { CATEGORIES } from '@models/navigation.model';
     .chip[open] summary::before { content: '−'; }
     .chip-body,
     .chip-example {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       line-height: var(--prose-line-height, 1.5);
       letter-spacing: var(--prose-letter-spacing, 0);
@@ -274,7 +274,7 @@ import { CATEGORIES } from '@models/navigation.model';
       background: var(--dark-bg-secondary);
       color: var(--dark-text-sec);
       font-family: inherit;
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       cursor: pointer;
     }
     .related-btn:hover {
@@ -286,13 +286,13 @@ import { CATEGORIES } from '@models/navigation.model';
     .footer {
       padding: 8px 20px;
       border-top: 1px solid var(--dark-border);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
     }
     kbd {
       display: inline-block;
       padding: 1px 5px;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
       background: var(--dark-bg-secondary);

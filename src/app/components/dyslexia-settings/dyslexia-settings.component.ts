@@ -221,11 +221,11 @@ import {
       margin-right: 12px;
     }
     .toggle-title {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text);
     }
     .toggle-desc {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin-top: 4px;
       line-height: 1.4;
@@ -239,14 +239,14 @@ import {
       border: 1px solid var(--dark-border);
     }
     .section-label {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       font-weight: 600;
       margin-bottom: 8px;
       display: block;
     }
     .desc {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin-top: 4px;
       line-height: 1.5;
@@ -263,7 +263,7 @@ import {
       display: inline-block;
       padding: 1px 5px;
       font-family: var(--font-sans);
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
       background: var(--dark-bg-card);
@@ -297,13 +297,13 @@ import {
       border: 1px solid rgba(92, 156, 230, 0.2);
     }
     .info-title {
-      font-size: 13px;
+      font-size: calc(13px * var(--font-scale, 1));
       color: var(--dark-blue);
       font-weight: 600;
       margin-bottom: 4px;
     }
     .info-text {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       line-height: 1.5;
     }

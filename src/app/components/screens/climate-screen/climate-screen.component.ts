@@ -223,11 +223,11 @@ function comfortScore(tempF: number): number {
   styles: [`
     .climate-screen { display: flex; flex-direction: column; gap: 16px; }
     .screen-header { display: flex; align-items: center; gap: 12px; }
-    .header-icon { font-size: 32px; }
-    .header-title { font-size: 20px; font-weight: 700; color: var(--dark-text); margin: 0; }
-    .header-sub { font-size: 12px; color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
+    .header-icon { font-size: calc(32px * var(--font-scale, 1)); }
+    .header-title { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); margin: 0; }
+    .header-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin: 2px 0 0; line-height: var(--prose-line-height, 1.5); }
     .badge-new {
-      font-size: 10px; font-weight: 700; color: var(--dark-green);
+      font-size: calc(10px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-green);
       padding: 2px 8px; background: rgba(76, 175, 80, 0.12); border-radius: 4px;
     }
 
@@ -235,20 +235,20 @@ function comfortScore(tempF: number): number {
       background: var(--dark-bg-card); border: 1px solid var(--dark-border);
       border-radius: 12px; padding: 20px;
     }
-    .card-title { font-size: 14px; font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
+    .card-title { font-size: calc(14px * var(--font-scale, 1)); font-weight: 600; color: var(--dark-text-sec); margin: 0 0 14px; }
 
     .podium { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
     .podium-card {
       padding: 16px; border-radius: 12px;
       background: var(--dark-bg-card); border: 1px solid var(--dark-border); border-top: 3px solid var(--dark-amber);
     }
-    .podium-name { font-weight: 700; color: var(--dark-text); font-size: 14px; }
-    .podium-score { font-size: 20px; font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
-    .podium-country { font-size: 11px; color: var(--dark-text-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .podium-name { font-weight: 700; color: var(--dark-text); font-size: calc(14px * var(--font-scale, 1)); }
+    .podium-score { font-size: calc(20px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-amber); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .podium-country { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
 
     .picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
     .pick-btn {
-      padding: 8px 10px; border-radius: 6px; text-align: left; font-size: 12px;
+      padding: 8px 10px; border-radius: 6px; text-align: left; font-size: calc(12px * var(--font-scale, 1));
       background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
       color: var(--dark-text-sec); cursor: pointer;
     }
@@ -258,7 +258,7 @@ function comfortScore(tempF: number): number {
     .line-chart { display: grid; grid-template-columns: 40px 1fr; height: 260px; gap: 4px; }
     .y-axis {
       display: flex; flex-direction: column; justify-content: space-between;
-      font-size: 11px; color: var(--dark-text-muted); text-align: right; padding: 2px 4px 2px 0;
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); text-align: right; padding: 2px 4px 2px 0;
     }
     .plot {
       position: relative; background: var(--dark-bg-secondary); border: 1px solid var(--dark-border);
@@ -278,11 +278,11 @@ function comfortScore(tempF: number): number {
     .series-dot.s-3 { background: #FFA07A; }
     .x-axis {
       display: flex; justify-content: space-between; padding: 6px 0 0 44px;
-      font-size: 11px; color: var(--dark-text-muted);
+      font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
     }
     .chart-legend {
       display: flex; flex-wrap: wrap; gap: 14px; padding-top: 10px;
-      font-size: 12px; color: var(--dark-text-sec);
+      font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-sec);
     }
     .swatch {
       display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px;
@@ -300,22 +300,22 @@ function comfortScore(tempF: number): number {
     }
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 14px; }
     .stat-cell { padding: 12px; background: var(--dark-bg-secondary); border-radius: 8px; }
-    .stat-label { font-size: 11px; color: var(--dark-text-muted); margin-bottom: 4px; }
-    .stat-val { font-size: 16px; font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
+    .stat-label { font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-bottom: 4px; }
+    .stat-val { font-size: calc(16px * var(--font-scale, 1)); font-weight: 700; color: var(--dark-text); font-variant-numeric: tabular-nums; }
     .stat-val.green { color: var(--dark-green); }
     .stat-val.amber { color: var(--dark-amber); }
-    .stat-sub { font-size: 12px; color: var(--dark-text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .stat-sub { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
 
     .table-wrap { overflow-x: auto; }
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: calc(13px * var(--font-scale, 1)); }
     .data-table th, .data-table td {
       padding: 8px 10px; border-bottom: 1px solid var(--dark-border); text-align: left;
     }
     .data-table.compact th, .data-table.compact td {
-      padding: 6px 4px; font-size: 11px;
+      padding: 6px 4px; font-size: calc(11px * var(--font-scale, 1));
     }
     .data-table th {
-      font-weight: 600; font-size: 11px; color: var(--dark-text-muted);
+      font-weight: 600; font-size: calc(11px * var(--font-scale, 1)); color: var(--dark-text-muted);
       text-transform: uppercase; letter-spacing: 0.4px;
     }
     .data-table td { color: var(--dark-text); }

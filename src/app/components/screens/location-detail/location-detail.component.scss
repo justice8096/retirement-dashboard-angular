@@ -13,24 +13,24 @@
       gap: 16px;
     }
     .loc-name {
-      font-size: 22px;
+      font-size: calc(22px * var(--font-scale, 1));
       font-weight: 700;
       color: var(--dark-text);
       margin: 0;
     }
     .loc-meta {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       margin-top: 4px;
     }
     .loc-total {
-      font-size: 28px;
+      font-size: calc(28px * var(--font-scale, 1));
       font-weight: 700;
       color: var(--dark-amber);
       white-space: nowrap;
     }
     .per-mo {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       font-weight: 400;
     }
@@ -40,13 +40,13 @@
       background: rgba(42, 123, 123, 0.08);
       border-radius: 8px;
       border: 1px solid rgba(42, 123, 123, 0.15);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-teal);
       line-height: 1.5;
     }
 
     .section-title {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text-sec);
       margin: 0 0 12px;
@@ -66,8 +66,8 @@
       align-items: baseline;
       margin-bottom: 4px;
     }
-    .bar-name { font-size: 12px; color: var(--dark-text); }
-    .bar-value { font-size: 12px; font-weight: 600; }
+    .bar-name { font-size: calc(12px * var(--font-scale, 1)); color: var(--dark-text); }
+    .bar-value { font-size: calc(12px * var(--font-scale, 1)); font-weight: 600; }
     .bar-track {
       height: 20px;
       background: var(--dark-bg-secondary);
@@ -80,7 +80,7 @@
       transition: width 0.3s ease;
     }
     .bar-anchor {
-      font-size: 9px;
+      font-size: calc(9px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       margin-top: 2px;
       font-style: italic;
@@ -98,7 +98,7 @@
       border: 1px solid var(--dark-border);
     }
     .range-label {
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       font-weight: 600;
       margin-bottom: 6px;
@@ -107,12 +107,12 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
     }
     .range-min { color: var(--dark-green); }
     .range-typical { color: var(--dark-amber); font-weight: 700; }
     .range-max { color: var(--dark-neutral); }
-    .range-arrow { color: var(--dark-text-muted); font-size: 10px; }
+    .range-arrow { color: var(--dark-text-muted); font-size: calc(10px * var(--font-scale, 1)); }
 
     /* #26 — FX stress widget. Same card visual idiom as the breakdown
      * and ranges sections. Hidden entirely for USD locations (template
@@ -124,7 +124,7 @@
       padding: 20px;
     }
     .fx-stress-blurb {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       line-height: 1.5;
       margin: 0 0 14px;
@@ -141,7 +141,7 @@
       border: 1px solid var(--dark-border);
       border-radius: 6px;
       color: var(--dark-text);
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       font-family: var(--font-sans);
       font-variant-numeric: tabular-nums;
       cursor: pointer;
@@ -170,23 +170,23 @@
       gap: 12px;
     }
     .fx-result-label {
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       color: var(--dark-text-sec);
     }
     .fx-result-value {
-      font-size: 22px;
+      font-size: calc(22px * var(--font-scale, 1));
       font-weight: 700;
       color: var(--dark-amber);
       font-variant-numeric: tabular-nums;
     }
     .fx-result-delta {
       margin-top: 4px;
-      font-size: 11px;
+      font-size: calc(11px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       font-variant-numeric: tabular-nums;
     }
     .fx-stress-note {
-      font-size: 10px;
+      font-size: calc(10px * var(--font-scale, 1));
       color: var(--dark-text-muted);
       line-height: 1.4;
       margin: 0;

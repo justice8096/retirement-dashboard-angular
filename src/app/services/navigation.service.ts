@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect } from '@angular/core';
 import {
   NavMode,
   FontSize,
@@ -26,6 +26,19 @@ export class NavigationService {
   );
 
   readonly fontSizeBase = computed(() => FONT_SIZES[this.fontSize()].base);
+
+  /** Ratio of the chosen base to the normal base (1 / ~1.231 / ~1.462). */
+  readonly fontScale = computed(() => this.fontSizeBase() / FONT_SIZES.normal.base);
+
+  constructor() {
+    // Publish the scale on :root so ALL app text sizes — screen cards
+    // included, not just the nav chrome's inline bindings — grow with the
+    // Display → Font Size setting. Stylesheets consume it as
+    // `font-size: calc(<n>px * var(--font-scale, 1))`.
+    effect(() => {
+      document.documentElement.style.setProperty('--font-scale', String(this.fontScale()));
+    });
+  }
 
   readonly railWidth = computed(() =>
     this.navMode() === 'compact' ? 52 : 180

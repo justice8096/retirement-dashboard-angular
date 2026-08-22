@@ -124,7 +124,7 @@ export class NumericInputDirective implements OnInit, OnDestroy {
       'padding: 0 6px',
       'height: 24px',
       'min-width: 28px',
-      'font-size: 13px',
+      'font-size: calc(13px * var(--font-scale, 1))',
       'border: 1px solid var(--dark-border)',
       'background: var(--dark-bg-secondary)',
       'color: var(--dark-text)',

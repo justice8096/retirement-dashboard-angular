@@ -88,7 +88,7 @@ import { Component, EventEmitter, Output, HostListener, ChangeDetectionStrategy 
       margin-bottom: 14px;
     }
     h2 {
-      font-size: 18px;
+      font-size: calc(18px * var(--font-scale, 1));
       margin: 0;
       color: var(--dark-text);
     }
@@ -96,7 +96,7 @@ import { Component, EventEmitter, Output, HostListener, ChangeDetectionStrategy 
       background: transparent;
       border: none;
       color: var(--dark-text-sec);
-      font-size: 24px;
+      font-size: calc(24px * var(--font-scale, 1));
       cursor: pointer;
       padding: 2px 8px;
       border-radius: 4px;
@@ -105,7 +105,7 @@ import { Component, EventEmitter, Output, HostListener, ChangeDetectionStrategy 
     .close:hover { background: var(--dark-bg-secondary); color: var(--dark-text); }
     section { margin-bottom: 16px; }
     h3 {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -119,11 +119,11 @@ import { Component, EventEmitter, Output, HostListener, ChangeDetectionStrategy 
       margin: 0;
     }
     dt {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       white-space: nowrap;
     }
     dd {
-      font-size: 14px;
+      font-size: calc(14px * var(--font-scale, 1));
       color: var(--dark-text-sec);
       line-height: 1.5;
       margin: 0;
@@ -131,7 +131,7 @@ import { Component, EventEmitter, Output, HostListener, ChangeDetectionStrategy 
     kbd {
       display: inline-block;
       padding: 2px 6px;
-      font-size: 12px;
+      font-size: calc(12px * var(--font-scale, 1));
       font-weight: 600;
       color: var(--dark-text);
       background: var(--dark-bg-secondary);
