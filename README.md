@@ -1,10 +1,16 @@
 # retirement-dashboard-angular
 
-Angular 19 SPA for retirement planning — scenarios, Monte Carlo
-simulation, ACA modeling, cost-of-living comparison across 88
-locations. Built as the frontend for
+Angular 22 SPA for retirement planning — scenarios, Monte Carlo
+simulation, ACA modeling, cost-of-living comparison across 160+
+locations. **This is the sole dashboard** (the earlier React dashboard
+was archived 2026-08 after the ecosystem consolidation). Built as the
+frontend for
 [`retirement-api`](https://github.com/justice8096/retirement-api);
-the two ship together but can be reviewed independently.
+the two ship together but can be reviewed independently. The Monte
+Carlo engine and calculation helpers come from the `@retirement/shared`
+package that lives in retirement-api (`file:../retirement-api/shared`) —
+CI checks out both repos as siblings, and Docker builds receive the
+package via a BuildKit additional context.
 
 [![CI](https://github.com/justice8096/retirement-dashboard-angular/actions/workflows/ci.yml/badge.svg)](https://github.com/justice8096/retirement-dashboard-angular/actions/workflows/ci.yml)
 [![Dyscalculia A](https://img.shields.io/badge/Dyscalculia-A_(93%2F100)-brightgreen)](audits/Dyscalculia-Compliance-Audit-retirement-dashboard-angular-2026-04-20.md)
