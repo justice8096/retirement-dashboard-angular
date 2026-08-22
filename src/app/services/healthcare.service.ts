@@ -1,4 +1,4 @@
-import { Injectable, inject, computed, signal } from '@angular/core';
+import { Injectable, inject, computed, signal, effect } from '@angular/core';
 import { ApiService } from './api.service';
 import { LocationService } from './location.service';
 import { TaxService } from './tax.service';
@@ -8,6 +8,7 @@ import {
   applicablePctCliff2026 as applicablePctCliff,
 } from '@retirement/shared/engine/aca-constants.js';
 import { apportion as apportionPure, ApportionStrategy as PureApportionStrategy } from '../lib/apportion';
+import { taxableSocialSecurity } from '../lib/taxable-social-security';
 
 export type ApportionStrategy = PureApportionStrategy;
 
@@ -122,6 +123,17 @@ export class HealthcareService {
   readonly household = signal<HouseholdProfile | null>(null);
   readonly financial = signal<FinancialSettings | null>(null);
   readonly loaded = signal(false);
+
+  constructor() {
+    // Push the SS slice of the income composition into TaxService so its
+    // bracket calc (converged totals, location compare) taxes only the
+    // IRC §86 portion of Social Security. One-way push — TaxService can't
+    // inject this service without a DI cycle.
+    effect(() => {
+      const i = this.income();
+      this.taxSvc.ssContext.set({ ssAnnual: i.ssAnnual, filingStatus: i.filingStatus });
+    });
+  }
 
   /** Auto-apportion mode — when not 'manual', traditional/Roth/taxable get derived. */
   readonly apportionStrategy = signal<ApportionStrategy>('manual');
@@ -390,20 +402,7 @@ export class HealthcareService {
     const taxableBrokerage = b.taxableBrokerageAnnual * b.taxableBrokerageTaxablePct;
     const taxableBase = b.traditionalAnnual + taxableBrokerage + b.pensionAnnual;
 
-    const thresholds = b.filingStatus === 'joint' ? [32_000, 44_000] : [25_000, 34_000];
-    const provisional = taxableBase + 0.5 * b.ssAnnual;
-
-    let taxableSS = 0;
-    if (provisional > thresholds[0]) {
-      const tier1 = Math.min(0.5 * b.ssAnnual, 0.5 * (provisional - thresholds[0]));
-      taxableSS = tier1;
-      if (provisional > thresholds[1]) {
-        const tier2Cap = 0.85 * b.ssAnnual - tier1;
-        const tier2Provisional = 0.85 * (provisional - thresholds[1]);
-        taxableSS = tier1 + Math.max(0, Math.min(tier2Cap, tier2Provisional));
-      }
-      taxableSS = Math.min(taxableSS, 0.85 * b.ssAnnual);
-    }
+    const taxableSS = taxableSocialSecurity(b.ssAnnual, taxableBase, b.filingStatus);
 
     const agi = taxableBase + taxableSS;
     const magiForAca = taxableBase + b.ssAnnual; // AGI + non-taxable portion of SS

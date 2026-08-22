@@ -1,7 +1,15 @@
-import { Injectable, inject, computed } from '@angular/core';
+import { Injectable, inject, computed, signal } from '@angular/core';
 import { LocationService } from './location.service';
 import { LocationFull, IncomeTaxTable, COST_CATEGORIES } from '@models/api.model';
 import { FED_BRACKETS_2026_MFJ, FED_STD_DEDUCTION_2026 } from '@retirement/shared/engine/tax-sources.js';
+import { taxableSocialSecurity, type SsFilingStatus } from '../lib/taxable-social-security';
+
+/** How much of the annual income is Social Security, and the filing status
+ *  for the IRC §86 thresholds. */
+export interface SsIncomeContext {
+  ssAnnual: number;
+  filingStatus: SsFilingStatus;
+}
 
 /** US-state location heuristic — drives the shared 2026-MFJ federal fallback
  *  when the seed doesn't ship location-level federal brackets (most don't). */
@@ -21,6 +29,15 @@ function isUsLocation(loc: LocationFull): boolean {
 @Injectable({ providedIn: 'root' })
 export class TaxService {
   private readonly loc = inject(LocationService);
+
+  /**
+   * SS portion of the household income, pushed by HealthcareService whenever
+   * its income composition changes (Healthcare → Tax dependency direction —
+   * TaxService cannot inject HealthcareService without a DI cycle). Used as
+   * the default `ss` context by convergedTotals / totalWithIncomeTax so the
+   * bracket calc taxes only the IRC §86 portion of Social Security.
+   */
+  readonly ssContext = signal<SsIncomeContext>({ ssAnnual: 0, filingStatus: 'joint' });
 
   /**
    * Normalize a rate that might be stored as a decimal fraction (0.22) or a
@@ -84,12 +101,23 @@ export class TaxService {
    * Uses federal + state brackets when available (US locations); otherwise
    * falls back to stored tax line, then VAT convergence, then zero.
    */
-  computeIncomeTax(loc: LocationFull, annualIncome: number): {
+  computeIncomeTax(loc: LocationFull, annualIncome: number, ss?: SsIncomeContext): {
     monthlyTax: number;
     federalAnnual: number;
     stateAnnual: number;
+    taxableSSAnnual: number;
     source: 'brackets' | 'stored' | 'vat-converged' | 'none';
   } {
+    // SS-aware bracket base: only the IRC §86 portion of the Social Security
+    // benefit is ordinary income. OPT-IN via `ss` — the healthcare/MAGI
+    // solver passes an already-adjusted AGI and must not adjust twice.
+    let bracketIncome = annualIncome;
+    let taxableSSAnnual = 0;
+    if (ss && ss.ssAnnual > 0) {
+      const other = Math.max(0, annualIncome - ss.ssAnnual);
+      taxableSSAnnual = taxableSocialSecurity(ss.ssAnnual, other, ss.filingStatus);
+      bracketIncome = other + taxableSSAnnual;
+    }
     const t = loc.taxes;
     // US locations: apply the shared 2026 MFJ federal table when the seed
     // doesn't ship federal brackets. Matches what retirement-api/shared/
@@ -105,24 +133,25 @@ export class TaxService {
             brackets: FED_BRACKETS_2026_MFJ,
             standardDeduction: FED_STD_DEDUCTION_2026.mfj,
           } : undefined);
-      const fed = this.applyBrackets(fedTable, annualIncome);
-      const state = this.applyBrackets(t?.stateIncomeTax, annualIncome);
+      const fed = this.applyBrackets(fedTable, bracketIncome);
+      const state = this.applyBrackets(t?.stateIncomeTax, bracketIncome);
       return {
         monthlyTax: (fed + state) / 12,
         federalAnnual: fed,
         stateAnnual: state,
+        taxableSSAnnual,
         source: 'brackets',
       };
     }
     const stored = loc.monthlyCosts['taxes']?.typical ?? 0;
     if (stored > 0) {
-      return { monthlyTax: stored, federalAnnual: 0, stateAnnual: 0, source: 'stored' };
+      return { monthlyTax: stored, federalAnnual: 0, stateAnnual: 0, taxableSSAnnual: 0, source: 'stored' };
     }
     const conv = this.computeConvergedTotal(loc);
     if (conv.tax > 0) {
-      return { monthlyTax: conv.tax, federalAnnual: 0, stateAnnual: 0, source: 'vat-converged' };
+      return { monthlyTax: conv.tax, federalAnnual: 0, stateAnnual: 0, taxableSSAnnual: 0, source: 'vat-converged' };
     }
-    return { monthlyTax: 0, federalAnnual: 0, stateAnnual: 0, source: 'none' };
+    return { monthlyTax: 0, federalAnnual: 0, stateAnnual: 0, taxableSSAnnual: 0, source: 'none' };
   }
 
   /**
@@ -140,7 +169,7 @@ export class TaxService {
     const healthcare = opts?.healthcareMonthly
       ?? (loc.monthlyCosts?.['healthcare']?.typical ?? 0);
     const baseMonthly = nonHealthcare + healthcare;
-    const tax = this.computeIncomeTax(loc, this.loc.annualIncome());
+    const tax = this.computeIncomeTax(loc, this.loc.annualIncome(), this.ssContext());
     return {
       total: baseMonthly + tax.monthlyTax,
       baseMonthly,
@@ -157,9 +186,10 @@ export class TaxService {
    */
   readonly convergedTotals = computed(() => {
     const income = this.loc.annualIncome();
+    const ss = this.ssContext();
     return this.loc.selectedFullLocations().map(l => {
       const conv = this.computeConvergedTotal(l);
-      const inc = this.computeIncomeTax(l, income);
+      const inc = this.computeIncomeTax(l, income, ss);
       // Avoid double-counting: only add bracket-computed income tax on top.
       // Stored/VAT values are already in conv.total via untaxedBase (taxes
       // category) or conv.tax (VAT-converged).
@@ -175,6 +205,7 @@ export class TaxService {
         tax: conv.tax + addIncomeTax,
         incomeTax: inc.monthlyTax,
         incomeTaxSource: inc.source,
+        taxableSSAnnual: inc.taxableSSAnnual,
       };
     });
   });
