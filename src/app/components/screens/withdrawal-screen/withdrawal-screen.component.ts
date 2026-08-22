@@ -22,11 +22,10 @@ import {
  *  (Dashboard Dyscalculia F-007) — reuses `/api/glossary` entries rather
  *  than redefining descriptions inline. `fixed`/`constant` both map to the
  *  general safe-withdrawal-rate entry; there's no dedicated glossary term
- *  for "constant percentage" specifically. `cape` has no glossary entry at
- *  all yet (the API's `/api/glossary` route doesn't define one) — mapped
- *  here anyway so it picks one up automatically if the glossary ever adds
- *  it; `strategyDescription()` below falls back to `CAPE_FALLBACK_DESC` in
- *  the meantime. */
+ *  for "constant percentage" specifically. `/api/glossary` now defines a
+ *  `cape` term too (added alongside the API's persisted `cape` strategy
+ *  support), but `strategyDescription()` below still falls back to
+ *  `CAPE_FALLBACK_DESC` if an older API build hasn't picked it up yet. */
 const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
   fixed: 'safe_withdrawal_rate',
   constant: 'safe_withdrawal_rate',
@@ -37,10 +36,10 @@ const STRATEGY_GLOSSARY_KEY: Record<ComparisonStrategy, string> = {
   cape: 'cape',
 };
 
-/** Fallback description for CAPE only, used until `/api/glossary` defines a
- *  `cape` term. Text matches the retired React `WithdrawalTab.tsx`'s own
- *  inline description for this strategy, since that's the only existing
- *  plain-language source for it. */
+/** Fallback description for CAPE, used only if `/api/glossary` hasn't
+ *  loaded its `cape` term (e.g. an older API build). Text matches the
+ *  retired React `WithdrawalTab.tsx`'s own inline description for this
+ *  strategy, since that's the only existing plain-language source for it. */
 const CAPE_FALLBACK_DESC =
   'Withdrawal rate adjusts based on the Shiller CAPE ratio — higher market valuations mean lower withdrawal rates.';
 
@@ -177,9 +176,9 @@ const CAPE_FALLBACK_DESC =
         <div class="card note">
           <span class="note-icon">ⓘ</span>
           <span>
-            CAPE (Shiller PE) can be compared here, but can't yet be saved as your
-            strategy of record above — the saved-strategy API doesn't have a CAPE
-            option yet, even though the comparison math now supports it.
+            Every strategy here, including CAPE (Shiller PE), is exploratory only —
+            this comparison view doesn't write back to your saved strategy above,
+            no matter which one you pick.
           </span>
         </div>
 
