@@ -177,6 +177,30 @@ export class MonteCarloStateService {
   readonly survivorRelocateEnabled = signal(false);
   readonly survivorRelocateLocationId = signal<string>('');
   readonly survivorRelocateMoveCostUSD = signal(0);
+  /* --- RMD / Roth conversions / IRMAA (engine #177, #179, #180) --- */
+  readonly rmdEnabled = signal(false);
+  readonly rmdTaxMode = signal<'flat' | 'bracket'>('bracket');
+  readonly rmdWithdrawalOrder = signal<'traditional-first' | 'other-first'>('traditional-first');
+  /** Flat-mode effective rate on forced RMD excess and conversions, percent. */
+  readonly rmdEffectiveTaxRate = signal(22);
+  /** Conversion schedule as inclusive sim-year ranges, nominal USD per year. */
+  readonly rothConversions = signal<{ fromYear: number; toYear: number; amountUSD: number }[]>([]);
+  readonly irmaaEnabled = signal(false);
+  readonly irmaaPartD = signal(true);
+  /** Household MAGI two years and one year before the planning start (nominal USD). */
+  readonly irmaaPriorMagi2 = signal(0);
+  readonly irmaaPriorMagi1 = signal(0);
+  /** Per-sim-year conversion array for the kernel, expanded from the ranges. */
+  readonly rothConversionByYear = computed<number[]>(() => {
+    const years = this.years();
+    const out = new Array<number>(years).fill(0);
+    for (const c of this.rothConversions()) {
+      const from = Math.max(0, Math.floor(c.fromYear));
+      const to = Math.min(years - 1, Math.floor(c.toYear));
+      for (let y = from; y <= to; y++) out[y] += Math.max(0, c.amountUSD);
+    }
+    return out;
+  });
 
   /* ─── Results + stale-results flag ─────────────────────────────── */
   readonly results = signal<MonteCarloResult | null>(null);

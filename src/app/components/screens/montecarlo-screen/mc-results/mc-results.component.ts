@@ -1,4 +1,4 @@
-import { Component, inject, signal, effect, untracked, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, computed, effect, untracked, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { ApiService } from '@services/api.service';
 import { DyscalculiaService } from '@services/dyscalculia.service';
@@ -153,6 +153,15 @@ export class McResultsComponent {
       survivorRelocateEnabled: s.survivorRelocateEnabled(),
       survivorRelocateLocationId: s.survivorRelocateLocationId(),
       survivorRelocateMoveCostUSD: s.survivorRelocateMoveCostUSD(),
+      rmdEnabled: s.rmdEnabled(),
+      rmdTaxMode: s.rmdTaxMode(),
+      rmdWithdrawalOrder: s.rmdWithdrawalOrder(),
+      rmdEffectiveTaxRate: s.rmdEffectiveTaxRate(),
+      rothConversions: s.rothConversions(),
+      irmaaEnabled: s.irmaaEnabled(),
+      irmaaPartD: s.irmaaPartD(),
+      irmaaPriorMagi2: s.irmaaPriorMagi2(),
+      irmaaPriorMagi1: s.irmaaPriorMagi1(),
     });
 
     this.api.createScenario({ name, scenarioData }).subscribe({
@@ -175,6 +184,72 @@ export class McResultsComponent {
    *  Rebuilds the charts into a single self-contained SVG (no external CSS
    *  dependency), rasterizes via a data-URL Image → canvas pipeline, then
    *  triggers a browser download. */
+  /* --- RMD / conversion / IRMAA pass (engine #177, #179, #180) --- */
+  protected readonly rmdChartW = 600;
+  protected readonly rmdChartH = 160;
+
+  protected readonly rmdStartYear = computed(() =>
+    this.state.household()?.planningStartYear ?? new Date().getFullYear());
+
+  protected readonly rmdTotals = computed(() => {
+    const m = this.state.results()?.rmd;
+    const sum = (a: number[] | undefined) => (a ?? []).reduce((s, v) => s + v, 0);
+    return {
+      rmdTax: sum(m?.meanTaxByYear),
+      conversions: sum(m?.meanConversionByYear),
+      conversionTax: sum(m?.meanConversionTaxByYear),
+      irmaa: sum(m?.meanIrmaaByYear),
+    };
+  });
+
+  protected readonly rmdFirst = computed(() => {
+    const g = this.state.results()?.rmd?.meanGrossByYear ?? [];
+    const i = g.findIndex(v => v > 0);
+    return i >= 0 ? { year: this.rmdStartYear() + i, amount: g[i] } : { year: 0, amount: 0 };
+  });
+
+  protected readonly rmdPeak = computed(() => {
+    const g = this.state.results()?.rmd?.meanGrossByYear ?? [];
+    let best = 0;
+    for (let i = 1; i < g.length; i++) if (g[i] > g[best]) best = i;
+    return g.length ? { year: this.rmdStartYear() + best, amount: g[best] } : { year: 0, amount: 0 };
+  });
+
+  protected readonly rmdChartMax = computed(() => {
+    const m = this.state.results()?.rmd;
+    if (!m) return 0;
+    let max = 0;
+    for (let i = 0; i < m.meanGrossByYear.length; i++) {
+      max = Math.max(max, m.meanGrossByYear[i] + (m.meanConversionByYear[i] ?? 0));
+    }
+    return max;
+  });
+
+  /** Stacked bars per sim year: conversions (bottom) and gross RMD (top). */
+  protected readonly rmdBars = computed(() => {
+    const m = this.state.results()?.rmd;
+    if (!m) return [] as { x: number; w: number; yConv: number; hConv: number; yRmd: number; hRmd: number }[];
+    const n = m.meanGrossByYear.length;
+    const max = this.rmdChartMax() || 1;
+    const top = 16;
+    const bottom = this.rmdChartH - 18;
+    const plotH = bottom - top;
+    const slot = this.rmdChartW / Math.max(1, n);
+    const w = Math.max(1, slot * 0.7);
+    return m.meanGrossByYear.map((rmd, i) => {
+      const conv = m.meanConversionByYear[i] ?? 0;
+      const hConv = (conv / max) * plotH;
+      const hRmd = (rmd / max) * plotH;
+      return {
+        x: i * slot + (slot - w) / 2,
+        w,
+        yConv: bottom - hConv,
+        hConv,
+        yRmd: bottom - hConv - hRmd,
+        hRmd,
+      };
+    });
+  });
   protected saveChartsPng(): void {
     const r = this.state.results();
     if (!r) return;

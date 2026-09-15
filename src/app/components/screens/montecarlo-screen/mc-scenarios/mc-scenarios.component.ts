@@ -162,6 +162,37 @@ export class McScenariosComponent {
     );
   }
 
+  /* --- Roth conversion schedule (RMD pass, engine #177/#179) --- */
+
+  /** Add a conversion range: defaults to years 1-7 at $80K/yr (the common
+   *  "fill the 12% bracket before RMDs start" shape). */
+  protected addRothConversion(): void {
+    const current = this.state.rothConversions();
+    const lastTo = current.length ? current[current.length - 1].toYear : 0;
+    const from = Math.min(this.state.years() - 1, current.length ? lastTo + 1 : 1);
+    const to = Math.min(this.state.years() - 1, from + 6);
+    this.state.rothConversions.set([...current, { fromYear: from, toYear: to, amountUSD: 80000 }]);
+    this.state.rmdEnabled.set(true);
+  }
+
+  protected removeRothConversion(idx: number): void {
+    this.state.rothConversions.update(list => list.filter((_, i) => i !== idx));
+  }
+
+  protected patchRothConversion(
+    idx: number,
+    partial: Partial<{ fromYear: number; toYear: number; amountUSD: number }>,
+  ): void {
+    this.state.rothConversions.update(list =>
+      list.map((c, i) => i === idx ? { ...c, ...partial } : c),
+    );
+  }
+
+  /** Calendar year for a sim year, for labels. */
+  protected calYear(simYear: number): number {
+    return (this.state.household()?.planningStartYear ?? new Date().getFullYear()) + simYear;
+  }
+
   /* ─── One-time incomes (#31 priority 2 — inheritance / payouts) ── */
 
   /** Add a one-time income row — defaults to year 10, $100K, "Inheritance",

@@ -111,6 +111,44 @@
     </div>
   }
 
+  <!-- RMD / Roth conversion / IRMAA pass -->
+  @if (r.rmd; as m) {
+  <div class="card">
+    <h3 class="card-title">RMDs, Conversions and IRMAA</h3>
+    <div class="results-grid">
+      <div class="result-card">
+        <div class="result-label">After-Tax Median</div>
+        <div class="result-value" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(m.afterTax.median) }}</div>
+        <div class="result-sub">net of deferred tax on the remaining pre-tax balance; {{ (m.afterTax.successRate * 100).toFixed(0) }}% of futures above $0 after tax</div>
+      </div>
+      <div class="result-card">
+        <div class="result-label">First RMD</div>
+        <div class="result-value" [class]="dyscalculia.numberSpacingClass()">{{ rmdFirst().year > 0 ? fmtK(rmdFirst().amount) : 'none' }}</div>
+        <div class="result-sub">@if (rmdFirst().year > 0) { in {{ rmdFirst().year }}, peaking at {{ fmtK(rmdPeak().amount) }} in {{ rmdPeak().year }} } @else { no RMD within the horizon }</div>
+      </div>
+      <div class="result-card">
+        <div class="result-label">Lifetime RMD Tax</div>
+        <div class="result-value" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(rmdTotals().rmdTax) }}</div>
+        <div class="result-sub">on forced excess only (mean across simulations)</div>
+      </div>
+      <div class="result-card">
+        <div class="result-label">Conversions / Tax</div>
+        <div class="result-value" [class]="dyscalculia.numberSpacingClass()">{{ fmtK(rmdTotals().conversions) }} / {{ fmtK(rmdTotals().conversionTax) }}</div>
+        <div class="result-sub">effective {{ rmdTotals().conversions > 0 ? (100 * rmdTotals().conversionTax / rmdTotals().conversions).toFixed(1) + '%' : 'n/a' }}; IRMAA {{ fmtK(rmdTotals().irmaa) }}</div>
+      </div>
+    </div>
+    <svg [attr.viewBox]="'0 0 ' + rmdChartW + ' ' + rmdChartH" class="chart-svg" role="img" aria-label="RMD and conversion by year">
+      @for (b of rmdBars(); track $index) {
+        <rect [attr.x]="b.x" [attr.y]="b.yConv" [attr.width]="b.w" [attr.height]="b.hConv" fill="#3AA0A0" />
+        <rect [attr.x]="b.x" [attr.y]="b.yRmd" [attr.width]="b.w" [attr.height]="b.hRmd" fill="#E8B86D" />
+      }
+      <text [attr.x]="4" [attr.y]="12" class="axis-text">{{ fmt(rmdChartMax(), '') }}</text>
+      <text [attr.x]="4" [attr.y]="rmdChartH - 4" class="axis-text">{{ rmdStartYear() }}</text>
+      <text [attr.x]="rmdChartW - 4" [attr.y]="rmdChartH - 4" text-anchor="end" class="axis-text">{{ rmdStartYear() + state.years() - 1 }}</text>
+      <text [attr.x]="rmdChartW - 4" [attr.y]="12" text-anchor="end" class="axis-text">teal = conversions, amber = gross RMD (mean, nominal)</text>
+    </svg>
+  </div>
+  }
   <!-- Paths chart -->
   @if (showStep(6)) {
   <div class="card">
