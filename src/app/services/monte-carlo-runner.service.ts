@@ -259,6 +259,23 @@ export class MonteCarloRunnerService implements OnDestroy {
       survivorMedicareMonthly: s.spouseDeathEnabled() ? s.survivorMonthlyMedicare() : undefined,
       survivorBirthYear: s.spouseDeathEnabled() ? (s.survivorBirthYear() ?? undefined) : undefined,
       survivorStepUpBenefitUSD: s.spouseDeathEnabled() ? s.survivorStepUpBenefitUSD() : undefined,
+      // Social Security slice of income: bracket-mode tax and IRMAA read it.
+      // Inert for the scheduled-cut path without ssCutSimYear.
+      ssMonthlyIncome: s.ssMonthly(),
+      // RMD / Roth conversions / IRMAA (engine #177, #179, #180). The
+      // household pre-tax balance from FinancialSettings is assigned to the
+      // first adult; a per-owner split is a follow-up.
+      rmdEnabled: s.rmdEnabled(),
+      traditionalBalance: s.rmdEnabled() ? (f.traditionalBalance ?? s.portfolio()) : undefined,
+      rmdTaxMode: s.rmdEnabled() ? s.rmdTaxMode() : undefined,
+      rmdWithdrawalOrder: s.rmdEnabled() ? s.rmdWithdrawalOrder() : undefined,
+      rmdEffectiveTaxRate: s.rmdEffectiveTaxRate() / 100,
+      rothConversionByYear: s.rmdEnabled() ? s.rothConversionByYear() : undefined,
+      irmaaEnabled: s.rmdEnabled() && s.irmaaEnabled(),
+      irmaaPartD: s.irmaaPartD(),
+      irmaaPriorMagi: (s.irmaaPriorMagi2() > 0 || s.irmaaPriorMagi1() > 0)
+        ? [s.irmaaPriorMagi2(), s.irmaaPriorMagi1()]
+        : undefined,
       partTimeMonthlyIncome: s.partTimeMonthlyIncome(),
       partTimeEndYear: s.partTimeEndYear(),
       // Rental Schedule E income (Todo #34, Stage 4b of #29). Pass-through

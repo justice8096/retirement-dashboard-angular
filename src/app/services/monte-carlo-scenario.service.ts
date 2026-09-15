@@ -54,6 +54,15 @@ export interface MonteCarloScenarioParams {
   survivorStepUpLtcgRate: number;
   survivorRelocateEnabled: boolean;
   survivorRelocateLocationId: string;
+  rmdEnabled: boolean;
+  rmdTaxMode: string;
+  rmdWithdrawalOrder: string;
+  rmdEffectiveTaxRate: number;
+  rothConversions: unknown;
+  irmaaEnabled: boolean;
+  irmaaPartD: boolean;
+  irmaaPriorMagi2: number;
+  irmaaPriorMagi1: number;
   survivorRelocateMoveCostUSD: number;
 }
 

@@ -341,6 +341,119 @@
   }
 </div>
 
+<!-- Required Minimum Distributions and Roth conversions -->
+<div class="card death-card">
+  <h3 class="card-title">RMDs and Roth Conversions</h3>
+  <p class="card-sub">
+    Tracks your pre-tax (traditional IRA / 401k) balance separately so Required Minimum
+    Distributions apply from age 73 (born 1951-1959) or 75 (born 1960 or later). Only the
+    forced part of a distribution is taxed: the RMD above what you already drew from
+    pre-tax money that year. Roth conversions move money out of the pre-tax bucket,
+    pay tax now, and shrink later RMDs. Bracket mode stacks each amount on your Social
+    Security and other income with real federal tables; flat mode uses one rate.
+  </p>
+
+  <label class="moves-toggle">
+    <input type="checkbox"
+      [checked]="state.rmdEnabled()"
+      (change)="state.rmdEnabled.set(!state.rmdEnabled())" />
+    <span>Model RMDs and conversions in the next run</span>
+  </label>
+
+  @if (state.rmdEnabled()) {
+    <div class="death-grid">
+      <label class="param">
+        <span class="param-label">Tax method</span>
+        <select class="param-input"
+          [ngModel]="state.rmdTaxMode()" (ngModelChange)="state.rmdTaxMode.set($event)">
+          <option value="bracket">Bracket-stacked (federal tables, SS torpedo)</option>
+          <option value="flat">Flat effective rate</option>
+        </select>
+      </label>
+      @if (state.rmdTaxMode() === 'flat') {
+        <label class="param">
+          <span class="param-label">Effective rate (%)</span>
+          <input appNumeric="percent" class="param-input" min="0" max="60" step="1"
+            [ngModel]="state.rmdEffectiveTaxRate()" (ngModelChange)="state.rmdEffectiveTaxRate.set(+$event)" />
+          <span class="param-hint">Applied to forced RMD excess and to conversions.</span>
+        </label>
+      }
+      <label class="param">
+        <span class="param-label">Spending draws come from</span>
+        <select class="param-input"
+          [ngModel]="state.rmdWithdrawalOrder()" (ngModelChange)="state.rmdWithdrawalOrder.set($event)">
+          <option value="traditional-first">Pre-tax first (shrinks future RMDs)</option>
+          <option value="other-first">Taxable and Roth first (maximizes RMDs)</option>
+        </select>
+      </label>
+    </div>
+    <p class="param-hint">
+      Pre-tax balance comes from Settings (traditional balance); if it is blank the whole
+      portfolio is treated as pre-tax.
+    </p>
+
+    <h4 class="card-title">Conversion schedule (nominal $ per year)</h4>
+    @for (c of state.rothConversions(); track $index; let i = $index) {
+      <div class="timeline-row">
+        <label class="tl-field">
+          <span class="tl-small-label">From year</span>
+          <input appNumeric="age" class="tl-input" min="0" [max]="state.years() - 1"
+            [ngModel]="c.fromYear"
+            (ngModelChange)="patchRothConversion(i, { fromYear: +$event })" />
+        </label>
+        <label class="tl-field">
+          <span class="tl-small-label">To year</span>
+          <input appNumeric="age" class="tl-input" min="0" [max]="state.years() - 1"
+            [ngModel]="c.toYear"
+            (ngModelChange)="patchRothConversion(i, { toYear: +$event })" />
+        </label>
+        <label class="tl-field">
+          <span class="tl-small-label">Amount per year ($)</span>
+          <input appNumeric="currency" class="tl-input" step="5000"
+            [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="c.amountUSD"
+            (ngModelChange)="patchRothConversion(i, { amountUSD: +$event })" />
+        </label>
+        <span class="tl-small-label">{{ calYear(c.fromYear) }} to {{ calYear(c.toYear) }}</span>
+        <button class="tl-remove" (click)="removeRothConversion(i)" aria-label="Remove conversion range">X</button>
+      </div>
+    }
+    <button mat-stroked-button class="add-move-btn" (click)="addRothConversion()">
+      + Add Conversion Range
+    </button>
+
+    <h4 class="card-title">Medicare IRMAA</h4>
+    <label class="moves-toggle">
+      <input type="checkbox"
+        [checked]="state.irmaaEnabled()"
+        (change)="state.irmaaEnabled.set(!state.irmaaEnabled())" />
+      <span>Charge IRMAA surcharges from the simulated MAGI (two-year lookback)</span>
+    </label>
+    @if (state.irmaaEnabled()) {
+      <div class="death-grid">
+        <label class="param">
+          <span class="param-label">MAGI two years before start ($)</span>
+          <input appNumeric="currency" class="param-input" min="0" step="1000"
+            [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="state.irmaaPriorMagi2()" (ngModelChange)="state.irmaaPriorMagi2.set(+$event)" />
+          <span class="param-hint">Sets the first Medicare year's premium. Leave 0 to use the simulated year-0 MAGI.</span>
+        </label>
+        <label class="param">
+          <span class="param-label">MAGI one year before start ($)</span>
+          <input appNumeric="currency" class="param-input" min="0" step="1000"
+            [class]="dyscalculia.numberSpacingClass()"
+            [ngModel]="state.irmaaPriorMagi1()" (ngModelChange)="state.irmaaPriorMagi1.set(+$event)" />
+        </label>
+        <label class="moves-toggle">
+          <input type="checkbox"
+            [checked]="state.irmaaPartD()"
+            (change)="state.irmaaPartD.set(!state.irmaaPartD())" />
+          <span>Include the Part D surcharge</span>
+        </label>
+      </div>
+    }
+  }
+</div>
 <!-- Long-Term Care planning -->
 <div class="card death-card">
   <h3 class="card-title">Long-Term Care</h3>
